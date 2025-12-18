@@ -1,0 +1,1993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In-Browser HTML/CSS Visual Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            color: #ccc;
+            background-color: #1e1e1e;
+        }
+        #main-container {
+            display: grid;
+            grid-template-rows: 32px 1fr;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #1e1e1e;
+        }
+        #content-area {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            overflow: hidden;
+        }
+        #preview-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: #ffffff;
+            border-right: 1px solid #333;
+        }
+        #file-input {
+            display: none;
+        }
+        #top-bar {
+            background-color: #2d2d2d; 
+            border-bottom: 1px solid #444; 
+            padding: 0 5px;
+            height: 32px;
+        }
+        #top-bar h1 {
+            color: #f0f0f0;
+        }
+        #top-bar label, #top-bar button, #top-bar select {
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 0; 
+            box-shadow: none; 
+            transition: background-color 0.1s;
+        }
+        #top-bar label, #top-bar select {
+            background-color: #555;
+            color: white;
+            border: 1px solid #666;
+            cursor: pointer;
+        }
+        #top-bar label:hover, #top-bar select:hover {
+            background-color: #666;
+        }
+        #top-bar button:hover {
+            opacity: 0.9;
+        }
+        #inspector-panel {
+            overflow-y: auto;
+            background-color: #1e1e1e; 
+            padding: 5px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        .inspector-group {
+            margin-bottom: 8px;
+            padding: 4px;
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+        }
+        .inspector-group h3 {
+            color: #ddd;
+            padding-bottom: 3px;
+        }
+        .inspector-group button {
+            border-radius: 0;
+        }
+        #inspector-panel input, #inspector-panel select, #inspector-panel textarea {
+            padding: 2px;
+            font-size: 11px;
+            border-radius: 0;
+            border: 1px solid #444;
+            background-color: #3e3e3e;
+            color: #ddd;
+        }
+        #inspector-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 4px;
+            margin-bottom: 0;
+        }
+        .tab-button {
+            padding: 4px 6px;
+            border: 1px solid #444;
+            border-bottom: none;
+            background-color: #2d2d2d;
+            color: #ccc;
+            font-size: 10px;
+            margin-right: -1px;
+            flex-grow: 1;
+            flex-basis: auto;
+            min-width: fit-content;
+        }
+        .tab-button.active {
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #1e1e1e;
+            color: #fff;
+        }
+        .tab-content {
+            display: none;
+            border: 1px solid #444;
+            padding: 8px;
+            background-color: #1e1e1e;
+            margin-top: -1px; 
+            color: #ccc;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        #inspector-panel select {
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23cccccc'%3e%3cpath d='M7 7l3 3 3-3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.5em;
+            padding-right: 2.5rem !important;
+            appearance: none;
+        }
+        .attribute-input {
+            width: 48%;
+        }
+        .hierarchy-item {
+            cursor: pointer;
+            padding: 2px 4px;
+            white-space: nowrap;
+            display: block;
+            margin: 1px 0;
+        }
+        .hierarchy-item:hover {
+            background-color: #3e3e3e;
+        }
+        .hierarchy-item.active-node {
+            background-color: #f59e0b;
+            color: #1e1e1e;
+            font-weight: bold;
+        }
+        .hierarchy-toggle {
+            display: inline-block;
+            width: 12px;
+            text-align: center;
+            margin-right: 2px;
+            user-select: none;
+            font-weight: bold;
+        }
+        .hierarchy-children {
+            padding-left: 15px;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+            max-height: 500px;
+        }
+        .hierarchy-children.collapsed {
+            max-height: 0;
+        }
+        .class-toggle-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            padding: 2px;
+            background-color: #3e3e3e;
+            border-radius: 0;
+        }
+        .class-toggle-label {
+            flex-grow: 1;
+            font-family: monospace;
+            color: #a7f3d0;
+        }
+        .class-toggle-input {
+            width: 16px;
+            height: 16px;
+            margin-right: 4px;
+        }
+        #js-globals-content {
+            font-family: monospace;
+            font-size: 10px;
+        }
+        .color-input-wrapper input[type="color"] {
+             width: 28px;
+             height: 28px;
+             padding: 0;
+             margin: 0;
+             -webkit-appearance: none;
+             appearance: none;
+             border: none;
+             background: none;
+             cursor: pointer;
+        }
+        .color-input-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+             padding: 0;
+        }
+        .color-input-wrapper input[type="color"]::-webkit-color-swatch {
+             border: 1px solid #444;
+        }
+        /* New Global Styles Tab specific CSS */
+        #global-css-editor {
+            width: 100%; 
+            min-height: 200px; 
+            font-family: monospace; 
+            font-size: 11px;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-sans antialiased">
+
+    <div id="main-container">
+        
+        <header id="top-bar" class="flex items-center justify-between z-10">
+            <h1 class="text-lg font-bold">HTML Inspector v3.6</h1>
+            
+            <div class="flex items-center space-x-1">
+                <select id="quick-style-select" class="text-xs bg-gray-600 border-gray-500 font-semibold h-full">
+                    <option value="">🎨 Quick Style (No Style)</option>
+                    <option value="classic">Classic (Win95 3D)</option>
+                    <option value="neutral">Neutral (Minimal)</option>
+                    <option value="flat">Flat (Modern)</option>
+                </select>
+
+                <label for="file-input" class="cursor-pointer bg-gray-600 hover:bg-gray-700 font-semibold border border-gray-500">
+                    📂 Load File
+                </label>
+                <input type="file" id="file-input" accept=".html">
+
+                <button id="save-button" disabled class="bg-blue-600 hover:bg-blue-700 text-white font-semibold border border-blue-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                    ⬇️ Save & Download
+                </button>
+            </div>
+        </header>
+
+        <div id="content-area">
+            
+            <iframe id="preview-iframe" title="Live HTML Preview" class="flex-grow"></iframe>
+
+            <div id="inspector-panel">
+                <p class="text-xs text-gray-400 mb-1 mt-1">
+                    Selected: <span id="selected-element-tag" class="font-mono text-pink-400 font-bold">&lt;none&gt;</span>
+                </p>
+
+                <div class="inspector-group space-y-1">
+                    <h3 class="font-medium text-sm">Element Management</h3>
+                    
+                    <div class="space-y-0.5">
+                        <label for="new-element-type" class="block text-xs font-medium text-gray-400">Type to Add</label>
+                        <select id="new-element-type" class="w-full">
+                            <option value="div">DIV (Container)</option>
+                            <option value="p">P (Paragraph)</option>
+                            <option value="h2">H2 (Heading)</option>
+                            <option value="button">BUTTON</option>
+                            <option value="a">A (Link)</option>
+                            <option value="input">INPUT (Text)</option>
+                            <option value="img">IMG (Image)</option>
+                            <option value="textarea">TEXTAREA</option>
+                        </select>
+                    </div>
+
+                    <button id="add-element-button" disabled class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 py-0.5 disabled:opacity-50">
+                        + Add Child
+                    </button>
+                    
+                    <div class="flex space-x-1 mt-1">
+                        <button id="delete-element-button" disabled class="w-1/2 bg-red-600 hover:bg-red-700 text-white py-0.5 disabled:opacity-50">
+                            🗑️ Delete
+                        </button>
+                        <button id="duplicate-element-button" disabled class="w-1/2 bg-purple-600 hover:bg-purple-700 text-white py-0.5 disabled:opacity-50">
+                            📋 Duplicate
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-1 bg-gray-700 text-xs border border-gray-600 mb-2 mt-1" id="status-container">
+                    <p id="status-message" class="text-gray-300">Load a file to start editing.</p>
+                </div>
+                
+                <div id="inspector-tabs">
+                    <button class="tab-button active" data-tab="tab-content">Content</button>
+                    <button class="tab-button" data-tab="tab-layout">Layout</button>
+                    <button class="tab-button" data-tab="tab-spacing">Spacing</button>
+                    <button class="tab-button" data-tab="tab-typography">Typography</button>
+                    <button class="tab-button" data-tab="tab-styles">Styles</button>
+                    <button class="tab-button" data-tab="tab-global-css">Global Styles</button>
+                    <button class="tab-button" data-tab="tab-attributes">Attributes</button>
+                    <button class="tab-button" data-tab="tab-hierarchy">Hierarchy</button>
+                    <button class="tab-button" data-tab="tab-profiler">Profiler</button>
+                    <button class="tab-button" data-tab="tab-js-globals">JS Globals</button>
+                </div>
+
+                <div id="tab-content-wrapper" class="pt-0">
+
+                    <div id="tab-content" class="tab-content active space-y-2">
+                        <div class="space-y-1">
+                            <label for="element-id" class="block text-xs font-medium text-gray-400">ID</label>
+                            <input type="text" id="element-id" placeholder="Optional ID" class="w-full">
+                        </div>
+                        <div class="space-y-1">
+                            <label for="element-class" class="block text-xs font-medium text-gray-400">Classes (Tailwind)</label>
+                            <input type="text" id="element-class" placeholder="e.g., bg-red-500 p-4" class="w-full">
+                        </div>
+                        <div class="space-y-1">
+                            <label for="element-content" class="block text-xs font-medium text-gray-400">Inner Content / Text / Value</label>
+                            <textarea id="element-content" rows="4" placeholder="Edit the text, HTML content, or form value here." class="w-full"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div id="tab-layout" class="tab-content space-y-2">
+                        <div class="space-y-1">
+                            <label for="display-select" class="block text-xs font-medium text-gray-400">Display</label>
+                            <select id="display-select" class="w-full">
+                                <option value="">(Inherit/Initial)</option>
+                                <option value="block">block</option>
+                                <option value="inline-block">inline-block</option>
+                                <option value="flex">flex</option>
+                                <option value="grid">grid</option>
+                                <option value="inline-flex">inline-flex</option>
+                                <option value="none">none</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex space-x-1">
+                            <div class="space-y-1 w-1/2">
+                                <label for="width" class="block text-xs font-medium text-gray-400">Width</label>
+                                <input type="text" id="width" placeholder="100% / 300px" class="w-full">
+                            </div>
+                            <div class="space-y-1 w-1/2">
+                                <label for="height" class="block text-xs font-medium text-gray-400">Height</label>
+                                <input type="text" id="height" placeholder="auto / 200px" class="w-full">
+                            </div>
+                        </div>
+
+                        <div class="p-1 bg-gray-600 text-white text-xs mt-3">Position</div>
+
+                        <div class="space-y-1">
+                            <label for="position-select" class="block text-xs font-medium text-gray-400">Position Type</label>
+                            <select id="position-select" class="w-full">
+                                <option value="">(static)</option>
+                                <option value="relative">relative</option>
+                                <option value="absolute">absolute</option>
+                                <option value="fixed">fixed</option>
+                                <option value="sticky">sticky</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex space-x-1 text-xs">
+                            <div class="space-y-1 w-1/2">
+                                <label for="top" class="block text-xs font-medium text-gray-400">Top</label>
+                                <input type="text" id="top" placeholder="0px / 10%" class="w-full">
+                            </div>
+                            <div class="space-y-1 w-1/2">
+                                <label for="left" class="block text-xs font-medium text-gray-400">Left</label>
+                                <input type="text" id="left" placeholder="0px / auto" class="w-full">
+                            </div>
+                        </div>
+                        <div class="flex space-x-1 text-xs">
+                            <div class="space-y-1 w-1/2">
+                                <label for="bottom" class="block text-xs font-medium text-gray-400">Bottom</label>
+                                <input type="text" id="bottom" placeholder="0px / 10%" class="w-full">
+                            </div>
+                            <div class="space-y-1 w-1/2">
+                                <label for="right" class="block text-xs font-medium text-gray-400">Right</label>
+                                <input type="text" id="right" placeholder="0px / auto" class="w-full">
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-1">
+                            <label for="z-index-slider" class="block text-xs font-medium text-gray-400 pt-1">Z-Index</label>
+                            <input type="range" id="z-index-slider" min="0" max="10" step="1" value="0" class="w-full h-1 bg-gray-500 rounded-lg appearance-none cursor-pointer range-sm">
+                            <input type="text" id="z-index" placeholder="auto / 5" class="w-full text-xs mt-1">
+                        </div>
+
+                        <div class="p-1 bg-gray-600 text-white text-xs mt-3">Colors</div>
+                        
+                        <div class="space-y-1">
+                            <label for="background-color-input" class="block text-xs font-medium text-gray-400">Background Color</label>
+                            <div class="flex space-x-2 items-center color-input-wrapper">
+                                <input type="color" id="background-color-picker" class="flex-shrink-0" value="#C0C0C0">
+                                <input type="text" id="background-color" placeholder="#HEX or RGB" class="w-full text-xs">
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="color-input" class="block text-xs font-medium text-gray-400">Text Color</label>
+                            <div class="flex space-x-2 items-center color-input-wrapper">
+                                <input type="color" id="color-picker" class="flex-shrink-0" value="#000000">
+                                <input type="text" id="color" placeholder="#HEX or RGB" class="w-full text-xs">
+                            </div>
+                        </div>
+
+                        <div class="p-1 bg-gray-600 text-white text-xs">Overflow & Box Model</div>
+                        <div class="space-y-1">
+                            <label for="overflow-select" class="block text-xs font-medium text-gray-400">Overflow (X/Y)</label>
+                            <select id="overflow-select" class="w-full">
+                                <option value="">(Inherit)</option>
+                                <option value="visible">visible</option>
+                                <option value="hidden">hidden</option>
+                                <option value="scroll">scroll</option>
+                                <option value="auto">auto</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label for="box-sizing-select" class="block text-xs font-medium text-gray-400">Box Sizing</label>
+                            <select id="box-sizing-select" class="w-full">
+                                <option value="">(Inherit)</option>
+                                <option value="content-box">content-box</option>
+                                <option value="border-box">border-box</option>
+                            </select>
+                        </div>
+
+                        <div class="p-1 bg-gray-600 text-white text-xs">Flex/Grid Layout</div>
+                        <div class="space-y-1">
+                            <label for="flex-direction-select" class="block text-xs font-medium text-gray-400">Direction</label>
+                            <select id="flex-direction-select" class="w-full">
+                                <option value="">(None)</option>
+                                <option value="row">Flex Row</option>
+                                <option value="column">Flex Column</option>
+                                <option value="row-reverse">Flex Row Reverse</option>
+                                <option value="column-reverse">Flex Column Reverse</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label for="justify-content-select" class="block text-xs font-medium text-gray-400">Justify Content</label>
+                            <select id="justify-content-select" class="w-full">
+                                <option value="">(None)</option>
+                                <option value="flex-start">flex-start</option>
+                                <option value="center">center</option>
+                                <option value="flex-end">flex-end</option>
+                                <option value="space-between">space-between</option>
+                                <option value="space-around">space-around</option>
+                                <option value="space-evenly">space-evenly</option>
+                            </select>
+                        </div>
+
+                        <div class="p-1 bg-gray-600 text-white text-xs">Grid Properties (if Display: grid)</div>
+                        <div class="space-y-1">
+                            <label for="grid-cols" class="block text-xs font-medium text-gray-400">Template Columns</label>
+                            <input type="text" id="grid-cols" placeholder="e.g., 1fr 2fr 1fr" class="w-full">
+                        </div>
+                         <div class="space-y-1">
+                            <label for="grid-gap" class="block text-xs font-medium text-gray-400">Gap</label>
+                            <input type="text" id="grid-gap" placeholder="e.g., 10px" class="w-full">
+                        </div>
+                        <div class="space-y-1">
+                            <label for="align-items-select" class="block text-xs font-medium text-gray-400">Align Items</label>
+                            <select id="align-items-select" class="w-full">
+                                <option value="">(None)</option>
+                                <option value="start">start</option>
+                                <option value="center">center</option>
+                                <option value="end">end</option>
+                                <option value="stretch">stretch</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="tab-spacing" class="tab-content space-y-2">
+                        <div class="space-y-1">
+                            <label for="padding" class="block text-xs font-medium text-gray-400">Padding (e.g., 5px 10px)</label>
+                            <input type="text" id="padding" placeholder="e.g., 5px 10px" class="w-full">
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="margin" class="block text-xs font-medium text-gray-400">Margin (e.g., 10px auto)</label>
+                            <input type="text" id="margin" placeholder="e.g., 10px auto" class="w-full">
+                        </div>
+                        
+                        <div class="space-y-1">
+                            <label for="border" class="block text-xs font-medium text-gray-400">Border (e.g., 1px solid #777)</label>
+                            <input type="text" id="border" placeholder="e.g., 1px solid #777" class="w-full">
+                            <label for="border-width-slider" class="block text-xs font-medium text-gray-400 pt-1">Border Width (px)</label>
+                            <input type="range" id="border-width-slider" min="0" max="5" step="1" value="0" class="w-full h-1 bg-gray-500 rounded-lg appearance-none cursor-pointer range-sm">
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="border-radius" class="block text-xs font-medium text-gray-400">Border Radius (px or %)</label>
+                            <input type="text" id="border-radius" placeholder="e.g., 0 or 50%" class="w-full">
+                            <label for="border-radius-slider" class="block text-xs font-medium text-gray-400 pt-1">Uniform Radius (px)</label>
+                            <input type="range" id="border-radius-slider" min="0" max="20" step="1" value="0" class="w-full h-1 bg-gray-500 rounded-lg appearance-none cursor-pointer range-sm">
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="box-shadow" class="block text-xs font-medium text-gray-400">Box Shadow</label>
+                            <input type="text" id="box-shadow" placeholder="e.g., 0 4px 6px rgba(0,0,0,0.5)" class="w-full">
+                        </div>
+                    </div>
+                    
+                    <div id="tab-typography" class="tab-content space-y-2">
+                         <div class="space-y-1">
+                            <label for="font-family-select" class="block text-xs font-medium text-gray-400">Font Family</label>
+                            <select id="font-family-select" class="w-full">
+                                <option value="">(Inherit)</option>
+                                <option value="sans-serif">System Sans-serif (Default)</option>
+                                <option value="serif">System Serif</option>
+                                <option value="monospace">System Monospace</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Verdana">Verdana</option>
+                                <option value="Tahoma">Tahoma</option>
+                                <option value="Georgia">Georgia</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="font-size-slider" class="block text-xs font-medium text-gray-400 pt-1">Font Size (px)</label>
+                            <input type="range" id="font-size-slider" min="8" max="32" step="1" value="16" class="w-full h-1 bg-gray-500 rounded-lg appearance-none cursor-pointer range-sm">
+                            <input type="text" id="font-size" placeholder="16px / 1em" class="w-full text-xs mt-1">
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="font-weight-select" class="block text-xs font-medium text-gray-400">Font Weight</label>
+                            <select id="font-weight-select" class="w-full">
+                                <option value="">(Normal)</option>
+                                <option value="100">100 (Thin)</option>
+                                <option value="400">400 (Normal)</option>
+                                <option value="bold">bold</option>
+                                <option value="700">700 (Bold)</option>
+                                <option value="900">900 (Black)</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="text-align-select" class="block text-xs font-medium text-gray-400">Text Align</label>
+                            <select id="text-align-select" class="w-full">
+                                <option value="">(Inherit)</option>
+                                <option value="left">left</option>
+                                <option value="center">center</option>
+                                <option value="right">right</option>
+                                <option value="justify">justify</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="line-height" class="block text-xs font-medium text-gray-400">Line Height (e.g., 1.5 or 20px)</label>
+                            <input type="text" id="line-height" placeholder="normal / 1.5" class="w-full text-xs">
+                        </div>
+                    </div>
+
+
+                    <div id="tab-styles" class="tab-content space-y-3">
+                        <div class="p-1 bg-gray-600 text-white font-semibold text-xs">Inline Class Toggler (Current Element)</div>
+                        <div id="defined-class-list" class="space-y-1 text-xs">
+                            <p class="text-gray-500">No custom classes defined yet.</p>
+                        </div>
+                    </div>
+                    
+                    <div id="tab-global-css" class="tab-content space-y-3">
+                        <div class="p-1 bg-gray-600 text-white font-semibold text-xs">Global Stylesheet Editor (Cascading)</div>
+                        <p class="text-xs text-gray-400">
+                            Edit full CSS rules here (e.g., <code>h1 { color: red; }</code> or <code>.card { padding: 10px; }</code>). Changes apply to **all** matching elements globally.
+                        </p>
+                        <textarea id="global-css-editor" class="w-full" rows="15"></textarea>
+                    </div>
+
+                    <div id="tab-attributes" class="tab-content space-y-2">
+                        <div id="attribute-list" class="space-y-2">
+                            <p class="text-xs text-gray-500">No element selected or element is root.</p>
+                        </div>
+                        <div class="p-1 bg-gray-700 text-white font-semibold text-xs">Add New Attribute</div>
+                        <div class="flex justify-between space-x-1">
+                            <input type="text" id="new-attr-key" placeholder="key (e.g., data-key)" class="attribute-input">
+                            <input type="text" id="new-attr-value" placeholder="value" class="attribute-input">
+                        </div>
+                        <button id="add-attribute-button" disabled class="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-0.5 disabled:opacity-50">
+                            + Add Attribute
+                        </button>
+                    </div>
+
+                    <div id="tab-hierarchy" class="tab-content space-y-2">
+                        <div class="p-1 bg-gray-700 text-white font-semibold text-xs">DOM Tree View (Click to select any element)</div>
+                        <div id="hierarchy-panel" class="text-xs font-mono">
+                            <p class="text-gray-500">Load a file to view the DOM structure.</p>
+                        </div>
+                    </div>
+
+                    <div id="tab-profiler" class="tab-content space-y-2">
+                        <div class="p-1 bg-gray-700 text-white font-semibold text-xs">DOM Structure Metrics</div>
+                        <div id="profiler-stats" class="space-y-1 text-xs">
+                            <p>Total Elements: <span id="stat-element-count" class="font-bold text-yellow-300">0</span></p>
+                            <p>Max Nesting Depth: <span id="stat-max-depth" class="font-bold text-yellow-300">0</span></p>
+                            <p>Avg Element Depth: <span id="stat-avg-depth" class="font-bold text-yellow-300">0</span></p>
+                        </div>
+                        
+                        <div class="p-1 bg-gray-700 text-white font-semibold text-xs">Optimization & Style Analysis</div>
+                        <div id="profiler-analysis" class="space-y-1 text-xs">
+                            <p>Inline Style Count: <span id="stat-inline-styles" class="font-bold text-red-400">0</span></p>
+                            <p>Bloated Elements (>5 Attrs): <span id="stat-bloated-count" class="font-bold text-yellow-300">0</span></p>
+                        </div>
+
+                        <div class="p-1 bg-gray-700 text-white font-semibold text-xs">Tag Distribution</div>
+                        <ul id="tag-distribution" class="list-none space-y-0.5 ml-0 text-xs pl-2">
+                            <li class="text-gray-400">Load a file to analyze...</li>
+                        </ul>
+                    </div>
+                    
+                    <div id="tab-js-globals" class="tab-content space-y-2">
+                        <div class="p-1 bg-gray-700 text-white font-semibold text-xs">Global JavaScript (Scripts consolidated upon save)</div>
+                        <textarea id="js-globals-content" rows="10" placeholder="// All inline JS will be consolidated here upon load.\n// Add your global variables or functions here..." class="w-full font-mono text-xs"></textarea>
+                        <p class="text-xs text-gray-400">Note: All inline &lt;script&gt; tags (without `src`) from the loaded file are merged here. The merged code is saved into a single &lt;script id="designer-js-globals"&gt; tag in the output file.</p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script id="designer-main-script">
+        const fileInput = document.getElementById('file-input');
+        const previewIframe = document.getElementById('preview-iframe');
+        const saveButton = document.getElementById('save-button');
+        const statusMessage = document.getElementById('status-message');
+        const selectedElementTag = document.getElementById('selected-element-tag');
+        const inspectorTabs = document.getElementById('inspector-tabs');
+        const addElementButton = document.getElementById('add-element-button');
+        const deleteElementButton = document.getElementById('delete-element-button');
+        const duplicateElementButton = document.getElementById('duplicate-element-button');
+        const newElementTypeSelect = document.getElementById('new-element-type');
+        const addAttributeButton = document.getElementById('add-attribute-button');
+        const attributeList = document.getElementById('attribute-list');
+        const newAttrKeyInput = document.getElementById('new-attr-key');
+        const newAttrValueInput = document.getElementById('new-attr-value');
+        const elementIdInput = document.getElementById('element-id');
+        const elementClassInput = document.getElementById('element-class');
+        const elementContentTextarea = document.getElementById('element-content');
+        const hierarchyPanel = document.getElementById('hierarchy-panel');
+        const styleNameInput = document.getElementById('new-class-name');
+        const styleDefinitionTextarea = document.getElementById('new-class-definition');
+        const addClassButton = document.getElementById('add-class-button');
+        const classListDiv = document.getElementById('defined-class-list');
+        const jsGlobalsTextarea = document.getElementById('js-globals-content');
+        const quickStyleSelect = document.getElementById('quick-style-select');
+        
+        const globalCssEditor = document.getElementById('global-css-editor'); // New element
+        // Removed globalCssSelectorInput, globalCssDefinitionTextarea, updateGlobalCssButton
+
+        // Spacing Sliders
+        const borderRadiusSlider = document.getElementById('border-radius-slider');
+        const borderRadiusInput = document.getElementById('border-radius');
+        const borderWidthSlider = document.getElementById('border-width-slider');
+        const borderInput = document.getElementById('border'); // For reading/writing border property
+
+        // Color Pickers/Inputs
+        const backgroundColorPicker = document.getElementById('background-color-picker');
+        const backgroundColorInput = document.getElementById('background-color');
+        const colorPicker = document.getElementById('color-picker');
+        const colorInput = document.getElementById('color');
+
+        // Typography Controls
+        const fontSizeSlider = document.getElementById('font-size-slider');
+        const fontSizeInput = document.getElementById('font-size');
+        const fontFamilySelect = document.getElementById('font-family-select');
+        const fontWeightSelect = document.getElementById('font-weight-select');
+        const textAlignSelect = document.getElementById('text-align-select');
+        const lineHeightInput = document.getElementById('line-height');
+        
+        // Layout Controls
+        const zIndexSlider = document.getElementById('z-index-slider');
+        const zIndexInput = document.getElementById('z-index');
+        const positionSelect = document.getElementById('position-select');
+        const overflowSelect = document.getElementById('overflow-select');
+        const topInput = document.getElementById('top');
+        const rightInput = document.getElementById('right');
+        const bottomInput = document.getElementById('bottom');
+        const leftInput = document.getElementById('left');
+
+        const QUICK_STYLE_ID = 'designer-external-stylesheet';
+        const GLOBAL_CSS_ID = 'designer-global-css-sheet';
+        
+        // --- EMBEDDED CLASSIC STYLESHEETS (Updated with detailed component styles) ---
+        const CLASSIC_STYLES_MAP = {
+            'classic': `
+                /* Root Variables (Windows 95 Classic) */
+                :root {
+                    --preferred-font: 'Microsoft Sans Serif', 'Arial';
+                    --desktop-bg: #008080;
+                    --window-bg: #C0C0C0;
+                    --window-fg: #000000;
+                    --lightest: #FFFFFF;
+                    --lighter: #E0E0E0;
+                    --light: #DFDFDF;
+                    --medium: var(--window-bg);
+                    --dark: #808080;
+                    --darker: #404040;
+                    --darkest: #000000;
+                    --button-bg: var(--window-bg);
+                    --button-fg: var(--window-fg);
+                    --input-bg: #FFFFFF;
+                    --input-fg: #000000;
+                    --title-bar-bg: var(--dark);
+                    --title-bar-fg: var(--medium);
+                    --title-bar-active-bg: #000080;
+                    --title-bar-active-fg: #FFFFFF;
+                    --selection-bg: #000080;
+                    --selection-fg: #FFFFFF;
+                    --selection-inverse: #FFFF7F;
+                    --spacing: 8px;
+                }
+
+                /* Global Styles */
+                body {
+                    background-color: var(--window-bg);
+                    color: var(--window-fg);
+                    font-family: var(--preferred-font), sans-serif;
+                    padding: 8px;
+                }
+                *, *::before, *::after { box-sizing: border-box; border-radius: 0 !important; }
+                button, input, textarea, select { font-family: inherit; font-size: inherit; border-radius: 0; }
+                a:focus { outline: 1px dotted var(--darkest); }
+                code { font-family: monospace; }
+                
+                /* Buttons */
+                button, input[type="submit"], input[type="button"], input[type="reset"] {
+                    background-color: var(--button-bg);
+                    color: var(--button-fg);
+                    border: 1px solid var(--darkest);
+                    border-top: 1px solid var(--lightest);
+                    border-left: 1px solid var(--lightest);
+                    box-shadow: inset -1px -1px 0 var(--dark);
+                    padding: 3px 10px 6px 10px;
+                    min-width: 75px;
+                    text-align: center;
+                    line-height: 1;
+                    cursor: default;
+                    user-select: none;
+                }
+                button:focus, button.focus {
+                    border: 1px solid var(--darkest);
+                    outline: 1px dotted var(--darkest);
+                    box-shadow: inset 1px 1px 0 var(--lightest), inset -1px -1px 0 var(--darkest),
+                      inset -2px -2px 0 var(--dark);
+                    outline-offset: -4px;
+                }
+                button:disabled, button.disabled {
+                    color: var(--dark);
+                    text-shadow: 1px 1px 0 var(--lightest);
+                }
+                button:not(:disabled):active, button.active {
+                    border: 1px solid var(--darkest);
+                    box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--dark);
+                    padding: 4px 9px 5px 11px;
+                }
+
+                /* Inputs */
+                input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select {
+                    background-color: var(--input-bg);
+                    color: var(--input-fg);
+                    border: 1px solid var(--dark);
+                    border-bottom: 1px solid var(--lightest);
+                    border-right: 1px solid var(--lightest);
+                    box-shadow: inset 1px 1px 0 var(--darkest), inset -1px -1px 0 var(--light);
+                    padding: 2px 6px;
+                    outline: none;
+                    min-height: 20px;
+                }
+                input:disabled, textarea:disabled, select:disabled {
+                    background: var(--window-bg);
+                    color: var(--dark);
+                    text-shadow: 1px 1px 0 var(--lightest);
+                }
+
+                /* Panels and Windows */
+                .raised {
+                    background: var(--window-bg);
+                    border: 1px solid var(--lightest);
+                    border-bottom-color: var(--dark);
+                    border-right-color: var(--dark);
+                    padding: 8px;
+                }
+                .lowered {
+                    background: var(--window-bg);
+                    border: 1px solid var(--dark);
+                    border-bottom-color: var(--lightest);
+                    border-right-color: var(--lightest);
+                    padding: 8px;
+                }
+                .window {
+                    background: var(--window-bg);
+                    border: 1px solid var(--light);
+                    border-bottom: 1px solid var(--darkest);
+                    border-right: 1px solid var(--darkest);
+                    box-shadow: inset 1px 1px 0 var(--lightest), inset -1px -1px 0 var(--dark);
+                    padding: 3px;
+                    overflow: auto;
+                }
+                .title-bar {
+                    background: var(--title-bar-active-bg);
+                    color: var(--title-bar-active-fg);
+                    display: flex;
+                    flex-direction: row;
+                    font-weight: bold;
+                    height: 18px;
+                }
+            `,
+            'neutral': `
+                /* Root Variables (Neutral Minimal) */
+                :root {
+                    --window-bg: #FFFFFF;
+                    --window-fg: #000000;
+                    --border-color: #AAAAAA;
+                    --spacing: 8px;
+                }
+                /* Global Styles */
+                body {
+                    background-color: var(--window-bg);
+                    color: var(--window-fg);
+                    font-family: Arial, sans-serif;
+                    padding: 8px;
+                }
+                *, *::before, *::after { box-sizing: border-box; border-radius: 0 !important; box-shadow: none !important; }
+                
+                /* Buttons */
+                button, input[type="submit"], input[type="button"], input[type="reset"] {
+                    background-color: #F0F0F0;
+                    color: var(--window-fg);
+                    border: 1px solid var(--border-color);
+                    padding: 4px 12px;
+                    min-width: 80px;
+                    text-align: center;
+                    cursor: pointer;
+                    line-height: 1.2;
+                }
+                button:hover { background-color: #E0E0E0; }
+                button:active { background-color: #D0D0D0; border: 1px solid #000000; }
+                
+                /* Inputs */
+                input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select {
+                    background-color: #FFFFFF;
+                    color: var(--window-fg);
+                    border: 1px solid var(--border-color);
+                    padding: 4px 8px;
+                    outline: none;
+                    min-height: 24px;
+                }
+                input:focus, textarea:focus, select:focus { border-color: #000000; }
+
+                /* Panels and Windows */
+                .raised, .lowered, .window {
+                    background: var(--window-bg);
+                    border: 1px solid var(--border-color);
+                    padding: 10px;
+                    margin-bottom: 10px;
+                    overflow: auto;
+                }
+                .title-bar { background: #EFEFEF; color: var(--window-fg); border-bottom: 1px solid var(--border-color); padding: 5px; }
+                .window-body { margin-top: 0; padding: 10px; min-height: 50px; }
+            `,
+            'flat': `
+                /* Root Variables (Flat Design) */
+                :root {
+                    --window-bg: #FFFFFF;
+                    --window-fg: #333333;
+                    --primary-color: #3498DB;
+                    --secondary-color: #2ECC71;
+                    --selection-bg: var(--primary-color);
+                    --selection-fg: #FFFFFF;
+                    --spacing: 12px;
+                }
+                /* Global Styles */
+                body {
+                    background-color: #F8F8F8;
+                    color: var(--window-fg);
+                    font-family: 'Inter', sans-serif;
+                    padding: 12px;
+                }
+                *, *::before, *::after { box-sizing: border-box; border-radius: 0 !important; box-shadow: none !important; border: none !important; outline: none !important; }
+                
+                /* Buttons */
+                button, input[type="submit"], input[type="button"], input[type="reset"] {
+                    background-color: var(--primary-color);
+                    color: var(--selection-fg);
+                    padding: 8px 16px;
+                    min-width: 100px;
+                    text-align: center;
+                    cursor: pointer;
+                    line-height: 1.2;
+                }
+                button:hover { background-color: #2980B9; }
+                button:active { background-color: #2471A3; }
+                
+                /* Inputs */
+                input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select {
+                    background-color: #ECF0F1;
+                    color: var(--window-fg);
+                    padding: 8px 12px;
+                    min-height: 32px;
+                }
+                input:focus, textarea:focus, select:focus { background-color: #FFFFFF; }
+
+                /* Panels and Windows */
+                .raised, .lowered, .window {
+                    background: var(--window-bg);
+                    padding: 15px;
+                    margin-bottom: 15px;
+                    overflow: auto;
+                }
+                .title-bar { background: var(--secondary-color); color: var(--selection-fg); padding: 8px 15px; }
+                .window-body { margin-top: 0; padding: 15px; min-height: 50px; }
+            `
+        };
+        
+        const cssControls = {
+            'padding': 'padding',
+            'margin': 'margin',
+            'border': 'border',
+            'border-radius': 'borderRadius',
+            'box-shadow': 'boxShadow',
+            'display-select': 'display', 
+            'flex-direction-select': 'flexDirection',
+            'justify-content-select': 'justifyContent',
+            'grid-cols': 'gridTemplateColumns',
+            'grid-gap': 'gap',
+            'align-items-select': 'alignItems',
+            'box-sizing-select': 'boxSizing',
+            'width': 'width',
+            'height': 'height',
+            'background-color': 'backgroundColor',
+            'color': 'color',
+            'position-select': 'position',
+            'overflow-select': 'overflow',
+            'top': 'top',
+            'right': 'right',
+            'bottom': 'bottom',
+            'left': 'left',
+            'z-index': 'zIndex',
+            'font-family-select': 'fontFamily',
+            'font-size': 'fontSize',
+            'font-weight-select': 'fontWeight',
+            'text-align-select': 'textAlign',
+            'line-height': 'lineHeight',
+        };
+
+        let activeElement = null; 
+        
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            const targetButton = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
+            const targetContent = document.getElementById(tabId);
+            
+            if (targetButton) targetButton.classList.add('active');
+            if (targetContent) targetContent.classList.add('active');
+
+            // NEW: If switching to the Global CSS Editor, load its current content from the iframe.
+            if (tabId === 'tab-global-css' && globalCssEditor) {
+                const iframeDoc = previewIframe.contentWindow.document;
+                const globalStyleElement = iframeDoc.getElementById(GLOBAL_CSS_ID);
+                globalCssEditor.value = globalStyleElement ? globalStyleElement.textContent : '';
+            }
+        }
+
+        function getOrCreateScriptTag(iframeDoc) {
+            let script = iframeDoc.getElementById('designer-js-globals');
+            if (!script) {
+                script = iframeDoc.createElement('script');
+                script.id = 'designer-js-globals';
+                script.type = 'text/javascript';
+                if (iframeDoc.body) {
+                    iframeDoc.body.appendChild(script);
+                } else {
+                    return null; 
+                }
+            }
+            return script;
+        }
+
+        function executeJsGlobals() {
+            const iframeWin = previewIframe.contentWindow;
+            const jsCode = jsGlobalsTextarea.value.trim();
+            const iframeDoc = iframeWin.document;
+
+            const jsScript = getOrCreateScriptTag(iframeDoc);
+            if (!jsScript) {
+                 statusMessage.textContent = 'Preview not ready for JS execution.';
+                 return;
+            }
+
+            jsScript.textContent = jsCode;
+            
+            if (jsCode) {
+                try {
+                    iframeWin.eval(jsCode);
+                    statusMessage.textContent = 'JavaScript updated and executed in preview.';
+                } catch (e) {
+                    statusMessage.textContent = `JS Execution Error: ${e.message}. See console.`;
+                    console.error('JS Execution Error in Preview:', e);
+                }
+            } else {
+                statusMessage.textContent = 'JavaScript cleared.';
+            }
+        }
+
+        function loadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            statusMessage.textContent = 'Loading file...';
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const htmlContent = e.target.result;
+                
+                const parser = new DOMParser();
+                const tempDoc = parser.parseFromString(htmlContent, 'text/html');
+                
+                const inlineScripts = Array.from(tempDoc.querySelectorAll('script:not([src])'));
+                
+                let combinedScriptContent = '';
+                
+                inlineScripts.forEach(script => {
+                    if (script.id !== 'designer-stylesheet' && script.id !== 'designer-main-script') { 
+                        combinedScriptContent += script.textContent.trim() + '\n\n';
+                    }
+                });
+
+                jsGlobalsTextarea.value = combinedScriptContent.trim() || '// All inline JS will be consolidated here upon load.\n// Add your global variables or functions here...';
+
+                const iframeDoc = previewIframe.contentWindow.document;
+                iframeDoc.open();
+                iframeDoc.write(htmlContent);
+                iframeDoc.close();
+                
+                const processIframeContent = (doc) => {
+                    setupIframeInteraction(doc);
+                    executeJsGlobals(); 
+                };
+
+                previewIframe.onload = () => processIframeContent(iframeDoc);
+                setTimeout(() => processIframeContent(iframeDoc), 100);
+
+                saveButton.disabled = false;
+                statusMessage.textContent = `File loaded successfully: ${file.name}. Click an element to inspect.`;
+                showTab('tab-content'); 
+            };
+            reader.readAsText(file);
+        }
+
+        function getOrCreateStyleSheet(iframeDoc, id = 'designer-stylesheet') {
+            let style = iframeDoc.getElementById(id);
+            if (!style) {
+                style = iframeDoc.createElement('style');
+                style.id = id;
+                if (iframeDoc.head) {
+                    iframeDoc.head.appendChild(style);
+                } else {
+                    return null;
+                }
+            }
+            return style;
+        }
+
+        function applyInternalStyle(styleKey) {
+            const iframeDoc = previewIframe.contentWindow.document;
+            if (!iframeDoc || !iframeDoc.head) return;
+
+            let styleElement = getOrCreateStyleSheet(iframeDoc, QUICK_STYLE_ID);
+
+            if (styleKey && CLASSIC_STYLES_MAP[styleKey]) {
+                const cssContent = CLASSIC_STYLES_MAP[styleKey];
+                styleElement.textContent = cssContent;
+                statusMessage.textContent = `Applied internal stylesheet: ${styleKey}.`;
+            } else {
+                styleElement.textContent = ''; 
+                statusMessage.textContent = `Internal stylesheet removed.`;
+            }
+        }
+        
+        // --- NEW GLOBAL CSS EDITOR LOGIC (Simplified: direct update on blur/input) ---
+        function updateGlobalCss() {
+            if (!previewIframe.contentWindow || !globalCssEditor) return;
+
+            const definition = globalCssEditor.value.trim();
+            const iframeDoc = previewIframe.contentWindow.document;
+
+            const globalStyleElement = getOrCreateStyleSheet(iframeDoc, GLOBAL_CSS_ID);
+            
+            globalStyleElement.textContent = definition;
+            
+            statusMessage.textContent = definition ? 'Global CSS updated.' : 'Global CSS cleared.';
+        }
+
+        function setupIframeInteraction(iframeDoc) {
+            if (!iframeDoc || !iframeDoc.body) return;
+
+            // Ensure all essential style sheets are present
+            getOrCreateStyleSheet(iframeDoc); // designer-stylesheet (for class definitions)
+            getOrCreateStyleSheet(iframeDoc, QUICK_STYLE_ID); // quick styles
+            getOrCreateStyleSheet(iframeDoc, GLOBAL_CSS_ID); // global editor styles
+
+            getOrCreateScriptTag(iframeDoc);
+            
+            // Assign unique data-node-id to ALL elements in the DOM for selection via Hierarchy
+            let counter = 1;
+            iframeDoc.querySelectorAll('*').forEach(el => {
+                 let id = el.getAttribute('data-node-id');
+                 if (!id) {
+                     id = `node-${counter++}`;
+                     el.setAttribute('data-node-id', id);
+                 }
+                 // Make sure elements are not contenteditable for clean selection
+                 if (el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE' && el.tagName !== 'HEAD') {
+                     el.setAttribute('contenteditable', 'false');
+                 }
+            });
+
+            iframeDoc.addEventListener('click', (event) => {
+                event.preventDefault(); 
+                event.stopPropagation();
+                // Select the deepest element clicked, falling back to body/html
+                const target = event.target.tagName === 'HTML' ? iframeDoc.body : event.target;
+                selectElement(target);
+            });
+            
+            selectElement(iframeDoc.body);
+            generateProfilerData(iframeDoc);
+            renderHierarchy(iframeDoc);
+            renderStyles();
+        }
+        
+        function getElementDepth(el) {
+            let depth = 0;
+            let current = el.parentElement;
+            while (current && current.tagName !== 'BODY') {
+                depth++;
+                current = current.parentElement;
+            }
+            return depth;
+        }
+
+        function generateProfilerData(iframeDoc) {
+            const body = iframeDoc.body;
+            if (!body) return;
+
+            const allElements = Array.from(body.querySelectorAll('*'));
+            
+            if (allElements.length === 0) {
+                document.getElementById('stat-element-count').textContent = 0;
+                document.getElementById('stat-max-depth').textContent = 0;
+                document.getElementById('stat-avg-depth').textContent = 0;
+                document.getElementById('stat-inline-styles').textContent = 0;
+                document.getElementById('stat-bloated-count').textContent = 0;
+                document.getElementById('tag-distribution').innerHTML = '<li class="text-gray-400">No elements found.</li>';
+                return;
+            }
+
+            let maxDepth = 0;
+            let totalDepth = 0;
+            let tagCounts = {};
+            let totalInlineStyles = 0;
+            let bloatedElementsCount = 0;
+
+            allElements.forEach(el => {
+                const depth = getElementDepth(el);
+                maxDepth = Math.max(maxDepth, depth);
+                totalDepth += depth;
+
+                const tag = el.tagName.toLowerCase();
+                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+
+                if (el.getAttribute('style')) {
+                    totalInlineStyles++;
+                }
+
+                if (el.attributes.length > 5) { 
+                    bloatedElementsCount++;
+                }
+            });
+            
+            const totalElements = allElements.length;
+            const avgDepth = totalElements > 0 ? (totalDepth / totalElements).toFixed(2) : 0;
+
+            document.getElementById('stat-element-count').textContent = totalElements;
+            document.getElementById('stat-max-depth').textContent = maxDepth;
+            document.getElementById('stat-avg-depth').textContent = avgDepth;
+            document.getElementById('stat-inline-styles').textContent = totalInlineStyles;
+            document.getElementById('stat-bloated-count').textContent = bloatedElementsCount;
+
+            const tagList = document.getElementById('tag-distribution');
+            tagList.innerHTML = '';
+            
+            const sortedTags = Object.entries(tagCounts).sort(([, a], [, b]) => b - a);
+
+            sortedTags.forEach(([tag, count]) => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="font-mono text-cyan-400">&lt;${tag.toUpperCase()}&gt;</span>: ${count}`;
+                tagList.appendChild(li);
+            });
+        }
+
+        function isFormElement(element) {
+            const tag = element.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+        }
+
+        function getElementContent(element) {
+            if (isFormElement(element) && element.type !== 'submit' && element.type !== 'button') {
+                return element.value || '';
+            }
+            return element.innerHTML || '';
+        }
+
+        function setElementContent(element, content) {
+             if (isFormElement(element) && element.type !== 'submit' && element.type !== 'button') {
+                element.value = content;
+            } else {
+                element.innerHTML = content;
+            }
+        }
+
+        function getStyleValue(element, property) {
+            const inlineValue = element.style[property];
+            if (inlineValue) return inlineValue;
+            
+            // Fallback for computed style (for color pickers to work reliably)
+            const computedStyle = getComputedStyle(element);
+            return computedStyle[property];
+        }
+
+        function selectElement(element) {
+            if (activeElement) {
+                activeElement.style.outline = ''; 
+                activeElement.style.outlineOffset = '';
+                // Use data-node-id for reliable hierarchy selection removal
+                const oldHierarchyItem = hierarchyPanel.querySelector(`.hierarchy-item[data-node-id="${activeElement.getAttribute('data-node-id')}"]`);
+                if (oldHierarchyItem) oldHierarchyItem.classList.remove('active-node');
+            }
+            
+            activeElement = element;
+            
+            const isRoot = element.tagName === 'BODY' || element.tagName === 'HTML';
+            let id = element.getAttribute('data-node-id');
+            
+            selectedElementTag.textContent = `<${element.tagName.toLowerCase()}>${element.id ? `#${element.id}` : ''}${element.className ? `.${element.className.split(' ').join('.')}` : ''}`;
+            
+            activeElement.style.outline = '3px solid #ef4444'; 
+            activeElement.style.outlineOffset = '-3px';
+
+            const hierarchyItem = hierarchyPanel.querySelector(`.hierarchy-item[data-node-id="${id}"]`);
+            if (hierarchyItem) hierarchyItem.classList.add('active-node');
+
+            
+            const canModify = !isRoot;
+            
+            addElementButton.disabled = false; 
+            deleteElementButton.disabled = !canModify;
+            duplicateElementButton.disabled = !canModify;
+            addAttributeButton.disabled = !canModify;
+            elementContentTextarea.disabled = !canModify;
+
+            elementIdInput.value = element.id || '';
+            elementClassInput.value = element.className || '';
+            
+            elementContentTextarea.value = getElementContent(element);
+            
+            // Sync all controls
+            for (const inputId in cssControls) {
+                const propName = cssControls[inputId];
+                const input = document.getElementById(inputId);
+                if (input) {
+                    let value = getStyleValue(element, propName) || '';
+                    if (input.tagName === 'SELECT') {
+                        input.value = value;
+                    } else if (input.id === 'border-radius') {
+                        input.value = value;
+                        const pxMatch = value.match(/^(\d+)px$/);
+                        borderRadiusSlider.value = pxMatch ? Math.min(Math.max(parseInt(pxMatch[1]), 0), 20) : 0;
+                    } else if (input.id === 'border') {
+                        input.value = value;
+                        const widthMatch = value.match(/^(\d+)px/);
+                        borderWidthSlider.value = widthMatch ? Math.min(Math.max(parseInt(widthMatch[1]), 0), 5) : 0;
+                    } else if (input.id === 'font-size') {
+                         input.value = value;
+                         const pxMatch = value.match(/^(\d+)px$/);
+                         fontSizeSlider.value = pxMatch ? Math.min(Math.max(parseInt(pxMatch[1]), 8), 32) : 16;
+                    } else if (input.id === 'z-index') {
+                         input.value = value;
+                         zIndexSlider.value = isNaN(parseInt(value)) ? 0 : Math.min(Math.max(parseInt(value), 0), 10);
+                    }
+                    else {
+                        input.value = value;
+                    }
+                }
+            }
+            
+            // Sync Color Pickers manually
+            const bgColor = getStyleValue(element, 'backgroundColor');
+            const color = getStyleValue(element, 'color');
+            backgroundColorInput.value = bgColor || '';
+            backgroundColorPicker.value = convertColorToHex(bgColor);
+            colorInput.value = color || '';
+            colorPicker.value = convertColorToHex(color);
+
+            renderAttributes();
+            renderHierarchy(previewIframe.contentWindow.document);
+            renderStyles();
+        }
+
+        function convertColorToHex(color) {
+            if (!color) return '#000000';
+            const tempDiv = document.createElement('div');
+            tempDiv.style.color = color;
+            document.body.appendChild(tempDiv);
+            const computedColor = getComputedStyle(tempDiv).color;
+            document.body.removeChild(tempDiv);
+            
+            if (computedColor.startsWith('rgb')) {
+                const match = computedColor.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+                if (!match) return '#000000';
+                
+                const hex = (num) => parseInt(num).toString(16).padStart(2, '0');
+                return `#${hex(match[1])}${hex(match[2])}${hex(match[3])}`.toUpperCase();
+            }
+            
+            return color.match(/^#[0-9A-Fa-f]{6}$/) ? color : '#000000';
+        }
+
+        function renderHierarchy(iframeDoc) {
+            hierarchyPanel.innerHTML = '';
+            if (!iframeDoc || !iframeDoc.body) {
+                hierarchyPanel.innerHTML = '<p class="text-gray-500">Iframe content not ready.</p>';
+                return;
+            }
+
+            const body = iframeDoc.body;
+            // The body is the root element in our visualizer context
+            const tree = buildHierarchyNode(body);
+            hierarchyPanel.appendChild(tree);
+        }
+
+        function buildHierarchyNode(element) {
+            const container = document.createElement('div');
+            const isCollapsed = element.getAttribute('data-collapsed') === 'true';
+
+            let tag = element.tagName.toLowerCase();
+            let labelText = `<${tag}>`;
+            if (element.id) labelText += `#${element.id}`;
+            if (element.className && element.className.trim()) labelText += `.${element.className.trim().split(/\s+/).join('.')}`;
+            
+            // Filter out internal script/style elements from the visible hierarchy
+            const children = Array.from(element.children).filter(el => el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE' && el.id !== QUICK_STYLE_ID && el.id !== GLOBAL_CSS_ID && el.id !== 'designer-stylesheet' && el.id !== 'designer-js-globals');
+            
+            const hasChildren = children.length > 0;
+            
+            // Rely on the setupIframeInteraction to assign data-node-id to all elements
+            const nodeId = element.getAttribute('data-node-id');
+
+            // NEW: Add content snippet for leaf nodes
+            if (!hasChildren && element.textContent && element.textContent.trim().length > 0) {
+                 const content = element.textContent.trim().replace(/\s\s+/g, ' ').substring(0, 30);
+                 labelText += ` - "${content}..."`;
+            }
+
+            const item = document.createElement('div');
+            item.className = `hierarchy-item ${activeElement === element ? 'active-node' : ''}`;
+            item.setAttribute('data-node-id', nodeId);
+            item.innerHTML = `
+                <span class="hierarchy-toggle">${hasChildren ? (isCollapsed ? '►' : '▼') : '—'}</span>
+                <span data-select-id="${nodeId}">${labelText}</span>
+            `;
+
+            item.querySelector('span[data-select-id]').addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectElement(element);
+            });
+
+            if (hasChildren) {
+                item.querySelector('.hierarchy-toggle').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const childrenContainer = container.querySelector('.hierarchy-children');
+                    if (childrenContainer) {
+                        const newState = !isCollapsed;
+                        element.setAttribute('data-collapsed', newState);
+                        childrenContainer.classList.toggle('collapsed', newState);
+                        item.querySelector('.hierarchy-toggle').textContent = newState ? '►' : '▼';
+                    }
+                });
+            }
+
+            container.appendChild(item);
+
+            if (hasChildren) {
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = `hierarchy-children ${isCollapsed ? 'collapsed' : ''}`;
+                children.forEach(child => {
+                    childrenContainer.appendChild(buildHierarchyNode(child));
+                });
+                container.appendChild(childrenContainer);
+            }
+
+            return container;
+        }
+
+        function renderAttributes() {
+            attributeList.innerHTML = '';
+            if (!activeElement || activeElement.tagName === 'BODY' || activeElement.tagName === 'HTML') {
+                attributeList.innerHTML = '<p class="text-xs text-gray-500">No element selected or element is root.</p>';
+                return;
+            }
+
+            const isRoot = activeElement.tagName === 'BODY' || activeElement.tagName === 'HTML';
+            if (isRoot) return;
+
+            const attributes = Array.from(activeElement.attributes).filter(attr => attr.name !== 'id' && attr.name !== 'class' && attr.name !== 'contenteditable' && attr.name !== 'data-node-id');
+
+            if (attributes.length === 0) {
+                 attributeList.innerHTML = '<p class="text-xs text-gray-500">No custom attributes.</p>';
+                 return;
+            }
+
+            attributes.forEach(attr => {
+                const container = document.createElement('div');
+                container.className = 'flex justify-between space-x-1 items-center';
+                const isSystemAttr = ['style'].includes(attr.name.toLowerCase());
+                
+                container.innerHTML = `
+                    <input type="text" value="${attr.name}" data-old-key="${attr.name}" class="attribute-input ${isSystemAttr ? 'bg-gray-600 text-yellow-300' : ''}" ${isSystemAttr ? 'disabled' : ''}>
+                    <input type="text" value="${attr.value}" data-key="${attr.name}" class="attribute-input attr-value-input">
+                    <button class="bg-red-500 hover:bg-red-600 text-white p-0.5 text-xs" data-key="${attr.name}" ${isSystemAttr ? 'disabled' : ''}>${isSystemAttr ? '—' : 'X'}</button>
+                `;
+                container.querySelector('.attr-value-input').addEventListener('input', updateAttribute);
+                if (!isSystemAttr) {
+                    container.querySelector('button').addEventListener('click', deleteAttribute);
+                }
+                attributeList.appendChild(container);
+            });
+        }
+
+        function updateAttribute(event) {
+            if (!activeElement) return;
+            const key = event.target.getAttribute('data-key');
+            const value = event.target.value;
+            activeElement.setAttribute(key, value);
+            statusMessage.textContent = `Attribute '${key}' updated.`;
+        }
+
+        function deleteAttribute(event) {
+            if (!activeElement) return;
+            const key = event.target.getAttribute('data-key');
+            activeElement.removeAttribute(key);
+            renderAttributes();
+            statusMessage.textContent = `Attribute '${key}' removed.`;
+        }
+        
+        function addAttribute() {
+            if (!activeElement || activeElement.tagName === 'BODY' || activeElement.tagName === 'HTML') return;
+            const key = newAttrKeyInput.value.trim();
+            const value = newAttrValueInput.value.trim();
+
+            const reserved = ['id', 'class', 'style', 'contenteditable', 'data-node-id'];
+
+            if (key && !reserved.includes(key.toLowerCase())) {
+                activeElement.setAttribute(key, value);
+                newAttrKeyInput.value = '';
+                newAttrValueInput.value = '';
+                renderAttributes();
+                statusMessage.textContent = `New attribute '${key}' added.`;
+            } else if (key) {
+                statusMessage.textContent = `Error: Cannot add reserved attribute '${key}' here (use Content tab).`;
+            }
+        }
+
+        function applyStyle(event) {
+            if (!activeElement) return;
+
+            const inputId = event.target.id;
+            let value = event.target.value.trim();
+
+            if (inputId.endsWith('-picker')) {
+                // Handle color pickers: sync the text input and apply style
+                const targetInputId = inputId.replace('-picker', '');
+                const targetInput = document.getElementById(targetInputId);
+                targetInput.value = value.toUpperCase();
+                activeElement.style[cssControls[targetInputId]] = value;
+                statusMessage.textContent = `Applied style "${cssControls[targetInputId]}: ${value}" to <${activeElement.tagName.toLowerCase()}>.`;
+            } else if (cssControls[inputId]) {
+                // Handle general text/select inputs
+                const propertyName = cssControls[inputId];
+                const propertiesRequiringUnits = ['width', 'height', 'margin', 'padding', 'grid-gap', 'top', 'right', 'bottom', 'left', 'font-size'];
+                const needsUnit = propertiesRequiringUnits.includes(inputId);
+                
+                if (needsUnit && value && !isNaN(parseFloat(value)) && inputId !== 'line-height' && inputId !== 'z-index') {
+                    const hasExplicitUnit = value.match(/(px|em|rem|%|vh|vw|fr|auto|0)$/i);
+                    if (!hasExplicitUnit) {
+                         value = value + 'px'; 
+                    }
+                }
+                
+                activeElement.style[propertyName] = value;
+                statusMessage.textContent = `Applied style "${propertyName}: ${value}" to <${activeElement.tagName.toLowerCase()}>.`;
+            }
+        }
+        
+        function addElement() {
+            if (!previewIframe.contentWindow) return;
+
+            const iframeDoc = previewIframe.contentWindow.document;
+            const targetElement = activeElement && activeElement.tagName !== 'HTML' ? activeElement : iframeDoc.body;
+            
+            const elementType = newElementTypeSelect.value.toLowerCase();
+            const newElement = iframeDoc.createElement(elementType);
+            
+            newElement.style.padding = '8px';
+            newElement.style.margin = '5px';
+            newElement.style.border = '1px dashed #999';
+
+            if (elementType === 'button') {
+                newElement.textContent = 'New Button';
+                newElement.style.backgroundColor = '#4f46e5';
+                newElement.style.color = '#fff';
+                newElement.style.borderRadius = '0';
+                newElement.style.cursor = 'pointer';
+                newElement.style.display = 'inline-block';
+            } else if (elementType === 'input') {
+                newElement.type = 'text';
+                newElement.style.padding = '4px';
+                newElement.style.width = '150px';
+                newElement.setAttribute('placeholder', 'New Input Field');
+            } else if (elementType === 'textarea') {
+                newElement.style.padding = '4px';
+                newElement.style.width = '150px';
+                newElement.setAttribute('placeholder', 'New Textarea');
+            } else if (elementType === 'a') {
+                newElement.textContent = 'New Link';
+                newElement.href = '#';
+                newElement.style.color = '#7dd3fc';
+            } else if (elementType === 'h2') {
+                newElement.innerHTML = `New Heading`;
+                newElement.style.fontSize = '24px';
+                newElement.style.fontWeight = 'bold';
+                newElement.style.color = '#fff';
+                newElement.style.margin = '10px 5px';
+            } else if (elementType === 'img') {
+                newElement.src = 'https://placehold.co/150x100/000000/FFFFFF?text=New+Image';
+                newElement.alt = 'New Placeholder Image';
+                newElement.style.display = 'block';
+            } else { 
+                newElement.innerHTML = `New &lt;${elementType.toUpperCase()}&gt; (Edit Content)`;
+                newElement.style.minHeight = '20px';
+                newElement.style.backgroundColor = '#3e3e3e';
+            }
+            
+            targetElement.appendChild(newElement);
+            // Re-select to assign data-node-id and ensure proper selection flow
+            if (newElement.parentNode) {
+                setupIframeInteraction(iframeDoc);
+                selectElement(newElement);
+            }
+            statusMessage.textContent = `New <${elementType}> element added.`;
+        }
+
+        function deleteElement() {
+            if (!activeElement || activeElement.tagName === 'BODY' || activeElement.tagName === 'HTML') {
+                statusMessage.textContent = 'Cannot delete root elements (HTML/BODY).';
+                return;
+            }
+
+            const parent = activeElement.parentElement;
+            if (parent) {
+                const deletedTagName = activeElement.tagName.toLowerCase();
+                parent.removeChild(activeElement);
+                
+                selectElement(parent);
+                generateProfilerData(previewIframe.contentWindow.document);
+                renderHierarchy(previewIframe.contentWindow.document);
+                statusMessage.textContent = `Element <${deletedTagName}> deleted. Parent selected.`;
+            }
+        }
+        
+        function duplicateElement() {
+            if (!activeElement || activeElement.tagName === 'BODY' || activeElement.tagName === 'HTML') {
+                statusMessage.textContent = 'Cannot duplicate root elements (HTML/BODY).';
+                return;
+            }
+
+            try {
+                const clonedElement = activeElement.cloneNode(true);
+                
+                clonedElement.style.outline = '';
+                clonedElement.style.outlineOffset = '';
+                clonedElement.removeAttribute('data-node-id');
+                clonedElement.removeAttribute('id');
+
+                activeElement.after(clonedElement); 
+                
+                if (clonedElement.parentNode) {
+                    setupIframeInteraction(previewIframe.contentWindow.document);
+                    selectElement(clonedElement); 
+                } else {
+                    selectElement(activeElement);
+                }
+                
+                generateProfilerData(previewIframe.contentWindow.document);
+                renderHierarchy(previewIframe.contentWindow.document);
+                statusMessage.textContent = `Element <${clonedElement.tagName.toLowerCase()}> duplicated.`;
+
+            } catch (e) {
+                statusMessage.textContent = 'Error during duplication. See console for details.';
+            }
+        }
+
+        function saveFile() {
+            if (!previewIframe.contentWindow) return;
+
+            const iframeDoc = previewIframe.contentWindow.document;
+
+            if (activeElement && activeElement.tagName !== 'BODY' && activeElement.tagName !== 'HTML') {
+                const newId = elementIdInput.value.trim();
+                const newClass = elementClassInput.value.trim();
+                const newContent = elementContentTextarea.value;
+                
+                if (activeElement.id !== newId) {
+                    activeElement.id = newId;
+                }
+                if (activeElement.className !== newClass) {
+                    activeElement.className = newClass;
+                    renderStyles(); 
+                }
+
+                setElementContent(activeElement, newContent);
+
+                generateProfilerData(iframeDoc);
+                renderHierarchy(iframeDoc);
+            }
+
+            // Remove internal editor styles before saving
+            const internalStyles = [QUICK_STYLE_ID, GLOBAL_CSS_ID, 'designer-stylesheet'];
+            internalStyles.forEach(id => {
+                 const el = iframeDoc.getElementById(id);
+                 if (el) el.remove();
+            });
+
+            const scriptsToRemove = Array.from(iframeDoc.querySelectorAll('script:not([src])'));
+            scriptsToRemove.forEach(script => {
+                if (script.id !== 'designer-js-globals') {
+                    script.remove();
+                }
+            });
+
+            const jsScript = getOrCreateScriptTag(iframeDoc);
+            if(jsScript) {
+                jsScript.textContent = jsGlobalsTextarea.value.trim();
+                iframeDoc.body.appendChild(jsScript);
+            }
+
+            if(activeElement) {
+                activeElement.style.outline = '';
+                activeElement.style.outlineOffset = '';
+            }
+            
+            iframeDoc.querySelectorAll('[data-node-id]').forEach(el => el.removeAttribute('data-node-id'));
+            iframeDoc.querySelectorAll('[data-collapsed]').forEach(el => el.removeAttribute('data-collapsed'));
+            
+            let newContent = iframeDoc.documentElement.outerHTML;
+
+            // Re-insert editor styles after content extraction
+            setupIframeInteraction(iframeDoc);
+
+            if(activeElement) {
+                activeElement.style.outline = '3px solid #ef4444'; 
+                activeElement.style.outlineOffset = '-3px';
+            }
+            
+            const blob = new Blob([newContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'modified_page.html';
+            
+            a.click();
+
+            URL.revokeObjectURL(url);
+            statusMessage.textContent = 'File downloaded! Check your downloads folder for "modified_page.html".';
+        }
+
+        function addClassDefinition() {
+            const className = styleNameInput.value.trim();
+            const definition = styleDefinitionTextarea.value.trim();
+
+            if (!className || !definition) {
+                statusMessage.textContent = 'Error: Class name and definition must not be empty.';
+                return;
+            }
+
+            if (!className.startsWith('.')) {
+                 statusMessage.textContent = 'Error: Class name must start with a dot (e.g., .my-class).';
+                 return;
+            }
+
+            const iframeDoc = previewIframe.contentWindow.document;
+            if (!iframeDoc) return;
+            const styleElement = getOrCreateStyleSheet(iframeDoc);
+            if (!styleElement) return;
+
+            let newStyleSheet = '';
+            let isUpdated = false;
+            
+            let existingRules = styleElement.textContent.split('}');
+            
+            for (let i = 0; i < existingRules.length; i++) {
+                const rule = existingRules[i].trim();
+                if (!rule) continue;
+
+                const ruleSelector = rule.substring(0, rule.indexOf('{')).trim();
+
+                if (ruleSelector === className) {
+                    newStyleSheet += `${className} { ${definition} }\n`;
+                    isUpdated = true;
+                } else {
+                    newStyleSheet += rule + '}\n';
+                }
+            }
+            
+            if (!isUpdated) {
+                newStyleSheet += `${className} { ${definition} }\n`;
+            }
+
+            styleElement.textContent = newStyleSheet.trim();
+            styleNameInput.value = '';
+            styleDefinitionTextarea.value = '';
+            statusMessage.textContent = `Class '${className}' ${isUpdated ? 'updated' : 'added'} successfully.`;
+            renderStyles();
+        }
+
+        function renderStyles() {
+            classListDiv.innerHTML = '';
+            const iframeDoc = previewIframe.contentWindow.document;
+            if (!iframeDoc) return;
+            const styleElement = getOrCreateStyleSheet(iframeDoc);
+            if (!styleElement) return; 
+            
+            let classNames = [];
+            const regex = /\.([a-zA-Z0-9_-]+)(:|\s|\{)/g; 
+            let match;
+            let textContent = styleElement.textContent;
+            
+            while ((match = regex.exec(textContent)) !== null) {
+                const name = match[1];
+                if (name && !classNames.includes(name)) {
+                     classNames.push(name);
+                }
+            }
+            
+            if (classNames.length === 0) {
+                 classListDiv.innerHTML = '<p class="text-gray-500">No custom classes defined yet.</p>';
+                 return;
+            }
+            
+            const activeClasses = activeElement ? activeElement.className.split(/\s+/).filter(c => c) : [];
+
+            classNames.forEach(name => {
+                const container = document.createElement('div');
+                container.className = 'class-toggle-container';
+                const isApplied = activeClasses.includes(name);
+
+                container.innerHTML = `
+                    <input type="checkbox" id="class-toggle-${name}" class="class-toggle-input" ${isApplied ? 'checked' : ''} data-class-name="${name}">
+                    <label for="class-toggle-${name}" class="class-toggle-label">.${name}</label>
+                `;
+                container.querySelector('.class-toggle-input').addEventListener('change', toggleCustomClass);
+                classListDiv.appendChild(container);
+            });
+        }
+
+        function toggleCustomClass(event) {
+            if (!activeElement || activeElement.tagName === 'BODY' || activeElement.tagName === 'HTML') {
+                statusMessage.textContent = 'Error: Select an element to apply a class.';
+                event.target.checked = !event.target.checked;
+                return;
+            }
+            
+            const className = event.target.getAttribute('data-class-name');
+            const classList = activeElement.className.split(/\s+/).filter(c => c);
+
+            if (event.target.checked) {
+                if (!classList.includes(className)) {
+                    classList.push(className);
+                    statusMessage.textContent = `Class .${className} applied.`;
+                }
+            } else {
+                const index = classList.indexOf(className);
+                if (index > -1) {
+                    classList.splice(index, 1);
+                    statusMessage.textContent = `Class .${className} removed.`;
+                }
+            }
+            activeElement.className = classList.join(' ');
+            elementClassInput.value = activeElement.className;
+        }
+        
+        // --- Custom Slider and Picker Handlers ---
+        
+        function syncBorderRadius(event) {
+            if (!activeElement) return;
+            const value = event.target.value;
+            const unit = (event.target.id === 'border-radius-slider') ? 'px' : '';
+            const newRadius = `${value}${unit}`;
+            
+            activeElement.style.borderRadius = newRadius;
+            
+            if (event.target.id === 'border-radius-slider') {
+                borderRadiusInput.value = newRadius;
+            } else if (event.target.id === 'border-radius') {
+                 const pxMatch = newRadius.match(/^(\d+)px$/);
+                 if (pxMatch) {
+                    borderRadiusSlider.value = Math.min(Math.max(parseInt(pxMatch[1]), 0), 20);
+                 }
+            }
+            statusMessage.textContent = `Applied style "borderRadius: ${activeElement.style.borderRadius}"`;
+        }
+
+        function syncBorderWidth(event) {
+            if (!activeElement) return;
+            const width = event.target.value;
+            
+            activeElement.style.borderWidth = `${width}px`;
+
+            // If border style is not set, set it to be visible
+            if (!activeElement.style.borderStyle || activeElement.style.borderStyle === 'none') {
+                 activeElement.style.borderStyle = 'solid';
+                 activeElement.style.borderColor = '#000000';
+            }
+            
+            // Sync border text input for visual feedback
+            const currentBorder = borderInput.value;
+            let parts = currentBorder.split(' ').filter(p => p);
+            
+            if (parts.length >= 2) {
+                let widthUpdated = false;
+                for (let i = 0; i < parts.length; i++) {
+                    if (parts[i].match(/^\d+(px|em|rem|%)$/)) {
+                        parts[i] = `${width}px`;
+                        widthUpdated = true;
+                        break;
+                    }
+                }
+                if (!widthUpdated) {
+                    parts.unshift(`${width}px`);
+                }
+                borderInput.value = parts.join(' ');
+            } else {
+                 borderInput.value = `${width}px solid #000000`;
+            }
+            
+            statusMessage.textContent = `Applied style "borderWidth: ${width}px"`;
+        }
+        
+        function syncFontSize(event) {
+            if (!activeElement) return;
+            const size = event.target.value;
+            const unit = (event.target.id === 'font-size-slider') ? 'px' : '';
+            const newSize = `${size}${unit}`;
+
+            activeElement.style.fontSize = newSize;
+
+            if (event.target.id === 'font-size-slider') {
+                fontSizeInput.value = newSize;
+            } else {
+                 const pxMatch = newSize.match(/^(\d+)px$/);
+                 if (pxMatch) {
+                    fontSizeSlider.value = Math.min(Math.max(parseInt(pxMatch[1]), 8), 32);
+                 }
+            }
+
+            statusMessage.textContent = `Applied style "fontSize: ${activeElement.style.fontSize}"`;
+        }
+
+        function syncZIndex(event) {
+            if (!activeElement) return;
+            const zIndex = event.target.value;
+            
+            activeElement.style.zIndex = zIndex;
+
+            if (event.target.id === 'z-index-slider') {
+                zIndexInput.value = zIndex;
+            } else {
+                const num = parseInt(zIndex);
+                if (!isNaN(num)) {
+                    zIndexSlider.value = Math.min(Math.max(num, 0), 10);
+                }
+            }
+            statusMessage.textContent = `Applied style "zIndex: ${activeElement.style.zIndex}"`;
+        }
+
+
+        // --- Event Listeners Setup ---
+        
+        // Helper function to safely bind an event listener
+        function safeAddListener(element, eventType, handler) {
+            if (element) {
+                element.addEventListener(eventType, handler);
+            } else {
+                // console.warn(`Element with ID ${element.id} not found during listener setup.`);
+            }
+        }
+
+        safeAddListener(backgroundColorPicker, 'input', applyStyle);
+        safeAddListener(backgroundColorInput, 'input', applyStyle);
+        safeAddListener(colorPicker, 'input', applyStyle);
+        safeAddListener(colorInput, 'input', applyStyle);
+        
+        // Spacing Handlers
+        safeAddListener(borderRadiusSlider, 'input', syncBorderRadius);
+        safeAddListener(borderRadiusInput, 'input', syncBorderRadius);
+        safeAddListener(borderWidthSlider, 'input', syncBorderWidth);
+        safeAddListener(borderInput, 'input', applyStyle);
+
+        // Typography Handlers
+        safeAddListener(fontSizeSlider, 'input', syncFontSize);
+        safeAddListener(fontSizeInput, 'input', syncFontSize);
+        safeAddListener(fontFamilySelect, 'change', applyStyle);
+        safeAddListener(fontWeightSelect, 'change', applyStyle);
+        safeAddListener(textAlignSelect, 'change', applyStyle);
+        safeAddListener(lineHeightInput, 'input', applyStyle);
+
+
+        // Layout Handlers
+        safeAddListener(zIndexSlider, 'input', syncZIndex);
+        safeAddListener(zIndexInput, 'input', syncZIndex);
+        safeAddListener(positionSelect, 'change', applyStyle);
+        safeAddListener(overflowSelect, 'change', applyStyle);
+        safeAddListener(topInput, 'input', applyStyle);
+        safeAddListener(rightInput, 'input', applyStyle);
+        safeAddListener(bottomInput, 'input', applyStyle);
+        safeAddListener(leftInput, 'input', applyStyle);
+        
+        // Global CSS Editor Handlers (New: Use blur/input for syncing textarea)
+        safeAddListener(globalCssEditor, 'input', updateGlobalCss); // Real-time feedback
+        safeAddListener(globalCssEditor, 'blur', updateGlobalCss);  // Final update confirmation
+
+
+        safeAddListener(quickStyleSelect, 'change', (event) => {
+            const styleKey = event.target.value;
+            applyInternalStyle(styleKey);
+        });
+
+        safeAddListener(fileInput, 'change', loadFile);
+        safeAddListener(saveButton, 'click', saveFile);
+        safeAddListener(jsGlobalsTextarea, 'input', executeJsGlobals);
+
+        safeAddListener(addElementButton, 'click', addElement);
+        safeAddListener(deleteElementButton, 'click', deleteElement);
+        safeAddListener(duplicateElementButton, 'click', duplicateElement);
+        safeAddListener(addAttributeButton, 'click', addAttribute);
+        safeAddListener(addClassButton, 'click', addClassDefinition);
+        
+        safeAddListener(inspectorTabs, 'click', (event) => {
+            if (event.target.classList.contains('tab-button')) {
+                showTab(event.target.getAttribute('data-tab'));
+            }
+        });
+
+        // Skip controls handled by dedicated sync functions
+        const skippedControls = [
+            'background-color', 'color', 'background-color-picker', 'color-picker',
+            'border-radius', 'border-width-slider', 'border-radius-slider', 'border',
+            'font-size', 'font-size-slider', 'z-index', 'z-index-slider'
+        ];
+        
+        Object.keys(cssControls).forEach(id => {
+            const input = document.getElementById(id);
+            if (input && !skippedControls.includes(id) && !skippedControls.includes(input.id)) {
+                safeAddListener(input, 'input', applyStyle);
+                if (input.tagName === 'SELECT') {
+                     safeAddListener(input, 'change', applyStyle);
+                }
+            }
+        });
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            showTab('tab-content');
+        });
+
+    </script>
+</body>
+</html>

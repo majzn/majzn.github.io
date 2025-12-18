@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Pia Studio v3.2 - High Quality Export</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap');
+        :root { --sb-bg: #0f172a; --pn-bg: #1e293b; --acc: #3b82f6; }
+        body { background-color: #020617; color: #f1f5f9; overflow: hidden; font-family: 'Inter', sans-serif; }
+        canvas { touch-action: none; cursor: crosshair; display: block; }
+        .control-panel::-webkit-scrollbar { width: 4px; }
+        .control-panel::-webkit-scrollbar-thumb { background: #334155; }
+        input[type="range"] { accent-color: var(--acc); height: 6px; cursor: pointer; background: #334155; appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; height: 10px; background: var(--acc); border-radius: 50%; border: 2px solid #0f172a; }
+        .card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 8px; padding: 4px; margin-bottom: 10px; }
+        .g-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.10em; color: #64748b; font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; margin-top: 12px;}
+        .g-title::after { content: ""; height: 1px; flex: 1; background: #1e293b; }
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+        .row label { font-size: 0.75rem; color: #94a3b8; font-weight: 500; width: 50px; }
+        .val { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--acc); min-width: 2rem; text-align: right; }
+        select { background: #0f172a; border: 1px solid #334155; border-radius: 4px; color: white; font-size: 0.7rem; padding: 2px 4px; outline: none; width: 100px; text-align: right; }
+        .btn { font-size: 0.65rem; font-weight: 700; padding: 8px; border-radius: 4px; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: center;}
+        .btn-p { background: var(--acc); color: white; }
+        .btn-p:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-s { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+        .btn-s:hover { background: #334155; color: white; }
+        .anim-box { background: rgba(15, 23, 42, 0.4); border-radius: 4px; padding: 6px; margin-bottom: 4px; border: 1px solid rgba(51, 65, 85, 0.2); }
+        .anim-lab { font-size: 10px; font-weight: 900; color: #94a3b8; display: block; }
+        .layer-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 8px; padding: 8px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .layer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+        .layer-header label { color:#94a3b8; font-size: 14px; font-weight: 800; }
+        .control-row { display: flex; align-items: center; gap: 8px; }
+        .control-row label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; width: 35px; font-weight: 700; }
+        .color-swatch-wrapper { position: relative; width: 20px; height: 16px; border-radius: 3px; overflow: hidden; border: 1px solid #334155; flex-shrink: 0; }
+        .color-swatch-wrapper input[type="color"] { position: absolute; top: -5px; left: -5px; width: 40px; height: 40px; cursor: pointer; }
+        .custom-select { appearance: none; background: #0f172a; border: 1px solid #334155; border-radius: 4px; font-weight: 600; color: #94a3b8; font-size: 0.75rem; padding: 4px; width: 100%; cursor: pointer; text-align-last: center; }
+        .export-input { background: #0f172a; border: 1px solid #334155; border-radius: 4px; color: white; font-size: 0.7rem; padding: 4px; width: 100%; text-align: center; }
+    </style>
+</head>
+<body class="flex h-screen w-screen m-0 p-0 overflow-hidden">
+
+    <div class="control-panel w-80 bg-[#0f172a] border-r border-slate-800 flex flex-col p-4 overflow-y-auto z-20 shrink-0">
+        <div class="mb-5">
+            <h1 class="text-lg font-bold text-white flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/></svg>
+                Pia Studio
+            </h1>
+            <p class="text-[8px] text-slate-500 uppercase font-black tracking-widest">Enhanced Engine v3.2</p>
+        </div>
+
+        <div class="g-title">Lattice</div>
+        <div class="card">
+            <div class="row flex justify-between p-2 text-[12px]"><label>Symmetry</label><select id="gridType"><option value="square">Square</option><option value="hex">Hexagonal</option><option value="tri">Triangular</option></select></div>
+            <div class="row"><label>N-Sides</label><div class="flex items-center gap-2 flex-1"><input type="range" id="polySides" min="3" max="42" step="1" value="6" class="flex-1"><span id="polySidesVal" class="val">6</span></div></div>
+            <div class="row"><label>Contact</label><div class="flex items-center gap-2 flex-1"><input type="range" id="expansion" min="0" max="100" value="80" class="flex-1"><span id="expansionVal" class="val">0.50</span></div></div>
+        </div>
+
+        <div class="g-title">Animation</div>
+        <div class="card">
+            <div class="flex items-center gap-2 mb-3 px-1"><input type="checkbox" id="animActive" class="w-3 h-3 accent-blue-500"><label class="text-[12px] font-bold text-slate-400">Animation Active</label></div>
+            
+            <div class="anim-box">
+                <div class="flex justify-between items-center mb-1"><span class="anim-lab">EXPANSION</span><input type="checkbox" id="aExpOn" checked class="w-2.5 h-2.5"></div>
+                <div class="row"><label class="text-[7px]">Speed</label><input type="range" id="aExpS" min="0" max="100" value="30" class="flex-1"></div>
+                <div class="row"><label class="text-[7px]">Range</label><input type="range" id="aExpR" min="0" max="100" value="20" class="flex-1"></div>
+            </div>
+            
+            <div class="anim-box">
+                <div class="flex justify-between items-center mb-1"><span class="anim-lab">N-SIDES</span><input type="checkbox" id="aSidesOn" class="w-2.5 h-2.5"></div>
+                <div class="row"><label class="text-[7px]">Speed</label><input type="range" id="aSidesS" min="0" max="100" value="20" class="flex-1"></div>
+                <div class="row"><label class="text-[7px]">Range</label><input type="range" id="aSidesR" min="0" max="100" value="30" class="flex-1"></div>
+            </div>
+        </div>
+
+        <div class="g-title">Visuals</div>
+        <div class="card">
+            <div class="row"><label>Zoom</label><div class="flex items-center gap-2 flex-1"><input type="range" id="zoom" min="20" max="800" value="120" class="flex-1"><span id="zoomVal" class="val">120</span></div></div>
+            <div class="row"><label>Round</label><div class="flex items-center gap-2 flex-1"><input type="range" id="rounding" min="0" max="100" value="0" class="flex-1"><span id="roundingVal" class="val">0%</span></div></div>
+            <div class="row"><label>Depth</label><div class="flex items-center gap-2 flex-1"><input type="range" id="elev" min="0" max="50" value="0" class="flex-1"><span id="elevVal" class="val">0</span></div></div>
+        </div>
+
+        <div class="g-title">Layers</div>
+        <div class="layer-card">
+            <div class="layer-header"><label>PRIMARY</label><input type="checkbox" id="vis1" checked class="w-3.5 h-3.5 accent-blue-500"></div>
+            <div class="control-row"><label>Fill</label><div class="color-swatch-wrapper"><input type="color" id="c1" value="#3b82f6"></div><input type="range" id="o1" min="0" max="100" value="40" class="flex-1"></div>
+            <div class="control-row"><label>Line</label><div class="color-swatch-wrapper"><input type="color" id="sc1" value="#3b82f6"></div><input type="range" id="sw1" min="0" max="1000" value="150" class="flex-1"></div>
+            <select id="b1" class="custom-select"><option value="source-over">Normal</option><option value="lighter">Add</option><option value="difference">Difference</option><option value="exclusion">Exclusion</option></select>
+        </div>
+
+        <div class="layer-card">
+            <div class="layer-header"><label>SECONDARY</label><input type="checkbox" id="vis2" checked class="w-3.5 h-3.5 accent-emerald-500"></div>
+            <div class="control-row"><label>Fill</label><div class="color-swatch-wrapper"><input type="color" id="c2" value="#10b981"></div><input type="range" id="o2" min="0" max="100" value="40" class="flex-1"></div>
+            <div class="control-row"><label>Line</label><div class="color-swatch-wrapper"><input type="color" id="sc2" value="#10b981"></div><input type="range" id="sw2" min="0" max="1000" value="150" class="flex-1"></div>
+            <select id="b2" class="custom-select"><option value="source-over">Normal</option><option value="lighter">Add</option><option value="difference">Difference</option><option value="exclusion">Exclusion</option></select>
+        </div>
+
+        <div class="layer-card">
+            <div class="layer-header"><label>FACE</label><input type="checkbox" id="vis3" checked class="w-3.5 h-3.5 accent-amber-500"></div>
+            <div class="control-row"><label>Fill</label><div class="color-swatch-wrapper"><input type="color" id="c3" value="#f59e0b"></div><input type="range" id="o3" min="0" max="100" value="40" class="flex-1"></div>
+            <div class="control-row"><label>Line</label><div class="color-swatch-wrapper"><input type="color" id="sc3" value="#f59e0b"></div><input type="range" id="sw3" min="0" max="1000" value="150" class="flex-1"></div>
+            <select id="b3" class="custom-select"><option value="source-over">Normal</option><option value="lighter">Add</option><option value="difference">Difference</option><option value="exclusion">Exclusion</option></select>
+        </div>
+
+        <div class="mt-auto pt-2 flex flex-col gap-1.5">
+            <button id="randBtn" class="btn btn-p bg-emerald-600 hover:bg-emerald-500">Randomize Studio</button>
+            <div class="flex gap-1.5">
+                <button id="resetBtn" class="btn btn-s flex-1">Reset View</button>
+            </div>
+            
+            <div class="g-title" style="margin-top: 4px;">Export</div>
+            <div class="card">
+                <div class="row mb-2">
+                    <label>Width</label>
+                    <input type="number" id="exportRes" value="2048" class="export-input" min="64" max="8192">
+                </div>
+                <div class="row mb-2">
+                    <label>Format</label>
+                    <select id="exportFmt" class="custom-select">
+                        <option value="png">PNG</option>
+                        <option value="bmp">BMP</option>
+                        <option value="svg">SVG (Vector)</option>
+                    </select>
+                </div>
+                <div class="row mb-2">
+                    <label>Filter</label>
+                    <select id="exportSmooth" class="custom-select">
+                        <option value="high">Bilinear</option>
+                        <option value="pixel">Nearest</option>
+                    </select>
+                </div>
+                <button id="tileBtn" class="btn btn-p w-full">Export Tile</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvasContainer" class="flex-1 relative bg-[#020617] cursor-move overflow-hidden">
+        <canvas id="canvas"></canvas>
+        <div id="toast" class="absolute top-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 px-6 py-2 rounded-full text-[10px] font-bold text-white pointer-events-none opacity-0 transition-all scale-95 uppercase tracking-widest z-50">
+            PROCESSING...
+        </div>
+    </div>
+
+    <script>
+        const cvs = document.getElementById('canvas'), 
+              ctx = cvs.getContext('2d', { alpha: false }),
+              container = document.getElementById('canvasContainer'),
+              tst = document.getElementById('toast');
+              
+        let cW, cH, off = {x:0, y:0}, isD = false, lM = {x:0, y:0}, aT = 0;
+
+        const cfg = {
+            gridType: 'square', polySides: 6, zoom: 120, expansion: 0.8, rounding: 0, elev: 0, animActive: false,
+            aExpOn: true, aExpS: 0.3, aExpR: 0.2, aSidesOn: false, aSidesS: 0.2, aSidesR: 3.0,
+            vis1: true, o1: 0.4, sc1: '#3b82f6', sw1: 1.5, b1: 'source-over', c1: '#3b82f6',
+            vis2: true, o2: 0.4, sc2: '#10b981', sw2: 1.5, b2: 'source-over', c2: '#10b981',
+            vis3: true, o3: 0.4, sc3: '#f59e0b', sw3: 1.5, b3: 'source-over', c3: '#f59e0b',
+            bgColor: '#020617', exportRes: 2048, exportFmt: 'png', exportSmooth: 'high'
+        };
+
+        const colorCache = new Map();
+        function getCachedRGBA(hex, alpha) {
+            const key = `${hex}_${alpha}`;
+            if (colorCache.has(key)) return colorCache.get(key);
+            const r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16);
+            const val = `rgba(${r},${g},${b},${alpha})`;
+            colorCache.set(key, val);
+            return val;
+        }
+
+        // --- Driver Interfaces ---
+        
+        class CanvasDriver {
+            constructor(ctx) { this.ctx = ctx; }
+            setBlend(mode) { this.ctx.globalCompositeOperation = mode; }
+            save() { this.ctx.save(); }
+            restore() { this.ctx.restore(); }
+            translate(x, y) { this.ctx.translate(x, y); }
+            draw(dStr, fill, opacity, sColor, sWidth, elev, round) {
+                const p = new Path2D(dStr);
+                
+                // Shadow / Depth
+                if(elev > 0) {
+                    this.ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    this.ctx.translate(elev, elev);
+                    this.ctx.fill(p);
+                    this.ctx.translate(-elev, -elev);
+                }
+
+                // Fill with Gap Fix (Optimized: Removed internal save/restore)
+                if (fill) {
+                    const rgba = getCachedRGBA(fill, opacity);
+                    this.ctx.fillStyle = rgba;
+                    this.ctx.fill(p);
+                    
+                    // GAP FIX: Stroke with fill color to seal anti-aliasing seams
+                    this.ctx.strokeStyle = rgba;
+                    this.ctx.lineWidth = 1; // Small overlap to heal gaps
+                    this.ctx.stroke(p);
+                }
+
+                // Stroke
+                if(sWidth > 0 && sColor) {
+                    this.ctx.strokeStyle = getCachedRGBA(sColor, 1);
+                    this.ctx.lineWidth = sWidth;
+                    this.ctx.stroke(p);
+                }
+            }
+        }
+
+        class SVGDriver {
+            constructor(w, h, bg) {
+                this.w = w; this.h = h; this.bg = bg;
+                this.content = [];
+                this.defs = [];
+            }
+            setBlend(mode) { /* Handled per group/path if needed, simplified here */ }
+            save() { /* No-op for linear SVG generation */ }
+            restore() { /* No-op */ }
+            translate(x, y) { /* Baked into paths in this simplified render logic */ }
+            
+            draw(dStr, fill, opacity, sColor, sWidth, elev, round) {
+                let style = "";
+                let blend = "normal";
+                // Note: Blend modes in SVG require mix-blend-mode CSS or filters. 
+                // We'll apply it to the element.
+                
+                // Shadow
+                if(elev > 0) {
+                    this.content.push(`<path d="${dStr}" fill="rgba(0,0,0,0.3)" transform="translate(${elev},${elev})" />`);
+                }
+
+                // Fill
+                const fillCol = getCachedRGBA(fill, opacity);
+                // Stroke
+                const strokeCol = (sWidth > 0) ? getCachedRGBA(sColor, 1) : "none";
+                const strokeW = (sWidth > 0) ? sWidth : 0;
+                
+                // Combine into one path for SVG efficiency
+                this.content.push(`<path d="${dStr}" fill="${fillCol}" stroke="${strokeCol}" stroke-width="${strokeW}" />`);
+            }
+            
+            getSVG() {
+                return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.w}" height="${this.h}" viewBox="0 0 ${this.w} ${this.h}" style="background:${this.bg}">
+                    ${this.content.join('')}
+                </svg>`;
+            }
+        }
+
+        // --- Logic ---
+
+        Object.keys(cfg).forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', () => {
+                if (el.type === 'checkbox') cfg[id] = el.checked;
+                else if (el.type === 'range') {
+                    let divisor = (id === 'zoom' || id === 'polySides' || id === 'elev' || id === 'aSidesR') ? 1 : 100;
+                    if (id === 'aSidesR') divisor = 10;
+                    cfg[id] = parseFloat(el.value) / (divisor || 1);
+                    const lbl = document.getElementById(id + 'Val');
+                    if (lbl) lbl.innerText = id === 'rounding' ? Math.floor(cfg[id]*100)+'%' : (id === 'polySides' ? Math.floor(cfg[id]) : cfg[id].toFixed(2));
+                } else if (el.type === 'number') {
+                    cfg[id] = parseInt(el.value);
+                } else cfg[id] = el.value;
+                
+                if (!cfg.animActive && id !== 'exportRes' && id !== 'exportFmt' && id !== 'exportSmooth') draw();
+            });
+        });
+
+        document.getElementById('randBtn').onclick = () => {
+            cfg.gridType = ['square', 'hex', 'tri'][Math.floor(Math.random()*3)];
+            cfg.polySides = 3 + Math.floor(Math.random()*15);
+            cfg.expansion = 0.3 + Math.random()*0.6;
+            cfg.zoom = 60 + Math.random()*150;
+            const rc = () => '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');
+            ['1','2','3'].forEach(i => { cfg['c'+i] = rc(); cfg['sc'+i] = rc(); cfg['o'+i] = 0.2 + Math.random()*0.6; });
+            updUI(); draw();
+        };
+
+        function updUI() {
+            Object.keys(cfg).forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if(el.type === 'color' || el.tagName === 'SELECT') el.value = cfg[id];
+                else if (el.type === 'checkbox') el.checked = cfg[id];
+                else if (el.type === 'range') {
+                    let mult = (id === 'zoom' || id === 'polySides' || id === 'elev' || id === 'aSidesR') ? 1 : 100;
+                    if (id === 'aSidesR') mult = 10;
+                    el.value = cfg[id] * mult;
+                    const lbl = document.getElementById(id + 'Val');
+                    if (lbl) lbl.innerText = id === 'rounding' ? Math.floor(cfg[id]*100)+'%' : (id === 'polySides' ? Math.floor(cfg[id]) : cfg[id].toFixed(2));
+                } else if(el.type === 'number') {
+                    el.value = cfg[id];
+                }
+            });
+        }
+
+        document.getElementById('resetBtn').onclick = () => { off={x:0,y:0}; draw(); };
+        document.getElementById('tileBtn').onclick = () => { tst.style.opacity='1'; setTimeout(genTile, 100); };
+
+        function resz() { cW = cvs.width = container.clientWidth; cH = cvs.height = container.clientHeight; draw(); }
+        window.onresize = resz;
+        cvs.onmousedown = e => { isD=true; lM={x:e.clientX, y:e.clientY}; };
+        window.onmouseup = () => isD=false;
+        window.onmousemove = e => { if(isD) { off.x+=e.clientX-lM.x; off.y+=e.clientY-lM.y; lM={x:e.clientX, y:e.clientY}; draw(); } };
+
+        // Generate SVG Path String (Universal for Canvas Path2D and SVG export)
+        function getPathData(pts, r) {
+            if(!pts || pts.length < 3) return "";
+            let d = "";
+            if(r <= 0.001) {
+                d += `M ${pts[0].x} ${pts[0].y}`;
+                for(let i=1; i<pts.length; i++) d += ` L ${pts[i].x} ${pts[i].y}`;
+            } else {
+                for(let i=0; i<pts.length; i++) {
+                    const pP=pts[(i-1+pts.length)%pts.length], pC=pts[i], pN=pts[(i+1)%pts.length];
+                    const d1x=pP.x-pC.x, d1y=pP.y-pC.y, d2x=pN.x-pC.x, d2y=pN.y-pC.y;
+                    const l1=Math.sqrt(d1x*d1x+d1y*d1y), l2=Math.sqrt(d2x*d2x+d2y*d2y), rad=(Math.min(l1,l2)/2)*r;
+                    const pS={x:pC.x+(d1x/l1)*rad, y:pC.y+(d1y/l1)*rad}, pE={x:pC.x+(d2x/l2)*rad, y:pC.y+(d2y/l2)*rad};
+                    if(i===0) d += `M ${pS.x} ${pS.y}`; else d += ` L ${pS.x} ${pS.y}`;
+                    d += ` Q ${pC.x} ${pC.y} ${pE.x} ${pE.y}`;
+                }
+            }
+            d += " Z";
+            return d;
+        }
+
+        function getPolyPoints(p1, p2, tw, sd, ex) {
+            const mx=(p1.x+p2.x)*0.5, my=(p1.y+p2.y)*0.5, dx=p2.x-p1.x, dy=p2.y-p1.y;
+            const d=Math.sqrt(dx*dx+dy*dy), ac=Math.atan2(tw.y-my, tw.x-mx);
+            const sl=d*ex, R=sl/(2*Math.sin(Math.PI/sd)), r=R*Math.cos(Math.PI/sd);
+            const cx=mx+r*Math.cos(ac), cy=my+r*Math.sin(ac), pts=[];
+            const step = (Math.PI*2)/sd, start = ac+Math.PI-(Math.PI/sd);
+            for(let i=0; i<sd; i++) {
+                const a = start + i*step;
+                pts.push({x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)});
+            }
+            return pts;
+        }
+
+        // Generic Render Function accepting a Driver
+        function render(driver, s, bnd) {
+            const an = cfg.animActive;
+            const ex = an && cfg.aExpOn ? Math.max(0.01, cfg.expansion + (Math.sin(aT*0.03)*cfg.aExpR)) : cfg.expansion;
+            const sd = an && cfg.aSidesOn ? Math.max(3, Math.round(cfg.polySides + (Math.sin(aT*0.02)*cfg.aSidesR))) : Math.floor(cfg.polySides);
+            const rd = cfg.rounding, el = cfg.elev;
+            
+            const vR = new Map(), fG = [];
+            const l1Batch = [];
+            
+            // Reusable shape processor
+            const proc = (vs) => {
+                const cntr = vs.reduce((a,b)=>({x:a.x+b.x/vs.length,y:a.y+b.y/vs.length}),{x:0,y:0});
+                vs.forEach((p1,i)=>{
+                    const p2=vs[(i+1)%vs.length], py=getPolyPoints(p1,p2,cntr,sd,ex);
+                    
+                    // Optimization: Batch Layer 1 instead of drawing immediately
+                    if(cfg.vis1){
+                        l1Batch.push(py);
+                    }
+                    
+                    const k1 = `${p1.x.toFixed(1)},${p1.y.toFixed(1)}`; if(!vR.has(k1)) vR.set(k1, {x:p1.x, y:p1.y, pts:[]}); vR.get(k1).pts.push(py[0]);
+                    const k2 = `${p2.x.toFixed(1)},${p2.y.toFixed(1)}`; if(!vR.has(k2)) vR.set(k2, {x:p2.x, y:p2.y, pts:[]}); vR.get(k2).pts.push(py[py.length-1]);
+                    fG.push({cntr, pts:py.slice(1,-1)});
+                });
+            };
+
+            const xS = Math.floor(bnd.x1/s)-1, xE = Math.ceil(bnd.x2/s)+1;
+            const yS = Math.floor(bnd.y1/s)-1, yE = Math.ceil(bnd.y2/s)+1;
+
+            if(cfg.gridType==='square') {
+                for(let i=xS; i<=xE; i++) for(let j=yS; j<=yE; j++) 
+                    proc([{x:i*s,y:j*s}, {x:(i+1)*s,y:j*s}, {x:(i+1)*s,y:(j+1)*s}, {x:i*s,y:(j+1)*s}]);
+            } else if(cfg.gridType==='hex') {
+                const hh=s*Math.sqrt(3);
+                for(let i=xS; i<=xE; i++) for(let j=Math.floor(bnd.y1/hh)-1; j<=Math.ceil(bnd.y2/hh)+1; j++) {
+                    const cx=i*s*1.5, cy=j*hh+(Math.abs(i)%2===1?hh/2:0), hx=[];
+                    for(let k=0;k<6;k++)hx.push({x:cx+s*Math.cos(k*Math.PI/3),y:cy+s*Math.sin(k*Math.PI/3)});
+                    proc(hx);
+                }
+            } else if(cfg.gridType==='tri') {
+                const th=s*Math.sqrt(3)/2;
+                for(let i=xS; i<=xE; i++) for(let j=Math.floor(bnd.y1/th)-1; j<=Math.ceil(bnd.y2/th)+1; j++) {
+                    const x=i*s+(Math.abs(j)%2===1?s/2:0), y=j*th;
+                    proc([{x,y},{x:x+s,y},{x:x+s/2,y:y+th}]);
+                    proc([{x:x+s,y},{x:x+1.5*s,y:y+th},{x:x+s/2,y:y+th}]);
+                }
+            }
+
+            // Draw Batch Layer 1 (Significant Performance Win for Blend Modes)
+            if(cfg.vis1 && l1Batch.length > 0){
+                driver.save(); 
+                driver.setBlend(cfg.b1);
+                for (let i = 0; i < l1Batch.length; i++) {
+                    driver.draw(getPathData(l1Batch[i], rd), cfg.c1, cfg.o1, cfg.sc1, cfg.sw1, el, rd);
+                }
+                driver.restore();
+            }
+
+            if(cfg.vis2){
+                driver.save(); driver.setBlend(cfg.b2);
+                vR.forEach(v => {
+                    if(v.pts.length<3) return;
+                    v.pts.sort((a,b)=>Math.atan2(a.y-v.y,a.x-v.x)-Math.atan2(b.y-v.y,b.x-v.x));
+                    driver.draw(getPathData(v.pts, rd), cfg.c2, cfg.o2, cfg.sc2, cfg.sw2, el, rd);
+                });
+                driver.restore();
+            }
+
+            if(cfg.vis3){
+                driver.save(); driver.setBlend(cfg.b3);
+                fG.forEach(g => {
+                    if(g.pts.length<3) return;
+                    g.pts.sort((a,b)=>Math.atan2(a.y-g.cntr.y,a.x-g.cntr.x)-Math.atan2(b.y-g.cntr.y,b.x-g.cntr.x));
+                    driver.draw(getPathData(g.pts, rd), cfg.c3, cfg.o3, cfg.sc3, cfg.sw3, el, rd);
+                });
+                driver.restore();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = cfg.bgColor;
+            ctx.fillRect(0, 0, cW, cH);
+            ctx.save();
+            ctx.translate(cW*0.5+off.x, cH*0.5+off.y);
+            render(new CanvasDriver(ctx), cfg.zoom, {x1:-cW*0.5-off.x, y1:-cH*0.5-off.y, x2:cW*0.5-off.x, y2:cH*0.5-off.y});
+            ctx.restore();
+        }
+
+        function loop() { 
+            if(cfg.animActive) { aT++; draw(); }
+            requestAnimationFrame(loop); 
+        }
+
+        function genTile() {
+            const s = cfg.zoom; 
+            let tw=s, th=s; 
+            if(cfg.gridType==='hex'){tw=s*3; th=s*Math.sqrt(3);} 
+            else if(cfg.gridType==='tri'){tw=s; th=s*Math.sqrt(3);}
+            
+            // Resolution and Format
+            const targetRes = Math.max(64, cfg.exportRes);
+            const format = cfg.exportFmt;
+            
+            // Logic Split: SVG vs Raster
+            if (format === 'svg') {
+                const sc = targetRes / Math.max(tw, th);
+                const oW = Math.round(tw*sc), oH = Math.round(th*sc);
+                const m = s * 2;
+                
+                const svgW = tw + m*2, svgH = th + m*2;
+                const driver = new SVGDriver(svgW, svgH, cfg.bgColor);
+                
+                driver.content.push(`<g transform="translate(${m},${m})">`);
+                render(driver, s, {x1:-m, y1:-m, x2:tw+m, y2:th+m});
+                driver.content.push(`</g>`);
+                
+                const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${oW}" height="${oH}" viewBox="${m} ${m} ${tw} ${th}" style="background:${cfg.bgColor}">
+                    ${driver.content.join('')}
+                </svg>`;
+                
+                const blob = new Blob([svgStr], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const l = document.createElement('a');
+                l.download = `tile_${Date.now()}.svg`;
+                l.href = url;
+                l.click();
+                
+            } else {
+                // Raster (PNG/BMP) with HIGH QUALITY Scaling
+                
+                // 1. Calculate the Scaling Factor required to hit the target resolution
+                const dim = Math.max(tw, th);
+                const scale = targetRes / dim;
+                
+                const oW = Math.round(tw * scale);
+                const oH = Math.round(th * scale);
+                const m = s * 2; // Keep margin relative to zoom (logical units)
+                
+                // 2. Create Buffer at FULL high resolution
+                const buf = document.createElement('canvas'); 
+                // Buffer size = (logical dimensions + margins) * scale
+                buf.width = Math.ceil((tw + m*2) * scale); 
+                buf.height = Math.ceil((th + m*2) * scale);
+                
+                const bC = buf.getContext('2d');
+                bC.fillStyle = cfg.bgColor; 
+                bC.fillRect(0,0,buf.width,buf.height);
+                
+                // 3. Transform the context to scale vectors
+                bC.save(); 
+                // Translate first in physical pixels to move origin past margins
+                bC.translate(m * scale, m * scale);
+                // Scale coordinate system so 's' logical units = 's * scale' physical pixels
+                bC.scale(scale, scale);
+                
+                // 4. Render using original logical units (s)
+                render(new CanvasDriver(bC), s, {x1:-m, y1:-m, x2:tw+m, y2:th+m}); 
+                bC.restore();
+                
+                // 5. Crop to final output
+                const fin = document.createElement('canvas'); 
+                fin.width = oW; 
+                fin.height = oH;
+                const fCtx = fin.getContext('2d');
+                
+                // Apply Filtering Preference
+                if (cfg.exportSmooth === 'pixel') {
+                    fCtx.imageSmoothingEnabled = false;
+                } else {
+                    fCtx.imageSmoothingEnabled = true;
+                    fCtx.imageSmoothingQuality = 'high';
+                }
+                
+                // Draw from high-res buffer (source coords are also scaled)
+                const srcX = m * scale;
+                const srcY = m * scale;
+                const srcW = tw * scale;
+                const srcH = th * scale;
+                
+                fCtx.drawImage(buf, srcX, srcY, srcW, srcH, 0, 0, oW, oH);
+                
+                const mime = format === 'bmp' ? 'image/bmp' : 'image/png';
+                const l = document.createElement('a'); 
+                l.download = `tile_${Date.now()}.${format}`; 
+                l.href = fin.toDataURL(mime); 
+                l.click();
+            }
+            
+            tst.style.opacity='0';
+        }
+
+        window.onload = () => { resz(); loop(); };
+    </script>
+</body>
+</html>
