@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPGPU CA IDE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --bg: #050505; --panel: #111; --border: #333; --accent: #0f0; --text: #ccc; --grid: #1a1a1a; }
+        body { background: var(--bg); color: var(--text); font-family: monospace; overflow: hidden; margin: 0; }
+        .node { position: absolute; background: var(--panel); border: 1px solid var(--border); min-width: 140px; user-select: none; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.5); border-radius: 0; }
+        .node.selected { border-color: var(--accent); z-index: 20; }
+        .node-header { background: #161616; padding: 4px 8px; font-weight: 700; cursor: grab; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .node-header:active { cursor: grabbing; }
+        .node-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .socket { height: 18px; display: flex; align-items: center; position: relative; font-size: 10px; color: #888; }
+        .socket:hover { color: #fff; }
+        .socket.in { justify-content: flex-start; }
+        .socket.out { justify-content: flex-end; }
+        .port { width: 10px; height: 10px; background: #333; border: 1px solid #555; cursor: crosshair; transition: all 0.1s; }
+        .port:hover { border-color: #fff; transform: scale(1.2); }
+        .socket.in .port { margin-right: 8px; }
+        .socket.out .port { margin-left: 8px; }
+        .port[data-type="float"] { background: #888; }
+        .port[data-type="vec"] { background: #0f0; }
+        .port[data-type="bool"] { background: #f0f; }
+        .port[data-type="color"] { background: #f80; }
+        #editor-area { background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 20px 20px; cursor: default; }
+        #connections-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+        path { fill: none; stroke: #555; stroke-width: 2px; }
+        path.active { stroke: var(--accent); stroke-dasharray: 5; animation: dash 1s linear infinite; }
+        @keyframes dash { to { stroke-dashoffset: -10; } }
+        #context-menu { display: none; position: absolute; background: #111; border: 1px solid #444; z-index: 100; min-width: 150px; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
+        .menu-item { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid #222; font-size: 11px; }
+        .menu-item:hover { background: var(--accent); color: #000; }
+        input[type="number"], input[type="text"] { background: #000; border: 1px solid #333; color: var(--accent); width: 100%; padding: 2px 6px; font-family: monospace; outline: none; }
+        input:focus { border-color: var(--accent); }
+        button:active { transform: translateY(1px); }
+        input[type="range"] { -webkit-appearance: none; background: #222; height: 4px; border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #0f0; cursor: pointer; border-radius: 0; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #333; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+    </style>
+</head>
+<body class="flex h-screen w-screen text-xs select-none">
+    <div class="flex flex-col w-1/2 border-r border-[#333] z-20 shadow-xl bg-black">
+        <div class="bg-[#111] p-2 border-b border-[#333] flex flex-wrap gap-4 justify-between items-center shrink-0">
+            <span class="font-bold text-[#0f0] tracking-wider">GPU CA ENGINE</span>
+            <div class="flex gap-4 items-center">
+                <div class="flex items-center gap-2" title="Simulation Speed">
+                    <span class="text-gray-500">SPD</span>
+                    <input type="range" id="sim-speed" min="1" max="120" value="60" class="w-20">
+                </div>
+                <div class="flex items-center gap-2" title="Resolution">
+                    <span class="text-gray-500">RES</span>
+                    <select id="sim-res" class="bg-[#000] border border-[#333] text-[#ccc] px-1 py-0.5 outline-none">
+                        <option value="128">128</option>
+                        <option value="256">256</option>
+                        <option value="512" selected>512</option>
+                        <option value="1024">1024</option>
+                        <option value="2048">2048</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-1">
+                <button id="btn-play" class="bg-[#222] hover:bg-[#333] text-white px-3 py-1 border border-[#444] min-w-[60px]">PAUSE</button>
+                <button id="btn-step" class="bg-[#222] hover:bg-[#333] text-white px-3 py-1 border border-[#444]">STEP</button>
+                <button id="btn-reset" class="bg-[#222] hover:bg-[#333] text-white px-3 py-1 border border-[#444] text-red-400 border-red-900/30">RESET</button>
+            </div>
+        </div>
+        <div class="flex-grow relative bg-[#050505] overflow-hidden group cursor-crosshair" id="canvas-container">
+            <div id="canvas-wrapper" class="origin-center w-full h-full flex items-center justify-center">
+                <canvas id="gl-canvas" class="image-pixelated shadow-2xl"></canvas>
+            </div>
+            <div class="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none">
+                <div id="fps-counter" class="font-mono text-[#0f0] bg-black/70 px-2 py-0.5 rounded backdrop-blur-sm">0 FPS</div>
+                <div id="zoom-level" class="font-mono text-gray-500 text-[10px] bg-black/70 px-2 py-0.5 rounded backdrop-blur-sm">100%</div>
+            </div>
+            <div class="absolute bottom-2 left-2 pointer-events-none text-gray-600">Pan: M-Click/Space | Zoom: Scroll</div>
+        </div>
+        <div class="h-8 bg-[#111] border-t border-[#333] flex items-center px-2 gap-2 shrink-0">
+            <span class="text-gray-500 text-[10px] w-8">HIST</span>
+            <input type="range" id="history-slider" min="0" max="0" value="0" class="flex-grow h-4 opacity-50 hover:opacity-100 transition-opacity" disabled>
+            <span id="history-frame" class="text-gray-500 text-[10px] w-12 text-right">0</span>
+        </div>
+        <div class="h-24 bg-[#0a0a0a] border-t border-[#333] p-2 font-mono text-[10px] overflow-auto flex flex-col-reverse" id="console-log">
+            <div class="text-[#444]">> System Ready</div>
+        </div>
+    </div>
+    <div class="relative w-1/2 bg-[#080808] overflow-hidden flex flex-col" id="editor-area">
+        <div class="absolute top-0 left-0 w-full z-20 p-2 flex justify-between pointer-events-none bg-gradient-to-b from-black/80 to-transparent">
+            <div class="flex gap-2 pointer-events-auto items-center">
+                <select id="preset-select" class="bg-[#111] border border-[#444] text-white px-2 py-1 outline-none hover:border-[#0f0] cursor-pointer shadow-lg">
+                    <option value="" disabled selected>LOAD PRESET</option>
+                    <option value="gol">Game of Life</option>
+                    <option value="high">HighLife</option>
+                    <option value="day">Day & Night</option>
+                    <option value="maze">Maze Generator</option>
+                    <option value="brain">Reaction Diffusion</option>
+                    <option value="cyc">Cyclic Demon</option>
+                </select>
+                <div class="text-[10px] text-gray-500 ml-2" id="compile-status">AUTO-COMPILE ON</div>
+            </div>
+            <button id="btn-clear" class="bg-[#222] border border-[#444] text-white px-3 py-1 hover:text-red-400 hover:border-red-400 transition-colors pointer-events-auto shadow-lg">CLEAR GRAPH</button>
+        </div>
+        <div id="graph-transform" class="origin-top-left w-full h-full absolute top-0 left-0">
+            <svg id="connections-svg"></svg>
+            <div id="nodes-container"></div>
+        </div>
+        <div id="context-menu"></div>
+        <div class="absolute bottom-2 right-2 text-[10px] text-gray-600 pointer-events-none text-right">R-Click: Add Node<br>Drag: Move | Scroll: Zoom</div>
+    </div>
+<script>
+const byId = (id) => document.getElementById(id);
+const log = (message, type = 'info') => {
+    const div = document.createElement('div');
+    div.innerHTML = `<span class="opacity-50">${new Date().toLocaleTimeString()}</span> ${message}`;
+    div.style.color = type === 'error' ? '#f55' : (type === 'success' ? '#0f0' : '#888');
+    byId('console-log').prepend(div);
+};
+const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
+};
+const canvas = byId('gl-canvas');
+const gl = canvas.getContext('webgl', { antialias: false, depth: false, preserveDrawingBuffer: true });
+if (!gl.getExtension('OES_texture_float') && !gl.getExtension('OES_texture_half_float')) {
+    alert('Browser does not support floating point textures.');
+}
+let simWidth = 512, simHeight = 512;
+let targetFPS = 60;
+let simInterval = 1000 / 60;
+let textures = [], framebuffers = [];
+let historyTextures = [];
+const MAX_HISTORY = 120;
+let activeIndex = 0;
+let programs = { display: null, compute: null };
+let quadBuffer;
+let isRunning = true;
+let isScrubbing = false;
+let animationFrameId;
+let lastTime = 0, lastFrameTime = 0, frameCount = 0;
+const createShader = (source, type) => {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        log(gl.getShaderInfoLog(shader), 'error');
+        return null;
+    }
+    return shader;
+};
+const createProgram = (vertexSrc, fragmentSrc) => {
+    const program = gl.createProgram();
+    const vs = createShader(vertexSrc, gl.VERTEX_SHADER);
+    const fs = createShader(fragmentSrc, gl.FRAGMENT_SHADER);
+    if (!vs || !fs) return null;
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        log(gl.getProgramInfoLog(program), 'error');
+        return null;
+    }
+    return program;
+};
+function initEngine() {
+    quadBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    resizeSimulation(simWidth);
+    const vs = 'attribute vec2 p; varying vec2 uv; void main(){ uv=p*0.5+0.5; gl_Position=vec4(p,0.,1.); }';
+    const fs = 'precision mediump float; uniform sampler2D t; varying vec2 uv; void main(){ gl_FragColor=texture2D(t,uv); }';
+    programs.display = createProgram(vs, fs);
+    resetSimulation();
+    renderLoop(0);
+}
+function resizeSimulation(size) {
+    simWidth = size; simHeight = size;
+    canvas.width = size; canvas.height = size;
+    textures.forEach(t => gl.deleteTexture(t));
+    framebuffers.forEach(f => gl.deleteFramebuffer(f));
+    historyTextures.forEach(t => gl.deleteTexture(t));
+    textures = []; framebuffers = []; historyTextures = [];
+    for (let i = 0; i < 2; i++) {
+        const t = createTexture();
+        textures.push(t);
+        const f = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+        framebuffers.push(f);
+    }
+    activeIndex = 0;
+    fitCanvas();
+}
+function createTexture() {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, simWidth, simHeight, 0, gl.RGBA, gl.FLOAT, null);
+    return t;
+}
+function resetSimulation() {
+    const data = new Float32Array(simWidth * simHeight * 4);
+    for (let i = 0; i < data.length; i += 4) {
+        const v = Math.random();
+        data[i] = v > 0.5 ? 1.0 : 0.0;
+        data[i+1] = v;
+        data[i+2] = Math.random();
+        data[i+3] = 1.0;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, simWidth, simHeight, 0, gl.RGBA, gl.FLOAT, data);
+    activeIndex = 0;
+    historyTextures.forEach(t => gl.deleteTexture(t));
+    historyTextures = [];
+    updateHistoryUI();
+    log("Simulation Reset", 'info');
+}
+function recordHistory() {
+    let tex;
+    if (historyTextures.length >= MAX_HISTORY) {
+        tex = historyTextures.shift();
+    } else {
+        tex = createTexture();
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[activeIndex]);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, simWidth, simHeight, 0);
+    historyTextures.push(tex);
+    updateHistoryUI();
+}
+function updateHistoryUI() {
+    const slider = byId('history-slider');
+    slider.max = Math.max(0, historyTextures.length - 1);
+    if (!isScrubbing) {
+        slider.value = slider.max;
+        slider.disabled = historyTextures.length === 0;
+    }
+    byId('history-frame').innerText = `${slider.value} / ${historyTextures.length}`;
+}
+function restoreFromHistory(index) {
+    if (index < 0 || index >= historyTextures.length) return;
+    const histTex = historyTextures[index];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[activeIndex]);
+    gl.viewport(0, 0, simWidth, simHeight);
+    gl.useProgram(programs.display);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, histTex);
+    gl.uniform1i(gl.getUniformLocation(programs.display, 't'), 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+function computeStep(time) {
+    if (!programs.compute) return;
+    if (isRunning && !isScrubbing) recordHistory();
+    const nextIndex = 1 - activeIndex;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[nextIndex]);
+    gl.viewport(0, 0, simWidth, simHeight);
+    gl.useProgram(programs.compute);
+    gl.uniform2f(gl.getUniformLocation(programs.compute, 'uRes'), simWidth, simHeight);
+    gl.uniform1f(gl.getUniformLocation(programs.compute, 'uTime'), time * 0.001);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, textures[activeIndex]);
+    gl.uniform1i(gl.getUniformLocation(programs.compute, 'uState'), 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    activeIndex = nextIndex;
+}
+function drawToScreen() {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, simWidth, simHeight);
+    gl.useProgram(programs.display);
+    gl.activeTexture(gl.TEXTURE0);
+    if (isScrubbing) {
+        const idx = parseInt(byId('history-slider').value);
+        if (historyTextures[idx]) gl.bindTexture(gl.TEXTURE_2D, historyTextures[idx]);
+        else gl.bindTexture(gl.TEXTURE_2D, textures[activeIndex]);
+    } else {
+        gl.bindTexture(gl.TEXTURE_2D, textures[activeIndex]);
+    }
+    gl.uniform1i(gl.getUniformLocation(programs.display, 't'), 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+function renderLoop(time) {
+    animationFrameId = requestAnimationFrame(renderLoop);
+    const delta = time - lastFrameTime;
+    if (isRunning && !isScrubbing) {
+        if (delta > simInterval) {
+            computeStep(time);
+            lastFrameTime = time - (delta % simInterval);
+        }
+    }
+    drawToScreen();
+    frameCount++;
+    if (time - lastTime >= 1000) {
+        byId('fps-counter').innerText = `${frameCount} FPS`;
+        frameCount = 0;
+        lastTime = time;
+    }
+}
+let cvsState = { x: 0, y: 0, scale: 1, isDragging: false, lastX: 0, lastY: 0 };
+const canvasWrapper = byId('canvas-wrapper');
+const canvasContainer = byId('canvas-container');
+function updateCanvasTransform() {
+    canvasWrapper.style.transform = `translate(${cvsState.x}px, ${cvsState.y}px) scale(${cvsState.scale})`;
+    byId('zoom-level').innerText = `${Math.round(cvsState.scale * 100)}%`;
+}
+function fitCanvas() {
+    const rect = canvasContainer.getBoundingClientRect();
+    const aspect = simWidth / simHeight;
+    const containerAspect = rect.width / rect.height;
+    if (containerAspect > aspect) {
+        cvsState.scale = (rect.height * 0.9) / simHeight;
+    } else {
+        cvsState.scale = (rect.width * 0.9) / simWidth;
+    }
+    cvsState.x = 0;
+    cvsState.y = 0;
+    updateCanvasTransform();
+}
+canvasContainer.addEventListener('wheel', e => {
+    e.preventDefault();
+    cvsState.scale = Math.min(Math.max(0.1, cvsState.scale - e.deltaY * 0.001), 20);
+    updateCanvasTransform();
+});
+canvasContainer.addEventListener('mousedown', e => {
+    if (e.button === 1 || (e.button === 0 && e.getModifierState('Space'))) {
+        cvsState.isDragging = true;
+        cvsState.lastX = e.clientX;
+        cvsState.lastY = e.clientY;
+        canvasContainer.style.cursor = 'grabbing';
+    }
+});
+window.addEventListener('mousemove', e => {
+    if (cvsState.isDragging) {
+        cvsState.x += e.clientX - cvsState.lastX;
+        cvsState.y += e.clientY - cvsState.lastY;
+        cvsState.lastX = e.clientX;
+        cvsState.lastY = e.clientY;
+        updateCanvasTransform();
+    }
+});
+window.addEventListener('mouseup', () => {
+    if (cvsState.isDragging) {
+        cvsState.isDragging = false;
+        canvasContainer.style.cursor = 'crosshair';
+    }
+});
+const NodeDefinitions = {
+    'Output': { cat: 'IO', inputs: [{n:'val',t:'vec'}], outputs: [], glsl: 'gl_FragColor = %1;' },
+    'Input':  { cat: 'IO', inputs: [], outputs: [{n:'self',t:'vec'}], custom: true },
+    'Time':   { cat: 'IO', inputs: [], outputs: [{n:'t',t:'float'}], glsl: 'vec4(uTime)' },
+    'Coord':  { cat: 'IO', inputs: [], outputs: [{n:'uv',t:'vec'}], glsl: 'vec4(gl_FragCoord.xy/uRes, 0.0, 1.0)' },
+    'Number': { cat: 'Param', inputs: [], outputs: [{n:'val',t:'float'}], type: 'float', default: 1.0 },
+    'Color':  { cat: 'Param', inputs: [], outputs: [{n:'col',t:'color'}], type: 'color', default: '#ff0000' },
+    'Add':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(%1 + %2)' },
+    'Sub':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(%1 - %2)' },
+    'Mul':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(%1 * %2)' },
+    'Div':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(%1 / (%2 + 0.00001))' },
+    'Mod':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: 'mod(%1, %2)' },
+    'Mix':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'},{n:'f',t:'float'}], outputs: [{n:'res',t:'vec'}], glsl: 'mix(%1, %2, %3)' },
+    'Step':   { cat: 'Math', inputs: [{n:'edge',t:'float'},{n:'x',t:'float'}], outputs: [{n:'res',t:'float'}], glsl: 'step(%1, %2)' },
+    'Sin':    { cat: 'Math', inputs: [{n:'x',t:'float'}], outputs: [{n:'res',t:'float'}], glsl: 'sin(%1)' },
+    'Abs':    { cat: 'Math', inputs: [{n:'x',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: 'abs(%1)' },
+    'Eq':     { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'bool',t:'bool'}], glsl: 'vec4(distance(%1, %2) < 0.001 ? 1.0 : 0.0)' },
+    'Neq':    { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'bool',t:'bool'}], glsl: 'vec4(distance(%1, %2) > 0.001 ? 1.0 : 0.0)' },
+    'GT':     { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'bool',t:'bool'}], glsl: 'vec4(%1.x > %2.x ? 1.0 : 0.0)' },
+    'LT':     { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'bool',t:'bool'}], glsl: 'vec4(%1.x < %2.x ? 1.0 : 0.0)' },
+    'And':    { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: 'min(%1, %2)' },
+    'Or':     { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: 'max(%1, %2)' },
+    'Not':    { cat: 'Logic', inputs: [{n:'a',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(1.0 - %1)' },
+    'Sum8':   { cat: 'CA', inputs: [], outputs: [{n:'sum',t:'vec'}], custom: true }, 
+    'Split':  { cat: 'Vec', inputs: [{n:'vec',t:'vec'}], outputs: [{n:'r',t:'float'},{n:'g',t:'float'},{n:'b',t:'float'},{n:'a',t:'float'}], custom: true },
+    'Pack':   { cat: 'Vec', inputs: [{n:'r',t:'float'},{n:'g',t:'float'},{n:'b',t:'float'},{n:'a',t:'float'}], outputs: [{n:'vec',t:'vec'}], glsl: 'vec4(%1.x, %2.x, %3.x, %4.x)' },
+};
+let nodes = [];
+let nextNodeId = 1;
+let transform = { x: 0, y: 0, k: 1 };
+let draggingNode = null;
+let draggingWire = null;
+const requestCompile = debounce(() => {
+    byId('compile-status').innerText = 'COMPILING...';
+    byId('compile-status').style.color = '#ff0';
+    setTimeout(() => {
+        compileGraph();
+        byId('compile-status').innerText = 'AUTO-COMPILE ON';
+        byId('compile-status').style.color = '#666';
+    }, 10);
+}, 500);
+function createNode(type, x, y, value = null) {
+    const def = NodeDefinitions[type];
+    const id = `n${nextNodeId++}`;
+    const el = document.createElement('div');
+    el.className = 'node';
+    const snap = (v) => Math.round(v / 20) * 20;
+    el.style.left = snap(x) + 'px';
+    el.style.top = snap(y) + 'px';
+    el.id = id;
+    el.dataset.type = type;
+    const header = document.createElement('div');
+    header.className = 'node-header';
+    header.innerHTML = `<span>${type}</span>`;
+    header.onmousedown = (e) => startDragNode(e, id);
+    el.appendChild(header);
+    const body = document.createElement('div');
+    body.className = 'node-body';
+    def.inputs.forEach(inp => {
+        const row = document.createElement('div');
+        row.className = 'socket in';
+        row.innerHTML = `<div class="port" id="${id}_in_${inp.n}" data-node="${id}" data-slot="${inp.n}" data-io="in" data-type="${inp.t}" title="${inp.t}"></div>${inp.n}`;
+        body.appendChild(row);
+    });
+    if (def.type === 'float') {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = 0.01;
+        input.value = value ?? def.default;
+        input.id = `${id}_val`;
+        input.oninput = requestCompile;
+        input.onmousedown = (e) => e.stopPropagation();
+        body.appendChild(input);
+    } else if (def.type === 'color') {
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = value ?? def.default;
+        input.id = `${id}_val`;
+        input.oninput = requestCompile;
+        body.appendChild(input);
+    }
+    def.outputs.forEach(out => {
+        const row = document.createElement('div');
+        row.className = 'socket out';
+        row.innerHTML = `${out.n}<div class="port" id="${id}_out_${out.n}" data-node="${id}" data-slot="${out.n}" data-io="out" data-type="${out.t}" title="${out.t}"></div>`;
+        body.appendChild(row);
+    });
+    el.appendChild(body);
+    el.querySelectorAll('.port').forEach(port => {
+        port.onmousedown = (e) => startDragWire(e, id, port.dataset.slot, port.dataset.io);
+    });
+    byId('nodes-container').appendChild(el);
+    nodes.push({ id, type });
+    requestCompile();
+    return id;
+}
+const updateTransform = () => byId('graph-transform').style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`;
+byId('editor-area').onwheel = (e) => {
+    e.preventDefault();
+    transform.k = Math.min(Math.max(0.2, transform.k - e.deltaY * 0.001), 3);
+    updateTransform();
+};
+byId('editor-area').onmousedown = (e) => {
+    if (e.button === 1 || (e.button === 0 && e.getModifierState('Space'))) {
+        draggingNode = { type: 'pan', x: e.clientX - transform.x, y: e.clientY - transform.y };
+        byId('graph-transform').style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+};
+window.startDragNode = (e, id) => {
+    if (e.target.tagName === 'INPUT') return;
+    e.stopPropagation();
+    const el = byId(id);
+    draggingNode = { type: 'node', el: el, offsetX: e.clientX / transform.k - parseFloat(el.style.left), offsetY: e.clientY / transform.k - parseFloat(el.style.top) };
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+    el.classList.add('selected');
+};
+window.startDragWire = (e, nodeId, slot, io) => {
+    e.stopPropagation();
+    if (io === 'in') {
+        const existing = document.querySelector(`path[data-to-node="${nodeId}"][data-to-slot="${slot}"]`);
+        if (existing) { existing.remove(); requestCompile(); }
+        return;
+    }
+    draggingWire = { nodeId, slot };
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.classList.add('active');
+    path.id = 'active-wire';
+    byId('connections-svg').appendChild(path);
+};
+window.onmousemove = (e) => {
+    if (draggingNode?.type === 'pan') {
+        transform.x = e.clientX - draggingNode.x;
+        transform.y = e.clientY - draggingNode.y;
+        updateTransform();
+    }
+    if (draggingNode?.type === 'node') {
+        let nx = e.clientX / transform.k - draggingNode.offsetX;
+        let ny = e.clientY / transform.k - draggingNode.offsetY;
+        nx = Math.round(nx / 20) * 20; ny = Math.round(ny / 20) * 20;
+        draggingNode.el.style.left = nx + 'px';
+        draggingNode.el.style.top = ny + 'px';
+        redrawWires();
+    }
+    if (draggingWire) {
+        const portEl = byId(`${draggingWire.nodeId}_out_${draggingWire.slot}`);
+        if (!portEl) return;
+        const startRect = portEl.getBoundingClientRect();
+        const graphRect = byId('graph-transform').getBoundingClientRect();
+        const x1 = (startRect.left + startRect.width / 2 - graphRect.left) / transform.k;
+        const y1 = (startRect.top + startRect.height / 2 - graphRect.top) / transform.k;
+        const x2 = (e.clientX - graphRect.left) / transform.k;
+        const y2 = (e.clientY - graphRect.top) / transform.k;
+        const dist = Math.abs(x2 - x1) * 0.5;
+        byId('active-wire').setAttribute('d', `M ${x1} ${y1} C ${x1 + dist} ${y1} ${x2 - dist} ${y2} ${x2} ${y2}`);
+    }
+};
+window.onmouseup = (e) => {
+    draggingNode = null;
+    byId('graph-transform').style.cursor = 'default';
+    if (draggingWire) {
+        byId('active-wire').remove();
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        if (el?.classList.contains('port') && el.dataset.io === 'in') {
+            connectPorts(draggingWire.nodeId, draggingWire.slot, el.dataset.node, el.dataset.slot);
+        }
+        draggingWire = null;
+    }
+};
+function connectPorts(fromNode, fromSlot, toNode, toSlot) {
+    const existing = document.querySelector(`path[data-to-node="${toNode}"][data-to-slot="${toSlot}"]`);
+    if (existing) existing.remove();
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.dataset.fromNode = fromNode;
+    path.dataset.fromSlot = fromSlot;
+    path.dataset.toNode = toNode;
+    path.dataset.toSlot = toSlot;
+    byId('connections-svg').appendChild(path);
+    redrawWires();
+    requestCompile();
+}
+function redrawWires() {
+    const graphRect = byId('graph-transform').getBoundingClientRect();
+    document.querySelectorAll('path:not(.active)').forEach(path => {
+        const fromEl = byId(`${path.dataset.fromNode}_out_${path.dataset.fromSlot}`);
+        const toEl = byId(`${path.dataset.toNode}_in_${path.dataset.toSlot}`);
+        if (!fromEl || !toEl) { path.remove(); return; }
+        const r1 = fromEl.getBoundingClientRect();
+        const r2 = toEl.getBoundingClientRect();
+        const x1 = (r1.left + r1.width / 2 - graphRect.left) / transform.k;
+        const y1 = (r1.top + r1.height / 2 - graphRect.top) / transform.k;
+        const x2 = (r2.left + r2.width / 2 - graphRect.left) / transform.k;
+        const y2 = (r2.top + r2.height / 2 - graphRect.top) / transform.k;
+        const dist = Math.abs(x2 - x1) * 0.5;
+        path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dist} ${y1} ${x2 - dist} ${y2} ${x2} ${y2}`);
+    });
+}
+function compileGraph() {
+    const outputNode = nodes.find(n => n.type === 'Output');
+    if (!outputNode) return;
+    let shaderLines = [];
+    let cache = {};
+    const preamble = `precision highp float; uniform sampler2D uState; uniform vec2 uRes; uniform float uTime; vec4 get(float x, float y) { return texture2D(uState, (gl_FragCoord.xy + vec2(x, y)) / uRes); }`;
+    function resolveNode(nodeId) {
+        if (cache[nodeId]) return cache[nodeId];
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node) return 'vec4(0.0)';
+        const def = NodeDefinitions[node.type];
+        const args = [];
+        def.inputs.forEach(inp => {
+            const wire = document.querySelector(`path[data-to-node="${nodeId}"][data-to-slot="${inp.n}"]`);
+            if (wire) {
+                const srcVar = resolveNode(wire.dataset.fromNode);
+                const srcSlot = wire.dataset.fromSlot;
+                const map = { 'r':'x', 'g':'y', 'b':'z', 'a':'w', 'val':'x', 'bool':'x', 'sum':'xyzw', 'res':'xyzw', 'vec':'xyzw', 'self':'xyzw', 'col':'xyzw', 'uv':'xyzw' };
+                const swizzle = map[srcSlot] || 'xyzw';
+                if (swizzle === 'xyzw') args.push(srcVar);
+                else args.push(`vec4(${srcVar}.${swizzle})`);
+            } else {
+                args.push('vec4(0.0)');
+            }
+        });
+        const varName = `v_${nodeId}`;
+        let expr = '';
+        if (node.type === 'Number') expr = `vec4(${byId(`${nodeId}_val`).value})`;
+        else if (node.type === 'Color') {
+            const hex = byId(`${nodeId}_val`).value;
+            const r = parseInt(hex.substr(1,2),16)/255;
+            const g = parseInt(hex.substr(3,2),16)/255;
+            const b = parseInt(hex.substr(5,2),16)/255;
+            expr = `vec4(${r}, ${g}, ${b}, 1.0)`;
+        }
+        else if (node.type === 'Input') expr = 'get(0.0, 0.0)';
+        else if (node.type === 'Sum8') expr = '(get(0.,1.)+get(0.,-1.)+get(1.,0.)+get(-1.,0.)+get(1.,1.)+get(-1.,1.)+get(1.,-1.)+get(-1.,-1.))';
+        else if (node.type === 'Split') expr = args[0];
+        else {
+            expr = def.glsl;
+            args.forEach((arg, i) => expr = expr.replace(`%${i + 1}`, arg));
+        }
+        shaderLines.push(`vec4 ${varName} = vec4(${expr});`);
+        cache[nodeId] = varName;
+        return varName;
+    }
+    try {
+        const outputWire = document.querySelector(`path[data-to-node="${outputNode.id}"]`);
+        const finalColor = outputWire ? resolveNode(outputWire.dataset.fromNode) : 'vec4(0.0)';
+        const fs = `${preamble} void main() { ${shaderLines.join('\n')} gl_FragColor = ${finalColor}; }`;
+        const vs = `attribute vec2 p; varying vec2 uv; void main(){ uv=p*0.5+0.5; gl_Position=vec4(p,0.,1.); }`;
+        const prog = createProgram(vs, fs);
+        if (prog) {
+            programs.compute = prog;
+            log('Graph Compiled', 'success');
+        }
+    } catch (err) {
+        log(err.message, 'error');
+    }
+}
+byId('sim-speed').oninput = (e) => { targetFPS = parseInt(e.target.value); simInterval = 1000 / targetFPS; };
+byId('sim-res').onchange = (e) => { resizeSimulation(parseInt(e.target.value)); };
+byId('history-slider').oninput = (e) => {
+    isScrubbing = true;
+    isRunning = false;
+    byId('btn-play').innerText = "RESUME";
+    byId('history-frame').innerText = `${e.target.value} / ${historyTextures.length}`;
+};
+byId('btn-reset').onclick = resetSimulation;
+byId('btn-play').onclick = function() {
+    if (isScrubbing) {
+        const idx = parseInt(byId('history-slider').value);
+        if (historyTextures[idx]) restoreFromHistory(idx);
+    }
+    isRunning = !isRunning;
+    isScrubbing = false;
+    this.innerText = isRunning ? "PAUSE" : "RESUME";
+    byId('history-slider').value = historyTextures.length - 1;
+};
+byId('btn-step').onclick = () => {
+    isRunning = false;
+    isScrubbing = false;
+    byId('btn-play').innerText = 'RESUME';
+    computeStep(0);
+    drawToScreen();
+};
+byId('btn-clear').onclick = () => {
+    nodes.forEach(n => byId(n.id).remove());
+    nodes = [];
+    byId('connections-svg').innerHTML = '';
+    nextNodeId = 1;
+    requestCompile();
+};
+const Presets = {
+    gol: () => {
+        createNode('Input', 50, 200); createNode('Sum8', 50, 350);
+        createNode('Split', 200, 200); createNode('Split', 200, 350);
+        createNode('Number', 200, 450, 3); createNode('Number', 200, 550, 2);
+        createNode('Eq', 350, 400); createNode('Eq', 350, 500);
+        createNode('And', 500, 300); createNode('Or', 650, 300);
+        createNode('Pack', 800, 200); createNode('Output', 950, 200);
+        connectPorts('n1','self','n3','vec'); connectPorts('n2','sum','n4','vec');
+        connectPorts('n4','r','n7','a'); connectPorts('n5','val','n7','b');
+        connectPorts('n4','r','n8','a'); connectPorts('n6','val','n8','b');
+        connectPorts('n3','r','n9','a'); connectPorts('n8','bool','n9','b');
+        connectPorts('n7','bool','n10','a'); connectPorts('n9','res','n10','b');
+        connectPorts('n10','res','n11','r'); connectPorts('n10','res','n11','g'); connectPorts('n10','res','n11','a');
+        connectPorts('n11','vec','n12','val');
+    },
+    high: () => {
+        createNode('Input', 50, 200); createNode('Sum8', 50, 350);
+        createNode('Split', 200, 200); createNode('Split', 200, 350);
+        createNode('Number', 200, 450, 3); createNode('Number', 200, 550, 2); createNode('Number', 200, 650, 6);
+        createNode('Eq', 350, 400); createNode('Eq', 350, 500); createNode('Eq', 350, 600);
+        createNode('Or', 500, 500); createNode('And', 500, 400); createNode('Or', 650, 400);
+        createNode('Pack', 800, 200); createNode('Output', 950, 200);
+        connectPorts('n1','self','n3','vec'); connectPorts('n2','sum','n4','vec');
+        connectPorts('n4','r','n8','a'); connectPorts('n5','val','n8','b');
+        connectPorts('n4','r','n9','a'); connectPorts('n6','val','n9','b');
+        connectPorts('n4','r','n10','a'); connectPorts('n7','val','n10','b');
+        connectPorts('n8','bool','n11','a'); connectPorts('n10','bool','n11','b');
+        connectPorts('n3','r','n12','a'); connectPorts('n9','bool','n12','b');
+        connectPorts('n11','res','n13','a'); connectPorts('n12','res','n13','b');
+        connectPorts('n13','res','n14','r'); connectPorts('n13','res','n14','g'); connectPorts('n13','res','n14','a');
+        connectPorts('n14','vec','n15','val');
+    },
+    day: () => {
+        createNode('Input', 50, 200); createNode('Sum8', 50, 350); createNode('Split', 200, 200); createNode('Split', 200, 350);
+        createNode('Number', 350, 100, 3); createNode('Number', 350, 200, 4); createNode('Number', 350, 300, 6); createNode('Number', 350, 400, 7); createNode('Number', 350, 500, 8);
+        createNode('Eq', 500, 100); createNode('Eq', 500, 200); createNode('Eq', 500, 300); createNode('Eq', 500, 400); createNode('Eq', 500, 500);
+        createNode('Or', 650, 400); createNode('Or', 800, 350); createNode('Or', 950, 200); createNode('And', 650, 200);
+        createNode('Or', 1100, 200); createNode('Pack', 1200, 200); createNode('Output', 1300, 200);
+        connectPorts('n1','self','n3','vec'); connectPorts('n2','sum','n4','vec');
+        [10,11,12,13,14].forEach((t,i)=>{ connectPorts('n4','r',`n${t}`,'a'); connectPorts(`n${5+i}`,'val',`n${t}`,'b'); });
+        connectPorts('n14','bool','n15','a'); connectPorts('n13','bool','n15','b');
+        connectPorts('n12','bool','n16','a'); connectPorts('n15','res','n16','b');
+        connectPorts('n10','bool','n17','a'); connectPorts('n16','res','n17','b');
+        connectPorts('n11','bool','n18','a'); connectPorts('n3','r','n18','b');
+        connectPorts('n17','res','n19','a'); connectPorts('n18','res','n19','b');
+        connectPorts('n19','res','n20','r'); connectPorts('n19','res','n20','g'); connectPorts('n19','res','n20','a');
+        connectPorts('n20','vec','n21','val');
+    },
+    maze: () => {
+        createNode('Input', 50, 200); createNode('Sum8', 50, 350); createNode('Split', 200, 200); createNode('Split', 200, 350);
+        createNode('Number', 200, 450, 3); createNode('Number', 200, 550, 1); createNode('Number', 200, 650, 5);
+        createNode('Eq', 350, 400); createNode('GT', 350, 500); createNode('LT', 350, 600);
+        createNode('And', 500, 550); createNode('And', 650, 300); createNode('Or', 800, 300);
+        createNode('Pack', 950, 200); createNode('Output', 1100, 200);
+        connectPorts('n1','self','n3','vec'); connectPorts('n2','sum','n4','vec');
+        connectPorts('n4','r','n8','a'); connectPorts('n5','val','n8','b');
+        connectPorts('n4','r','n9','a'); connectPorts('n6','val','n9','b');
+        connectPorts('n4','r','n10','a'); connectPorts('n7','val','n10','b');
+        connectPorts('n9','bool','n11','a'); connectPorts('n10','bool','n11','b');
+        connectPorts('n3','r','n12','a'); connectPorts('n11','res','n12','b');
+        connectPorts('n8','bool','n13','a'); connectPorts('n12','res','n13','b');
+        connectPorts('n13','res','n14','r'); connectPorts('n13','res','n14','g'); connectPorts('n13','res','n14','a');
+        connectPorts('n14','vec','n15','val');
+    },
+    brain: () => {
+        createNode('Input', 50, 200); createNode('Sum8', 50, 350);
+        createNode('Div', 200, 350); createNode('Number', 50, 450, 8);
+        createNode('Sub', 350, 250); createNode('Mul', 500, 250);
+        createNode('Number', 350, 400, 1.2); createNode('Output', 700, 200);
+        connectPorts('n2','sum','n3','a'); connectPorts('n4','val','n3','b');
+        connectPorts('n3','res','n5','a'); connectPorts('n1','self','n5','b');
+        connectPorts('n3','res','n6','a'); connectPorts('n7','val','n6','b');
+        connectPorts('n6','res','n8','val');
+    },
+    cyc: () => {
+        createNode('Input', 50, 200); createNode('Add', 200, 200); createNode('Mod', 350, 200);
+        createNode('Number', 50, 300, 0.05); createNode('Number', 200, 300, 1.0); createNode('Output', 500, 200);
+        connectPorts('n1','self','n2','a'); connectPorts('n4','val','n2','b');
+        connectPorts('n2','res','n3','a'); connectPorts('n5','val','n3','b');
+        connectPorts('n3','res','n6','val');
+    }
+};
+byId('preset-select').onchange = (e) => {
+    byId('btn-clear').click();
+    if(Presets[e.target.value]) setTimeout(() => { Presets[e.target.value](); resetSimulation(); }, 50);
+};
+const contextMenu = byId('context-menu');
+byId('editor-area').oncontextmenu = (e) => {
+    e.preventDefault();
+    contextMenu.innerHTML = '';
+    const categories = {};
+    Object.keys(NodeDefinitions).forEach(k => {
+        const cat = NodeDefinitions[k].cat;
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(k);
+    });
+    Object.keys(categories).forEach(cat => {
+        const h = document.createElement('div');
+        h.innerText = cat.toUpperCase();
+        h.style.cssText = 'background:#222;padding:4px 8px;font-size:9px;color:#666;border-bottom:1px solid #333';
+        contextMenu.appendChild(h);
+        categories[cat].forEach(type => {
+            const item = document.createElement('div');
+            item.className = 'menu-item';
+            item.innerText = type;
+            item.onclick = () => {
+                const r = byId('nodes-container').getBoundingClientRect();
+                createNode(type, (e.clientX - r.left)/transform.k, (e.clientY - r.top)/transform.k);
+                contextMenu.style.display = 'none';
+            };
+            contextMenu.appendChild(item);
+        });
+    });
+    contextMenu.style.left = e.clientX + 'px';
+    contextMenu.style.top = e.clientY + 'px';
+    contextMenu.style.display = 'block';
+};
+window.onclick = (e) => { if(!e.target.closest('#context-menu')) contextMenu.style.display='none'; };
+initEngine();
+Presets.gol();
+</script>
+</body>
+</html>
