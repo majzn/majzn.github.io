@@ -3,601 +3,540 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Pia Studio v19.2 - Production Grade Tiling Engine</title>
+    <title>Pro Pia Studio v23.1 [Studio Pro Edition]</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
-        :root { --acc: #3b82f6; --bg-deep: #020617; --bg-panel: #0f172a; }
-        body { background-color: var(--bg-deep); color: #f1f5f9; overflow: hidden; font-family: 'Inter', sans-serif; }
-        canvas { touch-action: none; display: block; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
-        .control-panel { position: relative; width: 340px; min-width: 300px; max-width: 550px; }
-        .resizer { position: absolute; right: 0; top: 0; width: 4px; height: 100%; cursor: col-resize; z-index: 50; }
-        .resizer:hover { background: rgba(59, 130, 246, 0.4); }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-        input[type="range"] { accent-color: var(--acc); height: 4px; cursor: pointer; background: #334155; appearance: none; width: 100%; border-radius: 2px; }
-        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; background: #fff; border-radius: 50%; border: 2px solid var(--acc); }
-        .card { background: rgba(30, 41, 59, 0.35); border: 1px solid rgba(51, 65, 85, 0.4); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
-        .g-title { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.15em; color: #64748b; font-weight: 900; margin: 12px 0 6px 0; display: flex; align-items: center; gap: 8px; }
-        .g-title::after { content: ""; height: 1px; flex: 1; background: linear-gradient(to right, #1e293b, transparent); }
-        .row-header { display: flex; align-items: center; justify-content: space-between; height: 20px; margin-bottom: 2px; }
-        .row-header label { font-size: 9px; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
-        .val { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--acc); min-width: 3.5rem; text-align: right; font-weight: 700; }
-        .snap-select { background: #020617; border: 1px solid #334155; border-radius: 4px; color: #64748b; font-size: 8px; font-weight: 900; width: 48px; height: 18px; outline: none; cursor: pointer; appearance: none; text-align: center; }
-        select { background: #020617; border: 1px solid #334155; border-radius: 4px; color: white; font-size: 10px; padding: 2px 4px; outline: none; }
-        .layer-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(51, 65, 85, 0.3); border-radius: 8px; padding: 10px; margin-bottom: 8px; border-left-width: 4px; }
-        .control-row { display: flex; align-items: center; gap: 8px; height: 20px; margin-bottom: 2px; }
-        .control-row label { font-size: 8px; color: #475569; width: 45px; font-weight: 900; }
-        .color-wrap { position: relative; width: 18px; height: 18px; border-radius: 4px; overflow: hidden; border: none; flex-shrink: 0; background: #1e293b; }
-        .color-wrap input[type="color"] { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; cursor: pointer; border: none; background: none; }
-        .btn-rand-small { font-size: 8px; font-weight: 900; color: #475569; opacity: 0.4; transition: opacity 0.2s; cursor: pointer; }
-        .btn-rand-small:hover { opacity: 1; color: var(--acc); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+        :root { 
+            --c-bg: #050505; --c-surf: #111111; --c-surf-light: #1a1a1a; --c-bord: #262626; 
+            --c-acc: #3b82f6; --c-acc-h: #60a5fa; --c-text: #a1a1aa; --c-text-hi: #fafafa; 
+        }
+        body { background-color: var(--c-bg); color: var(--c-text); font-family: 'Inter', sans-serif; overflow: hidden; height: 100vh; width: 100vw; display: flex; font-size: 12px; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: var(--c-bg); }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #444; }
+        .panel { width: 340px; min-width: 320px; max-width: 600px; background: var(--c-surf); border-right: 1px solid var(--c-bord); display: flex; flex-direction: column; z-index: 50; position: relative; box-shadow: 5px 0 20px rgba(0,0,0,0.5); }
+        .resizer { position: absolute; right: -3px; top: 0; width: 6px; height: 100%; cursor: col-resize; z-index: 60; opacity: 0; transition: opacity 0.2s; }
+        .resizer:hover { opacity: 1; background: var(--c-acc); }
+        .scroll-y { overflow-y: auto; flex: 1; padding: 0; }
+        .section-head { display: flex; align-items: center; justify-content: space-between; background: var(--c-surf-light); padding: 8px 16px; border-top: 1px solid var(--c-bord); border-bottom: 1px solid var(--c-bord); cursor: pointer; user-select: none; transition: background 0.2s; }
+        .section-head:hover { background: #222; }
+        .section-head span { font-weight: 700; color: var(--c-text-hi); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+        .section-icon { transition: transform 0.2s; }
+        .section-head.collapsed .section-icon { transform: rotate(-90deg); }
+        .section-body { display: block; padding: 12px 16px; }
+        .section-body.collapsed { display: none; }
+        .ctrl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; height: 24px; }
+        .ctrl-row label { font-weight: 500; color: #888; font-size: 11px; width: 75px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .val { font-family: 'JetBrains Mono', monospace; text-align: right; color: var(--c-acc); font-size: 10px; width: 40px; flex-shrink: 0; }
+        input[type="range"] { -webkit-appearance: none; background: transparent; width: 100%; cursor: pointer; height: 18px; flex: 1; }
+        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 3px; background: #333; border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; background: #ccc; margin-top: -4.5px; border-radius: 50%; box-shadow: 0 0 0 2px var(--c-surf); transition: all 0.1s; }
+        input[type="range"]::-webkit-slider-thumb:hover { background: var(--c-acc); transform: scale(1.2); }
+        .inp-select { background: #222; border: 1px solid #333; color: var(--c-text-hi); font-size: 10px; padding: 4px 6px; width: 100%; outline: none; border-radius: 3px; transition: border 0.2s; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+        .inp-select:hover { border-color: var(--c-acc); }
+        .dropdown-portal { position: fixed; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 1000; display: none; overflow-y: auto; min-width: 200px; padding: 4px; }
+        .dropdown-item { padding: 8px 12px; font-size: 10px; font-weight: 700; color: #888; text-transform: uppercase; cursor: pointer; border-radius: 3px; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+        .dropdown-item:hover { background: var(--c-acc); color: white; }
+        .dropdown-item.active { color: var(--c-acc); background: #222; }
+        .btn { border: none; padding: 6px 12px; border-radius: 3px; font-weight: 600; font-size: 10px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-primary { background: var(--c-acc); color: white; width: 100%; padding: 10px; margin-top: 8px; }
+        .btn-primary:hover { background: var(--c-acc-h); }
+        .btn-sec { background: #222; color: #ccc; border: 1px solid #333; flex: 1; }
+        .btn-sec:hover { background: #333; color: white; border-color: #555; }
+        .btn-icon { background: none; border: none; color: #666; cursor: pointer; padding: 4px; border-radius: 3px; }
+        .btn-icon:hover { color: var(--c-acc); background: #222; }
+        .layer-list { display: flex; flex-direction: column; gap: 8px; }
+        .layer-item { background: #151515; border: 1px solid #262626; border-radius: 4px; overflow: hidden; }
+        .layer-body { padding: 8px; display: grid; gap: 8px; }
+        .color-well { width: 40px; height: 12px; background: #222; position: relative; overflow: hidden; cursor: pointer; border: 1px solid #333; border-radius: 2px; flex-shrink: 0; }
+        .color-well input { position: absolute; top: -10px; left: -10px; width: 200%; height: 200%; opacity: 0; cursor: pointer; }
+        .chk { accent-color: var(--c-acc); cursor: pointer; width: 14px; height: 14px; }
+        #canvasContainer { flex: 1; position: relative; background-image: linear-gradient(45deg, #080808 25%, transparent 25%), linear-gradient(-45deg, #080808 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #080808 75%), linear-gradient(-45deg, transparent 75%, #080808 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; background-color: #050505; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        canvas { box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: var(--c-acc); color: white; padding: 8px 16px; border-radius: 4px; font-weight: 600; transform: translateY(100px); transition: transform 0.3s; z-index: 2000; box-shadow: 0 10px 15px rgba(0,0,0,0.3); }
+        .toast.show { transform: translateY(0); }
+        #evoOverlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px; backdrop-filter: blur(15px); }
+        .evo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; width: 100%; max-width: 1200px; }
+        .evo-thumb { background: #111; border: 2px solid #333; border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.2s; position: relative; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; }
+        .evo-thumb:hover { border-color: var(--c-acc); transform: scale(1.05); z-index: 10; box-shadow: 0 0 30px rgba(59, 130, 246, 0.4); }
+        .evo-thumb canvas { width: 100%; height: 100%; box-shadow: none; pointer-events: none; }
+        .evo-score { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8); padding: 2px 6px; border-radius: 4px; color: var(--c-acc); font-family: 'JetBrains Mono'; font-size: 10px; font-weight: 800; border: 1px solid #333; }
+        .topo-preview { width: 44px; height: 28px; background: #000; border-radius: 2px; overflow: hidden; border: 1px solid #333; }
     </style>
 </head>
-<body class="flex h-screen w-screen m-0 p-0 overflow-hidden select-none">
-
-    <div id="sidebar" class="control-panel bg-[#0f172a] border-r border-slate-800 flex flex-col p-4 overflow-y-auto z-20 shrink-0 shadow-2xl">
+<body>
+    <div id="sidebar" class="panel">
         <div id="resizer" class="resizer"></div>
-        <div class="mb-4">
-            <h1 class="text-base font-black text-white flex items-center gap-2">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="M12 2l10 6.5v7L12 22 2 15.5v-7L12 2z"/><path d="M12 22v-6.5M2 15.5l10-6.5 10 6.5"/></svg>
-                PIA STUDIO ULTRA
-            </h1>
-            <p class="text-[9px] text-slate-500 font-black tracking-[0.25em] pl-10 uppercase opacity-70">Production Grade Engine</p>
+        <div class="p-4 pb-2 border-b border-[#262626]">
+            <h1 class="text-sm font-black text-white flex items-center gap-2 tracking-wide mb-1"><div class="w-3 h-3 bg-blue-500 rounded-sm"></div> PIA STUDIO <span class="text-[9px] text-gray-600 bg-gray-900 px-1 rounded uppercase">v23.1 PRO</span></h1>
+            <div class="flex gap-2 mt-3"><button id="btnSavePreset" class="btn btn-sec text-[9px] py-1">Save</button><button id="btnLoadPreset" class="btn btn-sec text-[9px] py-1">Load</button></div>
         </div>
-
-        <div class="g-title"><span>Lattice Kernel</span><button onclick="randomizeLattice()" class="btn-rand-small">RAND</button></div>
-        <div class="card">
-            <select id="gridType" class="w-full mb-3 p-1.5 font-bold uppercase tracking-wider text-[10px]">
-                <option value="square">Square Grid (4.4.4.4)</option>
-                <option value="hex">Hexagonal Grid (6.6.6)</option>
-                <option value="tri">Triangular Grid (3.3.3.3.3.3)</option>
-                <option value="tetrille">Tetrille (Crystalline)</option>
-                <option value="truncsquare">Truncated Square (4.8.8)</option>
-            </select>
-            <div id="latticeControls"></div>
-        </div>
-
-        <div class="g-title"><span>Morphology Controls</span><button onclick="randomizeMorphology()" class="btn-rand-small">RAND</button></div>
-        <div class="card">
-            <div class="row">
-                <div class="row-header"><label>Global Scale</label><select id="snap_zoom" class="snap-select"><option value="0">OFF</option><option value="1" selected>1.0</option></select></div>
-                <div class="flex items-center gap-3"><input type="range" id="zoom" min="20" max="800" value="120"><span id="zoomVal" class="val">120.0</span></div>
+        <div class="scroll-y">
+            <div class="section-head" onclick="toggleSection(this)">
+                <span><div class="section-icon">▼</div> Evolution Engine</span>
+                <button id="btnEvolveNow" class="btn-icon text-[9px] font-bold text-blue-500 uppercase" onclick="event.stopPropagation()">Gen Matrix</button>
             </div>
-            <div class="row">
-                <div class="row-header"><label>Expansion Bias</label><select id="snap_expansion" class="snap-select"><option value="0">OFF</option><option value="0.05" selected>0.05</option></select></div>
-                <div class="flex items-center gap-3"><input type="range" id="expansion" min="1" max="150" value="50"><span id="expansionVal" class="val">0.50</span></div>
+            <div class="section-body">
+                <div class="mb-3 text-[10px] text-gray-500 font-bold uppercase leading-tight">Genetic Heuristics</div>
+                <div class="ctrl-row mb-1"><label title="Structural Chaos">Entropy</label><input type="range" id="evo_chaos" min="0" max="100" value="50"></div>
+                <div class="ctrl-row mb-1"><label title="Visual Density">Mass</label><input type="range" id="evo_density" min="0" max="100" value="50"></div>
+                <div class="ctrl-row mb-1"><label title="Color Energy">Chroma</label><input type="range" id="evo_vibrancy" min="0" max="100" value="50"></div>
+                <div class="ctrl-row mb-3"><label title="Lattice Logic">Structure</label><input type="range" id="evo_symmetry" min="0" max="100" value="50"></div>
+                <div class="ctrl-row mb-3"><label>Mutation</label><input type="range" id="evo_mutation" min="1" max="100" value="30"></div>
+                <button id="btnOpenEvo" class="btn btn-primary font-black uppercase">Breed Variations</button>
             </div>
-            <div class="row">
-                <div class="row-header"><label>Segment Curvature</label><select id="snap_rounding" class="snap-select"><option value="0">OFF</option><option value="0.05" selected>0.05</option></select></div>
-                <div class="flex items-center gap-3"><input type="range" id="rounding" min="0" max="100" value="0"><span id="roundingVal" class="val">0%</span></div>
+            <div class="section-head collapsed" onclick="toggleSection(this)">
+                <span><div class="section-icon">▼</div> Grid & Morphology</span>
+                <button id="btnRandGrid" class="btn-icon text-[9px] font-bold text-green-500 uppercase" onclick="event.stopPropagation()">Rnd</button>
             </div>
-        </div>
-
-        <div class="g-title"><span>Edge Generator</span><button onclick="randomizeEdge()" class="btn-rand-small">RAND</button></div>
-        <div class="card">
-            <div class="row"><div class="row-header"><label>Polygon Vertex Count</label></div><div class="flex items-center gap-3"><input type="range" id="polySides" min="3" max="32" step="1" value="4"><span id="polySidesVal" class="val">4</span></div></div>
-            <div class="row"><div class="row-header"><label>Local Phase Offset</label><select id="snap_polyRot" class="snap-select"><option value="0">OFF</option><option value="15" selected>15.0°</option></select></div><div class="flex items-center gap-3"><input type="range" id="polyRot" min="0" max="360" step="0.5" value="0"><span id="polyRotVal" class="val">0.0°</span></div></div>
-            <div class="row"><div class="row-header"><label>Linear Pivot X</label></div><div class="flex items-center gap-3"><input type="range" id="offsetX" min="-100" max="100" step="1" value="0"><span id="offsetXVal" class="val">0.00</span></div></div>
-            <div class="row"><div class="row-header"><label>Linear Pivot Y</label></div><div class="flex items-center gap-3"><input type="range" id="offsetY" min="0" max="100" step="1" value="50"><span id="offsetYVal" class="val">0.50</span></div></div>
-            <div class="flex items-center gap-3 mt-2"><input type="checkbox" id="polyMirror" class="w-4 h-4 rounded accent-blue-500"><label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mirror Dual Symmetry</label></div>
-        </div>
-
-        <div class="g-title"><span>LFO Modular Engine</span><button onclick="randomizeLFO()" class="btn-rand-small">RAND</button></div>
-        <div class="card">
-            <div class="flex items-center gap-3 mb-3"><input type="checkbox" id="autoAnim" class="w-4 h-4 accent-indigo-500"><label class="text-[11px] font-black text-indigo-400 uppercase tracking-widest">Studio Loop Master</label></div>
-            <div class="row"><div class="row-header"><label>Master Tempo</label></div><input type="range" id="animTempo" min="1" max="100" value="30"></div>
-            <div class="mt-4 space-y-3">
-                <div class="flex flex-col gap-1">
-                    <div class="flex justify-between items-center"><span class="text-[8px] font-black text-slate-500 uppercase">Local Poly Rotation</span><span id="mod_rotVal" class="text-[8px] text-blue-500 font-bold">0%</span></div>
-                    <input type="range" id="mod_rot" min="0" max="100" value="0">
+            <div class="section-body collapsed">
+                <div class="mb-3">
+                    <label class="block text-[9px] font-bold text-gray-500 mb-1 uppercase">Topology</label>
+                    <div id="gridSelector" class="inp-select font-black">
+                        <span id="gridTypeLabel">SQUARE LATTICE</span>
+                        <span>▼</span>
+                    </div>
                 </div>
-                <div class="flex flex-col gap-1">
-                    <div class="flex justify-between items-center"><span class="text-[8px] font-black text-slate-500 uppercase">Curvature Morph</span><span id="mod_roundVal" class="text-[8px] text-blue-500 font-bold">0%</span></div>
-                    <input type="range" id="mod_round" min="0" max="100" value="0">
-                </div>
-                <div class="flex flex-col gap-1">
-                    <div class="flex justify-between items-center"><span class="text-[8px] font-black text-slate-500 uppercase">Expansion LFO</span><span id="mod_expVal" class="text-[8px] text-blue-500 font-bold">0%</span></div>
-                    <input type="range" id="mod_exp" min="0" max="100" value="0">
-                </div>
-                <div class="flex flex-col gap-1">
-                    <div class="flex justify-between items-center"><span class="text-[8px] font-black text-slate-500 uppercase">Pivot Symmetry LFO</span><span id="mod_offsetVal" class="text-[8px] text-blue-500 font-bold">0%</span></div>
-                    <input type="range" id="mod_offset" min="0" max="100" value="0">
+                <div id="core-controls"></div>
+                <div class="flex items-center gap-3 mt-2 bg-gray-900/50 p-2 rounded border border-gray-800">
+                    <div class="flex items-center gap-2"><input type="checkbox" id="polyMirror" class="chk"><label class="text-[9px] font-bold text-gray-400 uppercase">Mirror</label></div>
+                    <div id="truncControl" class="flex-1 hidden"><div class="flex items-center gap-2"><label class="text-[9px] font-bold text-gray-600 uppercase">Trunc</label><input type="range" id="latParam1" min="10" max="45" value="33"></div></div>
                 </div>
             </div>
-        </div>
-
-        <div class="g-title"><span>Multi-Layer Stylist</span><button onclick="randomizeLayers()" class="btn-rand-small">RAND</button></div>
-        <div id="layers-container"></div>
-
-        <div class="mt-auto pt-6 flex flex-col gap-3">
-            <div class="row-header px-1"><label class="text-[10px] text-slate-500 uppercase font-black">Environment BG</label><div class="color-wrap"><input type="color" id="bgColor" value="#020617"></div></div>
-            <button id="randBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-[11px] uppercase tracking-widest rounded-lg shadow-xl active:scale-95 transition-all">Randomize Studio Core</button>
-            <div class="grid grid-cols-3 gap-2">
-                <button id="exportPng" class="py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[9px] uppercase rounded-md">PNG High</button>
-                <button id="exportBmp" class="py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[9px] uppercase rounded-md">BMP Raw</button>
-                <button id="exportSvg" class="py-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-300 font-bold text-[9px] uppercase rounded-md border border-indigo-500/30">SVG Vector</button>
+            <div class="section-head" onclick="toggleSection(this)"><span><div class="section-icon">▼</div> LFO & Animation</span><div class="flex items-center gap-2" onclick="event.stopPropagation()"><button id="btnRandLFO" class="btn-icon text-[9px] font-bold text-green-500 uppercase">Rnd</button><button id="playPauseBtn" class="btn-icon text-xs">▶</button></div></div>
+            <div class="section-body">
+                <div class="ctrl-row mb-3"><label>Tempo</label><input type="range" id="animTempo" min="0.1" max="10.0" step="0.1" value="1.0"><span class="val" id="animTempoVal">1.0</span></div>
+                <div class="grid grid-cols-4 gap-2 mb-2">
+                    <div class="flex flex-col gap-1 items-center"><div class="text-[8px] font-bold text-gray-600 uppercase">Rot</div><input type="range" id="mod_rot" min="0" max="100" value="0"><div id="mod_rotVal" class="text-[8px] text-blue-500 font-mono">0%</div></div>
+                    <div class="flex flex-col gap-1 items-center"><div class="text-[8px] font-bold text-gray-600 uppercase">Shape</div><input type="range" id="mod_round" min="0" max="100" value="0"><div id="mod_roundVal" class="text-[8px] text-blue-500 font-mono">0%</div></div>
+                    <div class="flex flex-col gap-1 items-center"><div class="text-[8px] font-bold text-gray-600 uppercase">Exp</div><input type="range" id="mod_exp" min="0" max="100" value="0"><div id="mod_expVal" class="text-[8px] text-blue-500 font-mono">0%</div></div>
+                    <div class="flex flex-col gap-1 items-center"><div class="text-[8px] font-bold text-gray-600 uppercase">Off</div><input type="range" id="mod_offset" min="0" max="100" value="0"><div id="mod_offsetVal" class="text-[8px] text-blue-500 font-mono">0%</div></div>
+                </div>
+            </div>
+            <div class="section-head" onclick="toggleSection(this)"><span><div class="section-icon">▼</div> Compositing</span><div class="flex items-center gap-2" onclick="event.stopPropagation()"><div class="flex items-center gap-1 mr-2"><input type="checkbox" id="enableFX" class="chk" checked><span class="text-[9px] font-bold text-gray-400 uppercase">Fx</span></div><button id="btnRandLayers" class="btn-icon text-[9px] font-bold text-green-500 uppercase">Rnd</button></div></div>
+            <div class="section-body">
+                <div class="ctrl-row mb-1"><label>Complexity</label><input type="range" id="iterations" min="1" max="5" step="1" value="1"><span id="iterationsVal" class="val">1</span></div>
+                <div class="ctrl-row mb-1"><label>Light Dir</label><input type="range" id="lightDir" min="0" max="360" step="1" value="45"><span id="lightDirVal" class="val">45°</span></div>
+                <div class="ctrl-row mb-3"><label>BG Color</label><div class="color-well flex-1"><input type="color" id="bgColor" value="#050505"></div><span class="text-[9px] text-gray-600 ml-2 uppercase">Hex</span></div>
+                <div id="layers-container" class="layer-list"></div>
+            </div>
+            <div class="section-head collapsed" onclick="toggleSection(this)"><span><div class="section-icon">▼</div> Output & Export</span></div>
+            <div class="section-body collapsed">
+                <div class="flex items-center gap-3 mb-3 p-2 bg-gray-900/50 rounded border border-gray-800"><input type="checkbox" id="singleTile" class="chk"><label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Single Tile Preview</label></div>
+                <div class="ctrl-row mb-3"><label class="text-[9px] font-bold text-gray-500 uppercase">Filtering</label><select id="filterMode" class="inp-select font-bold"><option value="nearest">Nearest Neighbor</option><option value="bilinear" selected>Bilinear (Smooth)</option><option value="bicubic">Bicubic (High Quality)</option></select></div>
+                <div class="mb-3"><div class="flex justify-between items-center mb-1"><label class="text-[9px] font-bold text-gray-500 uppercase">Export Res</label><span id="exportResVal" class="text-[10px] text-blue-500 font-mono">1024 PX</span></div><input type="range" id="exportResSlider" min="3" max="12" step="1" value="10"></div>
+                <div class="grid grid-cols-3 gap-2"><button id="exportPng" class="btn btn-sec">PNG</button><button id="exportSvg" class="btn btn-sec">SVG</button><button id="exportBmp" class="btn btn-sec">BMP</button></div>
+                <button id="randBtn" class="btn btn-primary font-bold uppercase mt-4">Randomize All</button>
             </div>
         </div>
     </div>
-
-    <div id="canvasContainer" class="flex-1 relative bg-[#020617] overflow-hidden">
-        <canvas id="canvas"></canvas>
+    <div id="canvasContainer"><canvas id="canvas"></canvas></div>
+    <div id="evoOverlay">
+        <h2 class="text-white text-xl font-black mb-6 uppercase tracking-tighter flex items-center justify-between w-full max-w-[1200px]">Evolutionary Selection <button id="btnCloseEvo" class="text-[10px] uppercase font-bold bg-zinc-800 border border-zinc-700 px-4 py-2 rounded hover:bg-red-600 transition-colors">Dismiss</button></h2>
+        <div id="evoGrid" class="evo-grid"></div>
+        <div class="mt-8 flex gap-4"><button id="btnRefreshEvo" class="btn btn-primary w-64 font-black uppercase">Mutate New Branches</button></div>
     </div>
-
+    <div id="blendDropdown" class="dropdown-portal"></div>
+    <div id="topoDropdown" class="dropdown-portal"></div>
+    <div id="toast" class="toast">Action Complete</div>
     <script>
-        const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d', { alpha: false, desynchronized: true });
-        const offCanvas = document.createElement('canvas');
-        const offCtx = offCanvas.getContext('2d');
-        
-        // Secondary buffers to handle layered shadow bleed and flattening
-        const layerTileCanvas = document.createElement('canvas');
-        const ltCtx = layerTileCanvas.getContext('2d');
-        const bleedCanvas = document.createElement('canvas');
-        const blCtx = bleedCanvas.getContext('2d');
+        // --- UTILS ---
+        function rad(deg) { return deg * Math.PI / 180; }
+        function hashCoord(p) { return `${Math.round(p.x * 1000)}|${Math.round(p.y * 1000)}`; }
+        function getRGBA(h, a) { 
+            const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16); 
+            return `rgba(${r},${g},${b},${a})`; 
+        }
+        function hslToHex(h, s, l) { 
+            l /= 100; const a = s * Math.min(l, 1 - l) / 100; 
+            const f = n => { const k = (n + h / 30) % 12; const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); return Math.round(255 * color).toString(16).padStart(2, '0'); }; 
+            return `#${f(0)}${f(8)}${f(4)}`; 
+        }
+        function generatePalette() { 
+            const h = Math.random() * 360, s = 40 + Math.random() * 60, type = Math.random(); 
+            let colors = []; if(type < 0.2) for(let i=0; i<5; i++) colors.push(hslToHex(h, s, 20 + i*15)); else if(type < 0.5) for(let i=0; i<5; i++) colors.push(hslToHex((h + i*30)%360, s, 50)); else if(type < 0.8) colors = [hslToHex(h, s, 50), hslToHex((h+180)%360, s, 50), hslToHex(h, s, 30), hslToHex((h+180)%360, s, 70), hslToHex(h, s*0.5, 90)]; else for(let i=0; i<5; i++) colors.push(hslToHex(Math.random()*360, 90, 60)); return colors; 
+        }
+        function drawPathDirect(ctx, list, rounding) {
+            ctx.beginPath();
+            list.forEach(item => {
+                const pts = item.pts; if(pts.length < 3) return;
+                if(rounding < 0.01) { ctx.moveTo(pts[0].x, pts[0].y); for(let i=1; i<pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); } 
+                else { for(let i=0; i<pts.length; i++) { const p1 = pts[i], p0 = pts[(i-1+pts.length)%pts.length], p2 = pts[(i+1)%pts.length]; const v1x = p0.x-p1.x, v1y = p0.y-p1.y, v2x = p2.x-p1.x, v2y = p2.y-p1.y; const l1 = Math.sqrt(v1x*v1x+v1y*v1y), l2 = Math.sqrt(v2x*v2x+v2y*v2y); const r = Math.min(l1,l2)*0.5*rounding, sx = p1.x+v1x/l1*r, sy = p1.y+v1y/l1*r, ex = p1.x+v2x/l2*r, ey = p1.y+v2y/l2*r; if(i===0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy); ctx.quadraticCurveTo(p1.x, p1.y, ex, ey); } ctx.closePath(); }
+            }); ctx.fill(); if(ctx.lineWidth > 0) ctx.stroke();
+        }
 
-        const ctr = document.getElementById('canvasContainer');
-        const sdb = document.getElementById('sidebar'), rsz = document.getElementById('resizer');
-        const latCtrlCnt = document.getElementById('latticeControls');
-        
-        let cW, cH, animT = 0, isDirty = true, lastOversample = 1;
+        // --- RENDER ENGINE HELPERS ---
+        function updateColorWell(input) { if(input && input.parentNode) input.parentNode.style.backgroundColor = input.value; }
+        function toggleSection(head) { head.classList.toggle('collapsed'); head.nextElementSibling.classList.toggle('collapsed'); }
+        function setFiltering(tCtx, mode) { if(mode === 'nearest') { tCtx.imageSmoothingEnabled = false; cvs.style.imageRendering = 'pixelated'; } else { tCtx.imageSmoothingEnabled = true; tCtx.imageSmoothingQuality = mode === 'bicubic' ? 'high' : 'low'; cvs.style.imageRendering = 'auto'; } }
+        function showToast(msg) { const t = document.getElementById('toast'); if(!t) return; t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+        function resize() { const container = document.getElementById('canvasContainer'); if(!container) return; cW = cvs.width = container.clientWidth; cH = cvs.height = container.clientHeight; markDirty(); }
+        function markDirty() { isDirty = true; if(!cfg.autoAnim) requestAnimationFrame(render); }
+        function invalidateGeomCache() { geomCache.baseGridType = null; markDirty(); }
+        function getUnitCellDimensions(pGridType) { const s = 100; switch(pGridType || cfg.gridType) { case 'hex': return { w: s * 3, h: s * Math.sqrt(3) }; case 'tri': return { w: s, h: s * Math.sqrt(3) }; case 'tetrille': return { w: s * 3, h: s * Math.sqrt(3) }; default: return { w: s, h: s }; } }
 
-        const cfg = {
-            gridType: 'square', polySides: 4, expansion: 0.5, zoom: 120, rounding: 0,
-            polyRot: 0, offsetY: 0.5, offsetX: 0, polyMirror: false, bgColor: '#020617',
-            autoAnim: false, animTempo: 30, 
-            mod_rot: 0, mod_round: 0, mod_exp: 0, mod_offset: 0,
-            latParam1: 0.4
-        };
-
-        const layerCfgs = [
-            { id: 0, name: 'Lattice Foundation', vis: true, c: '#1e293b', o: 0.15, sc: '#334155', sw: 0.5, b: 'source-over', shB: 0, shO: 0 },
-            { id: 1, name: 'Primal Mesh', vis: true, c: '#3b82f6', o: 0.5, sc: '#60a5fa', sw: 1.0, b: 'source-over', shB: 0, shO: 0 },
-            { id: 2, name: 'Dual Harmonic', vis: true, c: '#10b981', o: 0.4, sc: '#34d399', sw: 1.0, b: 'difference', shB: 15, shO: 2 },
-            { id: 3, name: 'Morph Edges', vis: true, c: '#f59e0b', o: 0.3, sc: '#fbbf24', sw: 1.0, b: 'source-over', shB: 0, shO: 0 }
+        // --- CORE CONFIG ---
+        const BLEND_MODES = ['source-over', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'hard-light', 'difference', 'exclusion'];
+        const LATTICES = [
+            { id: 'square', label: 'Square Lattice' },
+            { id: 'hex', label: 'Hexagonal Lattice' },
+            { id: 'tri', label: 'Triangular Lattice' },
+            { id: 'tetrille', label: 'Tetrille (3,4,6,4)' },
+            { id: 'truncsquare', label: 'Truncated Square' }
         ];
 
-        const BLEND_MODES = ['source-over', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'];
+        let cfg = { gridType: 'square', polySides: 4, expansion: 0.5, zoom: 120, rounding: 0, spike: 0, polyRot: 0, offsetY: 0, offsetX: 0, polyMirror: false, bgColor: '#050505', autoAnim: false, animTempo: 1.0, iterations: 1, mod_rot: 0, mod_round: 0, mod_exp: 0, mod_offset: 0, latParam1: 0.33, enableFX: true, singleTile: false, filterMode: 'bilinear', lightDir: 45 };
+        let layerCfgs = [
+            { id: 'base', name: 'Base Grid', vis: true, c: '#1f2937', o: 0.1, sc: '#374151', sw: 1, so: 1, b: 'source-over', shB: 0, shO: 0, shC: '#000000', ld: 0 },
+            { id: 'dual', name: 'Dual Grid', vis: false, c: '#10b981', o: 0.1, sc: '#34d399', sw: 1, so: 1, b: 'overlay', shB: 0, shO: 0, shC: '#000000', ld: 0 },
+            { id: 'ag1', name: 'Geom 1', vis: true, c: '#3b82f6', o: 0.25, sc: '#60a5fa', sw: 1, so: 1, b: 'source-over', shB: 10, shO: 5, shC: '#000000', ld: 0 },
+            { id: 'ad1', name: 'Dual 1', vis: false, c: '#f43f5e', o: 0, sc: '#fb7185', sw: 1, so: 1, b: 'screen', shB: 10, shO: 5, shC: '#000000', ld: 0 }
+        ];
 
-        const rad = (deg) => deg * Math.PI / 180;
-        const getRGBA = (h, a) => {
-            const r = parseInt(h.slice(1,3), 16), g = parseInt(h.slice(3,5), 16), b = parseInt(h.slice(5,7), 16);
-            return `rgba(${r},${g},${b},${a})`;
-        };
-        const hashCoord = (p) => `${(p.x*1000).toFixed(0)}|${(p.y*1000).toFixed(0)}`;
-        const randHex = () => '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+        const coreControlDefs = [
+            { id: 'zoom', label: 'Zoom', min: 20, max: 800, step: 1, mult: 1, unit: '', snaps: [10, 50, 100] },
+            { id: 'expansion', label: 'Expand', min: 1, max: 150, step: 1, mult: 0.01, unit: '', snaps: [0.1, 0.25, 0.5] },
+            { id: 'spike', label: 'Spike', min: -90, max: 90, step: 1, mult: 0.01, unit: '', snaps: [0.1, 0.25, 0.5] },
+            { id: 'rounding', label: 'Round', min: 0, max: 100, step: 1, mult: 0.01, unit: '%', unitMul: 100, snaps: [0.1, 0.25, 0.5] },
+            { id: 'polySides', label: 'Sides', min: 3, max: 16, step: 1, mult: 1, unit: '', snaps: [1] },
+            { id: 'polyRot', label: 'Rotate', min: 0, max: 360, step: 1, mult: 1, unit: '°', snaps: [15, 45, 90] },
+            { id: 'offsetX', label: 'Pan X', min: -50, max: 50, step: 1, mult: 0.01, unit: '', snaps: [0.1, 0.25] },
+            { id: 'offsetY', label: 'Pan Y', min: -50, max: 50, step: 1, mult: 0.01, unit: '', snaps: [0.1, 0.25] }
+        ];
 
-        function randomizeLattice() {
-            cfg.gridType = ['square', 'hex', 'tri', 'tetrille', 'truncsquare'][Math.floor(Math.random() * 5)];
-            cfg.latParam1 = 0.2 + Math.random() * 0.25;
-            updateLatticeControls(); syncUI(); markDirty();
+        // --- ENGINE PIPELINE ---
+        const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d', { alpha: false });
+        const offCanvas = document.createElement('canvas'), offCtx = offCanvas.getContext('2d');
+        const tileCanvas = document.createElement('canvas'), tCtx = tileCanvas.getContext('2d');
+        const shadowBuffer = document.createElement('canvas'), sbCtx = shadowBuffer.getContext('2d');
+        const tileStack = document.createElement('canvas'), tsCtx = tileStack.getContext('2d');
+        let cW, cH, animT = 0, isDirty = true, geomCache = { baseGridType: null, baseFaces: null, baseDuals: null };
+
+        function generateBaseGrid(dim, pCfg) {
+            const currentCfg = pCfg || cfg; if(!pCfg && geomCache.baseGridType === currentCfg.gridType && geomCache.baseFaces && geomCache.baseDuals) return { faces: geomCache.baseFaces, duals: geomCache.baseDuals };
+            const s = 100, b = { x1: -dim.w * 2, x2: dim.w * 2, y1: -dim.h * 2, y2: dim.h * 2 }; let faces = []; const gt = currentCfg.gridType;
+            if(gt === 'square') { for(let y=Math.floor(b.y1/s)*s; y<b.y2; y+=s) for(let x=Math.floor(b.x1/s)*s; x<b.x2; x+=s) faces.push({ pts: [{x,y}, {x:x+s,y}, {x:x+s,y:y+s}, {x,y:y+s}] }); }
+            else if(gt === 'hex') { const h = s * Math.sqrt(3)/2; for(let r=Math.floor(b.y1/(h*2))-2; r*h*2<b.y2+h; r++) for(let c=Math.floor(b.x1/(s*1.5))-2; c*s*1.5<b.x2+s; c++) { const cx = c*s*1.5, cy = r*h*2 + (Math.abs(c)%2 ? h : 0); const pts = []; for(let i=0; i<6; i++) pts.push({x:cx+s*Math.cos(i*Math.PI/3), y:cy+s*Math.sin(i*Math.PI/3)}); faces.push({ pts }); } }
+            else if(gt === 'tri') { const h = s * Math.sqrt(3)/2; for(let r=Math.floor(b.y1/h)-1; r*h<b.y2+h; r++) { const off = (Math.abs(r)%2?s/2:0); for(let c=Math.floor(b.x1/s)-1; c*s<b.x2+s; c++) { const x = c*s+off; faces.push({ pts: [{x,y:r*h}, {x:x+s,y:r*h}, {x:x+s/2,y:(r+1)*h}] }); faces.push({ pts: [{x:x+s,y:r*h}, {x:x+s*1.5,y:(r+1)*h}, {x:x+s/2,y:(r+1)*h}] }); } } }
+            else if(gt === 'tetrille') { const h = s * Math.sqrt(3); for (let r = Math.floor(b.y1/h)-1; r*h < b.y2+h; r++) for (let c = Math.floor(b.x1/(s*1.5))-1; c*s*1.5 < b.x2+s; c++) { const cx = c*s*1.5, cy = r*h + (Math.abs(c)%2 ? h/2 : 0); for(let i=0; i<6; i++){ const a = i*Math.PI/3; faces.push({ pts: [{x:cx,y:cy}, {x:cx+s*0.5*Math.cos(a),y:cy+s*0.5*Math.sin(a)}, {x:cx+s*0.866*Math.cos(a+Math.PI/6),y:cy+s*0.866*Math.sin(a+Math.PI/6)}, {x:cx+s*0.5*Math.cos(a+Math.PI/3),y:cy+s*0.5*Math.sin(a+Math.PI/3)}]}); } } }
+            else if(gt === 'truncsquare') { const k = s * (currentCfg.latParam1 || 0.33); for(let y=Math.floor(b.y1/s)*s; y<b.y2; y+=s) for(let x=Math.floor(b.x1/s)*s; x<b.x2; x+=s) { faces.push({ pts: [{x:x+k, y:y}, {x:x+s-k, y:y}, {x:x+s, y:y+k}, {x:x+s, y:y+s-k}, {x:x+s-k, y:y+s}, {x:x+k, y:y+s}, {x:x, y:y+s-k}, {x:x, y:y+k}]}); faces.push({ pts: [{x:x+s-k, y:y+s}, {x:x+s, y:y+s-k}, {x:x+s+k, y:y+s}, {x:x+s, y:y+s+k}]}); } }
+            const extractDuals = (polyList) => { const vertMap = new Map(); polyList.forEach((f, fIdx) => { f.pts.forEach((p) => { const vK = hashCoord(p); if(!vertMap.has(vK)) vertMap.set(vK, { p, f: [] }); vertMap.get(vK).f.push(fIdx); }); }); const duals = []; vertMap.forEach(v => { if(v.f.length < 3) return; const pts = v.f.map(fi => { const f = polyList[fi]; const cx = f.pts.reduce((a,b)=>a+b.x,0)/f.pts.length, cy = f.pts.reduce((a,b)=>a+b.y,0)/f.pts.length; return { x:cx, y:cy, a: Math.atan2(cy-v.p.y, cx-v.p.x) }; }).sort((a,b) => a.a - b.a); duals.push({ pts }); }); return duals; };
+            const duals = extractDuals(faces); if(!pCfg) { geomCache.baseGridType = gt; geomCache.baseFaces = faces; geomCache.baseDuals = duals; } return { faces, duals };
         }
 
-        function randomizeMorphology() {
-            cfg.zoom = 40 + Math.random() * 400;
-            cfg.expansion = 0.1 + Math.random() * 1.0;
-            cfg.rounding = Math.random() < 0.3 ? 0 : Math.random() * 0.6;
-            syncUI(); markDirty();
+        function generateActiveGeom(baseData, pCfg) {
+            const currentCfg = pCfg || cfg; const t = currentCfg.autoAnim ? animT : 0, lfo = (amp) => Math.sin(t * 0.01 * currentCfg.animTempo) * amp;
+            const sides = Math.floor(currentCfg.polySides), rotA = rad(currentCfg.polyRot + lfo(120 * 0.1 * currentCfg.mod_rot));
+            const expVal = currentCfg.expansion + lfo(0.04 * currentCfg.mod_exp), biasY = 0.5 + currentCfg.offsetY + lfo(0.02 * currentCfg.mod_offset), shX = currentCfg.offsetX + lfo(0.02 * currentCfg.mod_offset);
+            const extractUniqueEdges = (polyList) => { const edgeMap = new Map(); polyList.forEach(f => { const pts = f.pts; for(let i=0; i<pts.length; i++) { const p1 = pts[i], p2 = pts[(i+1)%pts.length]; const h1 = hashCoord(p1), h2 = hashCoord(p2); const eK = h1 < h2 ? h1 + '|' + h2 : h2 + '|' + h1; if(!edgeMap.has(eK)) edgeMap.set(eK, { p1, p2 }); } }); return edgeMap; };
+            const makeGeom = (eMap) => { const result = []; eMap.forEach(({ p1, p2 }) => { const dx = p2.x-p1.x, dy = p2.y-p1.y, len = Math.sqrt(dx*dx+dy*dy), ang = Math.atan2(dy,dx), nx = -dy/len, ny = dx/len; const mk = (sX) => { const cx = p1.x + dx * biasY + nx * sX * len, cy = p1.y + dy * biasY + ny * sX * len; const R = (len * expVal) * 0.5 / Math.sin(Math.PI / sides), flatDist = R * Math.cos(Math.PI / sides), pts = []; for (let i = 0; i < sides; i++) { const a = ang + Math.PI / 2 + rotA + (i * (2 * Math.PI) / sides); pts.push({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }); const aMid = a + Math.PI / sides, rSpike = flatDist + (currentCfg.spike * R); pts.push({ x: cx + rSpike * Math.cos(aMid), y: cy + rSpike * Math.sin(aMid) }); } return pts; }; result.push({ pts: mk(shX) }); if(currentCfg.polyMirror) result.push({ pts: mk(-shX) }); }); return result; };
+            let activeGeoms = [], activeDuals = [], curFaces = baseData.faces, curDuals = baseData.duals;
+            for(let i=0; i<currentCfg.iterations; i++) { 
+                let edges = extractUniqueEdges(curFaces), nG = makeGeom(edges); activeGeoms.push(nG); curFaces = nG;
+                let dEdges = extractUniqueEdges(curDuals), nD = makeGeom(dEdges); activeDuals.push(nD); curDuals = nD;
+            } 
+            return { activeGeoms, activeDuals };
         }
 
-        function randomizeEdge() {
-            cfg.polySides = 3 + Math.floor(Math.random() * 12);
-            cfg.polyRot = Math.random() * 360;
-            cfg.offsetX = (Math.random() - 0.5) * 120;
-            cfg.offsetY = Math.random() * 100;
-            cfg.polyMirror = Math.random() > 0.5;
-            syncUI(); markDirty();
+        function renderLayer(targetCtx, layer, data, w, h, rounding, scale, pCfg) {
+            tileCanvas.width = w; tileCanvas.height = h; tCtx.clearRect(0, 0, w, h); tCtx.save(); tCtx.scale(scale, scale); tCtx.lineJoin = 'round'; tCtx.lineCap = 'round'; tCtx.fillStyle = getRGBA(layer.c, layer.o); tCtx.strokeStyle = getRGBA(layer.sc, layer.so); tCtx.lineWidth = layer.sw; drawPathDirect(tCtx, data, rounding); tCtx.restore();
+            const hasShadow = layer.shB > 0 || Math.abs(layer.shO) > 0; const currentCfg = pCfg || cfg;
+            if(currentCfg.enableFX && hasShadow) {
+                tileStack.width = w * 3; tileStack.height = h * 3; tsCtx.clearRect(0, 0, w*3, h*3); for(let ty=0; ty<3; ty++) for(let tx=0; tx<3; tx++) tsCtx.drawImage(tileCanvas, tx * w, ty * h);
+                shadowBuffer.width = w * 3; shadowBuffer.height = h * 3; sbCtx.clearRect(0, 0, w*3, h*3); sbCtx.save(); sbCtx.shadowBlur = layer.shB * scale; sbCtx.shadowColor = getRGBA(layer.shC || '#000000', 0.6);
+                const lightAngle = rad((layer.ld||0) + currentCfg.lightDir); sbCtx.shadowOffsetX = Math.cos(lightAngle) * layer.shO * scale; sbCtx.shadowOffsetY = Math.sin(lightAngle) * layer.shO * scale;
+                sbCtx.drawImage(tileStack, 0, 0); sbCtx.restore(); targetCtx.save(); targetCtx.globalCompositeOperation = layer.b; targetCtx.drawImage(shadowBuffer, w, h, w, h, -w/2, -h/2, w, h); targetCtx.restore();
+            } else { targetCtx.save(); targetCtx.globalCompositeOperation = layer.b; targetCtx.drawImage(tileCanvas, -w/2, -h/2); targetCtx.restore(); }
         }
 
-        function randomizeLFO() {
-            cfg.mod_rot = Math.random() * 0.8;
-            cfg.mod_round = Math.random() * 0.8;
-            cfg.mod_exp = Math.random() * 0.8;
-            cfg.mod_offset = Math.random() * 0.8;
-            syncUI(); markDirty();
-        }
-
-        function randomizeLayers() {
-            layerCfgs.forEach(l => {
-                l.c = randHex();
-                l.sc = randHex();
-                l.o = 0.1 + Math.random() * 0.7;
-                l.sw = 0.5 + Math.random() * 4;
-                l.b = BLEND_MODES[Math.floor(Math.random() * BLEND_MODES.length)];
-                l.shB = Math.random() < 0.4 ? 0 : Math.random() * 40;
-                l.shO = Math.random() * 10;
-            });
-            setupUI(); markDirty();
-        }
-
-        function randomizeAll() {
-            randomizeLattice(); randomizeMorphology(); randomizeEdge(); randomizeLFO(); randomizeLayers();
-            cfg.bgColor = randHex();
-            document.getElementById('bgColor').value = cfg.bgColor;
-            markDirty();
-        }
-
-        function syncUI() {
-            Object.keys(cfg).forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    if (el.type === 'checkbox') el.checked = cfg[id];
-                    else if (el.type === 'range') {
-                        let div = 100;
-                        if (['zoom', 'polySides', 'polyRot', 'animTempo'].includes(id)) div = 1;
-                        el.value = cfg[id] * div;
-                    } else if (el.tagName === 'SELECT') el.value = cfg[id];
-                }
-            });
-            syncLabels();
-        }
-
-        function setupUI() {
-            const container = document.getElementById('layers-container');
-            container.innerHTML = '';
-            layerCfgs.forEach(l => {
-                const card = document.createElement('div');
-                card.className = `layer-card shadow-lg`;
-                card.style.borderLeftColor = l.c;
-                let blendOptions = BLEND_MODES.map(b => `<option value="${b}" ${l.b===b?'selected':''}>${b.replace('-',' ').toUpperCase()}</option>`).join('');
-                card.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-black text-white tracking-widest uppercase">${l.name}</span>
-                        <input type="checkbox" id="vis${l.id}" ${l.vis?'checked':''} class="w-3.5 h-3.5 accent-blue-500">
-                    </div>
-                    <div class="control-row"><label>FILL</label><div class="color-wrap"><input type="color" id="c${l.id}" value="${l.c}"></div><input type="range" id="o${l.id}" min="0" max="100" value="${l.o*100}"></div>
-                    <div class="control-row"><label>STROKE</label><div class="color-wrap"><input type="color" id="sc${l.id}" value="${l.sc}"></div><input type="range" id="sw${l.id}" min="0" max="1000" value="${l.sw*100}"></div>
-                    <div class="control-row"><label>GLOW/SHB</label><input type="range" id="shB${l.id}" min="0" max="60" value="${l.shB}"><input type="range" id="shO${l.id}" min="0" max="20" value="${l.shO}"></div>
-                    <div class="control-row"><label>MODE</label><select id="b${l.id}" class="flex-1 h-5 text-[8px] font-bold uppercase tracking-tighter">${blendOptions}</select></div>
-                `;
-                container.appendChild(card);
-                ['vis','c','o','sc','sw','shB','shO','b'].forEach(key => {
-                    const el = document.getElementById(key+l.id);
-                    el.oninput = (e) => {
-                        if(key === 'vis') l.vis = e.target.checked;
-                        else if(['c', 'sc', 'b'].includes(key)) { l[key] = e.target.value; if(key==='c') card.style.borderLeftColor = l.c; }
-                        else if(['shB', 'shO'].includes(key)) l[key] = parseFloat(e.target.value);
-                        else l[key] = e.target.value / 100;
-                        markDirty();
-                    };
-                });
-            });
-
-            const inputs = ['gridType','polySides','expansion','rounding','zoom','bgColor', 'polyRot', 'offsetY', 'offsetX', 'polyMirror', 'autoAnim', 'animTempo', 'mod_rot', 'mod_round', 'mod_exp', 'mod_offset'];
-            inputs.forEach(id => {
-                const el = document.getElementById(id); if(!el) return;
-                el.oninput = (e) => {
-                    if(el.type === 'checkbox') cfg[id] = e.target.checked;
-                    else if(id === 'gridType') { cfg[id] = e.target.value; updateLatticeControls(); }
-                    else {
-                        let div = 100;
-                        if(['zoom', 'polySides', 'polyRot', 'animTempo'].includes(id)) div = 1;
-                        cfg[id] = el.type === 'color' ? e.target.value : parseFloat(e.target.value)/div;
-                    }
-                    syncLabels(); markDirty();
-                };
-            });
-            updateLatticeControls(); syncLabels();
-        }
-
-        function syncLabels() {
-            ['polyRot','zoom','expansion','rounding','polySides','offsetX','offsetY', 'mod_rot', 'mod_round', 'mod_exp', 'mod_offset'].forEach(id => {
-                const v = document.getElementById(id+'Val'); if(!v) return;
-                if(id === 'polyRot') v.innerText = cfg[id].toFixed(1) + '°';
-                else if(id === 'rounding' || id.startsWith('mod_')) v.innerText = Math.round(cfg[id]*100) + '%';
-                else if(id === 'polySides') v.innerText = Math.round(cfg[id]);
-                else v.innerText = cfg[id].toFixed(2);
-            });
-        }
-
-        function updateLatticeControls() {
-            latCtrlCnt.innerHTML = '';
-            if(cfg.gridType === 'truncsquare') {
-                const row = document.createElement('div'); row.className = 'row';
-                row.innerHTML = `<div class="row-header"><label>Octagon Aspect</label></div><div class="flex items-center gap-3"><input type="range" id="latParam1" min="15" max="48" value="${cfg.latParam1*100}"><span id="latParam1Val" class="val">${cfg.latParam1.toFixed(2)}</span></div>`;
-                latCtrlCnt.appendChild(row);
-                document.getElementById('latParam1').oninput = (e) => { cfg.latParam1 = parseFloat(e.target.value)/100; document.getElementById('latParam1Val').innerText = cfg.latParam1.toFixed(2); markDirty(); };
+        function renderTile(targetCtx, targetW, targetH, scaleFactor, pCfg, pLayers) {
+            const currentCfg = pCfg || cfg; const currentLayers = pLayers || layerCfgs; const dim = getUnitCellDimensions(currentCfg.gridType); const baseData = generateBaseGrid(dim, currentCfg), activeData = generateActiveGeom(baseData, currentCfg);
+            const lfo = currentCfg.autoAnim ? Math.sin(animT * 0.007 * currentCfg.animTempo) * 0.5 + 0.5 : 0, curRounding = currentCfg.rounding + (lfo * currentCfg.mod_round * 0.8);
+            targetCtx.fillStyle = currentCfg.bgColor; targetCtx.fillRect(0, 0, targetW, targetH);
+            targetCtx.save(); targetCtx.translate(targetW/2, targetH/2);
+            const baseL = currentLayers.find(l=>l.id==='base'); if(baseL && baseL.vis) renderLayer(targetCtx, baseL, baseData.faces, targetW, targetH, curRounding, scaleFactor, currentCfg);
+            const dualL = currentLayers.find(l=>l.id==='dual'); if(dualL && dualL.vis) renderLayer(targetCtx, dualL, baseData.duals, targetW, targetH, curRounding, scaleFactor, currentCfg);
+            for(let i=0; i<currentCfg.iterations; i++) { 
+                const agL = currentLayers.find(l=>l.id===`ag${i+1}`); if(agL && agL.vis && activeData.activeGeoms[i]) renderLayer(targetCtx, agL, activeData.activeGeoms[i], targetW, targetH, curRounding, scaleFactor, currentCfg); 
+                const adL = currentLayers.find(l=>l.id===`ad${i+1}`); if(adL && adL.vis && activeData.activeDuals[i]) renderLayer(targetCtx, adL, activeData.activeDuals[i], targetW, targetH, curRounding, scaleFactor, currentCfg); 
             }
-        }
-
-        function markDirty() { isDirty = true; reqDraw(); }
-
-        function getUnitCellDimensions() {
-            const s = 80;
-            switch(cfg.gridType) {
-                case 'hex': return { w: s * 3, h: s * Math.sqrt(3) };
-                case 'tri': return { w: s, h: s * Math.sqrt(3) };
-                case 'tetrille': return { w: s * 3, h: s * Math.sqrt(3) };
-                default: return { w: s, h: s };
-            }
-        }
-
-        function generateUnitGeom(dim) {
-            const s = 80;
-            const faces = [];
-            // Generate a larger buffer to ensure no geometric clipping before the 3x3 bleed step
-            const b = { x1: -dim.w * 2, x2: dim.w * 2, y1: -dim.h * 2, y2: dim.h * 2 };
-            const type = cfg.gridType;
-
-            if(type === 'square') {
-                for(let y=Math.floor(b.y1/s)*s; y<b.y2; y+=s)
-                for(let x=Math.floor(b.x1/s)*s; x<b.x2; x+=s)
-                faces.push({ pts: [{x,y}, {x:x+s,y}, {x:x+s,y:y+s}, {x,y:y+s}] });
-            } else if(type === 'hex' || type === 'tri') {
-                const h = s * Math.sqrt(3)/2;
-                if(type === 'hex') {
-                    for(let r=Math.floor(b.y1/(h*2))-1; r*h*2<b.y2+h; r++)
-                    for(let c=Math.floor(b.x1/(s*1.5))-1; c*s*1.5<b.x2+s; c++) {
-                        const cx = c*s*1.5, cy = r*h*2 + (Math.abs(c)%2 ? h : 0);
-                        const pts = []; for(let i=0; i<6; i++) pts.push({x:cx+s*Math.cos(i*Math.PI/3), y:cy+s*Math.sin(i*Math.PI/3)});
-                        faces.push({ pts });
-                    }
-                } else {
-                    for(let r=Math.floor(b.y1/h)-1; r*h<b.y2+h; r++) {
-                        const off = (Math.abs(r)%2?s/2:0);
-                        for(let c=Math.floor(b.x1/s)-1; c*s<b.x2+s; c++) {
-                            const x = c*s+off;
-                            faces.push({ pts: [{x,y:r*h}, {x:x+s,y:r*h}, {x:x+s/2,y:(r+1)*h}] });
-                            faces.push({ pts: [{x:x+s,y:r*h}, {x:x+s*1.5,y:(r+1)*h}, {x:x+s/2,y:(r+1)*h}] });
-                        }
-                    }
-                }
-            } else if(type === 'tetrille') {
-                const h = s * Math.sqrt(3);
-                for (let r = Math.floor(b.y1/h)-1; r*h < b.y2+h; r++) {
-                    for (let c = Math.floor(b.x1/(s*1.5))-1; c*s*1.5 < b.x2+s; c++) {
-                        const cx = c*s*1.5, cy = r*h + (Math.abs(c)%2 ? h/2 : 0);
-                        for(let i=0; i<6; i++){
-                            const a = i*Math.PI/3;
-                            faces.push({ pts: [{x:cx,y:cy}, {x:cx+s*0.5*Math.cos(a),y:cy+s*0.5*Math.sin(a)}, {x:cx+s*0.866*Math.cos(a+Math.PI/6),y:cy+s*0.866*Math.sin(a+Math.PI/6)}, {x:cx+s*0.5*Math.cos(a+Math.PI/3),y:cy+s*0.5*Math.sin(a+Math.PI/3)}] });
-                        }
-                    }
-                }
-            } else if(type === 'truncsquare') {
-                const k = s * cfg.latParam1;
-                for(let y=Math.floor(b.y1/s)*s; y<b.y2; y+=s)
-                for(let x=Math.floor(b.x1/s)*s; x<b.x2; x+=s) {
-                    faces.push({ pts: [{x:x+k, y:y}, {x:x+s-k, y:y}, {x:x+s, y:y+k}, {x:x+s, y:y+s-k}, {x:x+s-k, y:y+s}, {x:x+k, y:y+s}, {x:x, y:y+s-k}, {x:x, y:y+k}] });
-                    faces.push({ pts: [{x:x+s-k, y:y+s}, {x:x+s, y:y+s-k}, {x:x+s+k, y:y+s}, {x:x+s, y:y+s+k}] });
-                }
-            }
-
-            const edgeMap = new Map(), vertMap = new Map();
-            faces.forEach((f, fIdx) => {
-                f.pts.forEach((p1, i) => {
-                    const p2 = f.pts[(i+1)%f.pts.length], eK = [p1,p2].map(hashCoord).sort().join('|');
-                    if(!edgeMap.has(eK)) edgeMap.set(eK, { p1, p2, f: [] });
-                    edgeMap.get(eK).f.push(fIdx);
-                    const vK = hashCoord(p1);
-                    if(!vertMap.has(vK)) vertMap.set(vK, { p: p1, f: [] });
-                    if(!vertMap.get(vK).f.includes(fIdx)) vertMap.get(vK).f.push(fIdx);
-                });
-            });
-
-            const duals = [];
-            vertMap.forEach(v => {
-                if(v.f.length < 3) return;
-                const pts = v.f.map(fi => {
-                    const f = faces[fi], cx = f.pts.reduce((a,b)=>a+b.x,0)/f.pts.length, cy = f.pts.reduce((a,b)=>a+b.y,0)/f.pts.length;
-                    return { x:cx, y:cy, a: Math.atan2(cy-v.p.y, cx-v.p.x) };
-                }).sort((a,b) => a.a - b.a);
-                duals.push({ pts });
-            });
-
-            const sides = Math.floor(cfg.polySides);
-            const rotA = rad(cfg.polyRot + (cfg.autoAnim ? Math.sin(animT*0.012 * cfg.animTempo)*120 * cfg.mod_rot : 0));
-            const expVal = cfg.expansion + (cfg.autoAnim ? Math.sin(animT*0.008 * cfg.animTempo)*0.4 * cfg.mod_exp : 0);
-            const biasY = cfg.offsetY + (cfg.autoAnim ? Math.sin(animT*0.015 * cfg.animTempo)*0.3 * cfg.mod_offset : 0);
-            const shX = cfg.offsetX + (cfg.autoAnim ? Math.sin(animT*0.01 * cfg.animTempo)*0.2 * cfg.mod_offset : 0);
-
-            const edges = [];
-            edgeMap.forEach(e => {
-                const { p1, p2 } = e;
-                const dx = p2.x-p1.x, dy = p2.y-p1.y, len = Math.sqrt(dx*dx+dy*dy), ang = Math.atan2(dy,dx), nx = -dy/len, ny = dx/len;
-                const mk = (sX) => {
-                    const cx = p1.x + dx*biasY + nx*sX*len, cy = p1.y + dy*biasY + ny*sX*len;
-                    const R = (len*expVal)*0.5/Math.sin(Math.PI/sides), pts = [];
-                    for(let i=0; i<sides; i++) {
-                        const a = ang + Math.PI/2 + rotA + (i*2*Math.PI/sides);
-                        pts.push({ x: cx + R*Math.cos(a), y: cy + R*Math.sin(a) });
-                    }
-                    return pts;
-                };
-                edges.push({ pts: mk(shX) });
-                if(cfg.polyMirror) edges.push({ pts: mk(-shX) });
-            });
-
-            return { faces, duals, edges };
-        }
-
-        function renderMasterTile() {
-            const dim = getUnitCellDimensions();
-            const dpr = window.devicePixelRatio || 1;
-            const currentZoomScale = cfg.zoom / 100;
-            const oversample = Math.min(8, Math.max(2, currentZoomScale * dpr)); 
-            lastOversample = oversample;
-
-            // Integer dimensions are mandatory to prevent sub-pixel "dark gap" seams
-            const expW = Math.round(dim.w * oversample);
-            const expH = Math.round(dim.h * oversample);
-            
-            offCanvas.width = expW;
-            offCanvas.height = expH;
-            layerTileCanvas.width = expW;
-            layerTileCanvas.height = expH;
-            bleedCanvas.width = expW;
-            bleedCanvas.height = expH;
-
-            const data = generateUnitGeom(dim);
-            const curRounding = cfg.rounding + (cfg.autoAnim ? (Math.sin(animT * 0.007 * cfg.animTempo) * 0.5 + 0.5) * cfg.mod_round * 0.8 : 0);
-
-            offCtx.fillStyle = cfg.bgColor;
-            offCtx.fillRect(0, 0, expW, expH);
-
-            const drawLayer = (list, l) => {
-                if(!l || !l.vis || list.length === 0) return;
-                
-                // 1. Render base layer geometry to a single tile buffer (flat sourcing)
-                ltCtx.clearRect(0, 0, expW, expH);
-                ltCtx.save();
-                ltCtx.scale(oversample, oversample);
-                ltCtx.lineJoin = 'round';
-                ltCtx.lineCap = 'round';
-                ltCtx.fillStyle = getRGBA(l.c, l.o);
-                ltCtx.strokeStyle = getRGBA(l.sc, 1);
-                ltCtx.lineWidth = l.sw;
-
-                const batchPath = new Path2D();
-                list.forEach(item => {
-                    const pts = item.pts;
-                    if(curRounding < 0.01) {
-                        batchPath.moveTo(pts[0].x, pts[0].y);
-                        for(let i=1; i<pts.length; i++) batchPath.lineTo(pts[i].x, pts[i].y);
-                        batchPath.closePath();
-                    } else {
-                        for(let i=0; i<pts.length; i++) {
-                            const p1 = pts[i], p0 = pts[(i-1+pts.length)%pts.length], p2 = pts[(i+1)%pts.length];
-                            const v1 = {x:p0.x-p1.x,y:p0.y-p1.y}, v2 = {x:p2.x-p1.x,y:p2.y-p1.y};
-                            const l1 = Math.sqrt(v1.x*v1.x+v1.y*v1.y), l2 = Math.sqrt(v2.x*v2.x+v2.y*v2.y);
-                            const r = Math.min(l1,l2)*0.5*curRounding;
-                            const s = {x:p1.x+v1.x/l1*r, y:p1.y+v1.y/l1*r}, e = {x:p1.x+v2.x/l2*r, y:p1.y+v2.y/l2*r};
-                            if(i===0) batchPath.moveTo(s.x, s.y); else batchPath.lineTo(s.x, s.y);
-                            batchPath.quadraticCurveTo(p1.x, p1.y, e.x, e.y);
-                        }
-                        batchPath.closePath();
-                    }
-                });
-                ltCtx.fill(batchPath);
-                if(l.sw > 0) ltCtx.stroke(batchPath);
-                ltCtx.restore();
-
-                // 2. Perform 3x3 shadow bleed into the Bleed Buffer
-                blCtx.clearRect(0, 0, expW, expH);
-                blCtx.save();
-                if(l.shB > 0) {
-                    // Shadow blur is scaled by oversample to remain sharp
-                    blCtx.shadowBlur = l.shB * oversample;
-                    blCtx.shadowColor = 'rgba(0,0,0,0.5)';
-                    blCtx.shadowOffsetX = l.shO * oversample;
-                    blCtx.shadowOffsetY = l.shO * oversample;
-                }
-                
-                // Draw 9 tiles: the 8 neighbors' shadows will bleed into the center (0,0) frame
-                for(let ty=-1; ty<=1; ty++) {
-                    for(let tx=-1; tx<=1; tx++) {
-                        blCtx.drawImage(layerTileCanvas, tx * expW, ty * expH);
-                    }
-                }
-                blCtx.restore();
-
-                // 3. Composite the resulting seamless layer buffer onto the master tile
-                offCtx.save();
-                offCtx.globalCompositeOperation = l.b;
-                offCtx.drawImage(bleedCanvas, 0, 0);
-                offCtx.restore();
-            };
-
-            // Process Bottom-to-Top: Foundation -> Mesh -> Dual -> Edges
-            drawLayer(data.faces, layerCfgs[0]);
-            drawLayer(data.faces, layerCfgs[1]);
-            drawLayer(data.duals, layerCfgs[2]);
-            drawLayer(data.edges, layerCfgs[3]);
+            targetCtx.restore();
         }
 
         function render() {
-            if(isDirty || cfg.autoAnim) {
-                renderMasterTile();
-                isDirty = false;
-            }
-
-            ctx.fillStyle = cfg.bgColor;
-            ctx.fillRect(0, 0, cW, cH);
-
-            const pattern = ctx.createPattern(offCanvas, 'repeat');
-            const scale = cfg.zoom / 100;
-            
-            ctx.save();
-            ctx.translate(cW/2, cH/2);
-            
-            const patternScale = scale / lastOversample;
-            const matrix = new DOMMatrix();
-            matrix.scaleSelf(patternScale, patternScale);
-            // Center alignment offset
-            matrix.translateSelf(-offCanvas.width / 2, -offCanvas.height / 2);
-            pattern.setTransform(matrix);
-
-            ctx.fillStyle = pattern;
-            ctx.fillRect(-cW, -cH, cW*2, cH*2);
-            ctx.restore();
+            if(!isDirty && !cfg.autoAnim) return; const dim = getUnitCellDimensions(); const dpr = window.devicePixelRatio || 1, zoomS = cfg.zoom / 100, scaleF = Math.max(1, zoomS * dpr); 
+            const expW = Math.round(dim.w * scaleF), expH = Math.round(dim.h * scaleF); if(offCanvas.width !== expW || offCanvas.height !== expH) { offCanvas.width = expW; offCanvas.height = expH; }
+            renderTile(offCtx, expW, expH, scaleF); ctx.fillStyle = cfg.bgColor; ctx.fillRect(0, 0, cW, cH);
+            setFiltering(ctx, cfg.filterMode);
+            if(cfg.singleTile) { ctx.drawImage(offCanvas, cW/2 - (expW * zoomS / scaleF)/2, cH/2 - (expH * zoomS / scaleF)/2, expW * zoomS / scaleF, expH * zoomS / scaleF); }
+            else { const pat = ctx.createPattern(offCanvas, 'repeat'); ctx.save(); ctx.translate(cW/2, cH/2); const fS = zoomS / scaleF; const mat = new DOMMatrix().scale(fS, fS).translate(-expW / 2, -expH / 2); pat.setTransform(mat); ctx.fillStyle = pat; ctx.fillRect(-cW/2, -cH/2, cW, cH); ctx.restore(); }
+            isDirty = false;
         }
 
-        function loop() { if(cfg.autoAnim) { animT++; render(); } requestAnimationFrame(loop); }
-        function reqDraw() { if(!cfg.autoAnim) requestAnimationFrame(() => render()); }
-        function resize() { cW = cvs.width = ctr.clientWidth; cH = cvs.height = ctr.clientHeight; markDirty(); }
+        // --- EVOLUTION ENGINE ---
+        function mutate(pCfg, pLayers, strength) {
+            const nCfg = JSON.parse(JSON.stringify(pCfg));
+            const nLayers = JSON.parse(JSON.stringify(pLayers));
+            const tweak = (v, min, max, s) => { let nv = v + (Math.random()-0.5) * (max-min) * s; return Math.max(min, Math.min(max, nv)); };
+            nCfg.polyRot = tweak(nCfg.polyRot, 0, 360, strength);
+            nCfg.expansion = tweak(nCfg.expansion, 0.1, 1.5, strength);
+            nCfg.rounding = tweak(nCfg.rounding, 0, 1.0, strength);
+            nCfg.spike = tweak(nCfg.spike, -0.9, 0.9, strength);
+            nCfg.polySides = Math.round(tweak(nCfg.polySides, 3, 12, strength));
+            if(Math.random() < strength * 0.2) nCfg.gridType = LATTICES[Math.floor(Math.random()*LATTICES.length)].id;
+            const pal = generatePalette();
+            nLayers.forEach(l => {
+                if(Math.random() < strength) l.c = pal[Math.floor(Math.random()*pal.length)];
+                if(Math.random() < strength) l.sc = pal[Math.floor(Math.random()*pal.length)];
+                l.o = tweak(l.o, 0, 0.6, strength);
+                l.sw = tweak(l.sw, 0.1, 8, strength);
+                if(Math.random() < strength * 0.4) l.b = BLEND_MODES[Math.floor(Math.random()*BLEND_MODES.length)];
+            });
+            return { cfg: nCfg, layers: nLayers };
+        }
 
-        document.getElementById('randBtn').onclick = randomizeAll;
-        document.getElementById('exportPng').onclick = () => {
-            const link = document.createElement('a');
-            link.download = `seamless_pattern_${Date.now()}.png`;
-            link.href = offCanvas.toDataURL('image/png');
-            link.click();
-        };
-        document.getElementById('exportBmp').onclick = () => {
-            const link = document.createElement('a');
-            link.download = `seamless_pattern_${Date.now()}.bmp`;
-            link.href = offCanvas.toDataURL('image/bmp');
-            link.click();
-        };
-        document.getElementById('exportSvg').onclick = () => {
-            const dim = getUnitCellDimensions();
-            const data = generateUnitGeom(dim);
-            const curRounding = cfg.rounding + (cfg.autoAnim ? (Math.sin(animT * 0.007 * cfg.animTempo) * 0.5 + 0.5) * cfg.mod_round * 0.8 : 0);
+        function calculateFitness(pCfg, pLayers, heuristics) {
+            let score = 0;
+            score += pCfg.polySides * 0.2 * heuristics.chaos;
+            score += Math.abs(pCfg.spike) * 30 * heuristics.chaos;
+            const avgOp = pLayers.reduce((a,b)=>a+b.o,0)/pLayers.length;
+            const avgSw = pLayers.reduce((a,b)=>a+b.sw,0)/pLayers.length;
+            score += (avgOp * 20 + avgSw * 3) * heuristics.density;
+            if(pCfg.polyMirror) score += 5 * heuristics.symmetry;
+            if(['hex','tetrille'].includes(pCfg.gridType)) score += 10 * heuristics.symmetry;
+            const vibrancy = pLayers.reduce((a,b) => {
+                const c = b.c;
+                const r = parseInt(c.slice(1,3),16), g = parseInt(c.slice(3,5),16), b_val = parseInt(c.slice(5,7),16);
+                return a + (Math.max(r,g,b_val) - Math.min(r,g,b_val));
+            }, 0) / pLayers.length;
+            score += (vibrancy / 255) * 30 * heuristics.vibrancy;
+            return Math.min(99, Math.max(1, Math.round(score)));
+        }
 
-            let svg = `<svg width="${dim.w}" height="${dim.h}" viewBox="0 0 ${dim.w} ${dim.h}" xmlns="http://www.w3.org/2000/svg" style="background:${cfg.bgColor}">`;
-            svg += `<defs><clipPath id="tileClip"><rect x="0" y="0" width="${dim.w}" height="${dim.h}" /></clipPath></defs>`;
-            svg += `<g clip-path="url(#tileClip)">`;
-
-            const addLayerSvg = (list, l) => {
-                if(!l.vis) return;
-                for(let ty=-1; ty<=1; ty++) {
-                    for(let tx=-1; tx<=1; tx++) {
-                        svg += `<g transform="translate(${tx*dim.w}, ${ty*dim.h})" style="mix-blend-mode:${l.b};">`;
-                        list.forEach(item => {
-                            let pathData = "";
-                            const pts = item.pts;
-                            if(curRounding < 0.01) {
-                                pathData = `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ') + " Z";
-                            } else {
-                                for(let i=0; i<pts.length; i++) {
-                                    const p1 = pts[i], p0 = pts[(i-1+pts.length)%pts.length], p2 = pts[(i+1)%pts.length];
-                                    const v1 = {x:p0.x-p1.x,y:p0.y-p1.y}, v2 = {x:p2.x-p1.x,y:p2.y-p1.y};
-                                    const l1 = Math.sqrt(v1.x*v1.x+v1.y*v1.y), l2 = Math.sqrt(v2.x*v2.x+v2.y*v2.y);
-                                    const r = Math.min(l1,l2)*0.5*curRounding;
-                                    const s = {x:p1.x+v1.x/l1*r, y:p1.y+v1.y/l1*r}, e = {x:p1.x+v2.x/l2*r, y:p1.y+v2.y/l2*r};
-                                    pathData += (i===0 ? `M ${s.x} ${s.y} ` : `L ${s.x} ${s.y} `) + `Q ${p1.x} ${p1.y}, ${e.x} ${e.y} `;
-                                }
-                                pathData += "Z";
-                            }
-                            svg += `<path d="${pathData}" fill="${getRGBA(l.c, l.o)}" stroke="${l.sc}" stroke-width="${l.sw}" stroke-linejoin="round" stroke-linecap="round" />`;
-                        });
-                        svg += `</g>`;
-                    }
-                }
+        function openEvolution() {
+            const overlay = document.getElementById('evoOverlay'), grid = document.getElementById('evoGrid');
+            overlay.style.display = 'flex';
+            grid.innerHTML = '';
+            const heuristics = {
+                chaos: document.getElementById('evo_chaos').value / 100,
+                density: document.getElementById('evo_density').value / 100,
+                vibrancy: document.getElementById('evo_vibrancy').value / 100,
+                symmetry: document.getElementById('evo_symmetry').value / 100
             };
-            addLayerSvg(data.faces, layerCfgs[0]);
-            addLayerSvg(data.faces, layerCfgs[1]);
-            addLayerSvg(data.duals, layerCfgs[2]);
-            addLayerSvg(data.edges, layerCfgs[3]);
-            svg += `</g></svg>`;
+            const mutationS = document.getElementById('evo_mutation').value / 100;
+            let candidates = [];
+            for(let i=0; i<32; i++) {
+                const v = mutate(cfg, layerCfgs, mutationS);
+                v.fitness = calculateFitness(v.cfg, v.layers, heuristics);
+                candidates.push(v);
+            }
+            candidates.sort((a,b) => b.fitness - a.fitness).slice(0, 12).forEach(v => {
+                const thumb = document.createElement('div');
+                thumb.className = 'evo-thumb';
+                const tCvs = document.createElement('canvas');
+                tCvs.width = 400; tCvs.height = 300;
+                thumb.appendChild(tCvs);
+                const score = document.createElement('div');
+                score.className = 'evo-score';
+                score.textContent = `FIT: ${v.fitness}`;
+                thumb.appendChild(score);
+                grid.appendChild(thumb);
+                const tCtxLocal = tCvs.getContext('2d');
+                const tDim = getUnitCellDimensions(v.cfg.gridType);
+                const tScale = 180 / tDim.w;
+                const tExpW = Math.round(tDim.w * tScale), tExpH = Math.round(tDim.h * tScale);
+                const tOffCvs = document.createElement('canvas');
+                tOffCvs.width = tExpW; tOffCvs.height = tExpH;
+                renderTile(tOffCvs.getContext('2d'), tExpW, tExpH, tScale, v.cfg, v.layers);
+                tCtxLocal.fillStyle = v.cfg.bgColor;
+                tCtxLocal.fillRect(0,0,400,300);
+                const tPat = tCtxLocal.createPattern(tOffCvs, 'repeat');
+                const pMat = new DOMMatrix().translate(200, 150).scale(1.2, 1.2).translate(-tExpW/2, -tExpH/2);
+                tPat.setTransform(pMat);
+                tCtxLocal.fillStyle = tPat;
+                tCtxLocal.fillRect(0, 0, 400, 300);
+                thumb.onclick = () => {
+                    Object.assign(cfg, v.cfg);
+                    layerCfgs = v.layers;
+                    overlay.style.display = 'none';
+                    syncUI();
+                    invalidateGeomCache();
+                    setupLayerUI();
+                    markDirty();
+                };
+            });
+        }
 
+        // --- INTERFACE BUILDERS ---
+        function setupCoreUI() {
+            const container = document.getElementById('core-controls'); container.innerHTML = '';
+            coreControlDefs.forEach(d => {
+                const row = document.createElement('div'); row.className = 'ctrl-row'; let snapOpts = d.snaps.map(s => `<option value="${s}">${s}</option>`).join(''); row.innerHTML = `<label>${d.label}</label><select id="snap_${d.id}" class="inp-select" style="width:36px; padding:0; text-align:center;">${snapOpts}</select><input type="range" id="${d.id}" min="${d.min}" max="${d.max}" step="${d.step}" value="${cfg[d.id] / d.mult}"><span id="${d.id}Val" class="val"></span>`; container.appendChild(row);
+                const input = document.getElementById(d.id), snapSel = document.getElementById('snap_' + d.id); input.oninput = (e) => { let val = parseFloat(e.target.value) * d.mult; const snap = parseFloat(snapSel.value); if(snap > 0) val = Math.round(val / snap) * snap; cfg[d.id] = val; syncLabels(); markDirty(); };
+            });
+        }
+
+        function setupLayerUI() {
+            const container = document.getElementById('layers-container'); container.innerHTML = '';
+            layerCfgs.forEach((l, idx) => {
+                const card = document.createElement('div'); card.className = `layer-item`; card.style.borderLeft = `3px solid ${l.c}`;
+                card.innerHTML = `<div class="layer-head p-1.5 flex items-center justify-between border-b border-[#222]"><div class="flex items-center gap-1"><input type="checkbox" id="vis${idx}" ${l.vis?'checked':''} class="chk"><span class="text-[9px] font-bold text-gray-400 uppercase tracking-tight">${l.name}</span></div><div id="blendBtn${idx}" class="inp-select py-0 px-2 h-5 flex items-center justify-center font-bold uppercase text-[8px] min-w-[75px]">${l.b}</div></div><div class="layer-body"><div class="grid grid-cols-[40px_1fr_24px] gap-2 items-center h-4"><div class="color-well" style="background-color:${l.c}"><input type="color" id="c${idx}" value="${l.c}"></div><input type="range" id="o${idx}" min="0" max="100" value="${l.o*100}"><span class="text-[8px] text-gray-500 font-mono text-right uppercase">Fil</span></div><div class="grid grid-cols-[40px_1fr_1fr_24px] gap-2 items-center h-4"><div class="color-well" style="background-color:${l.sc}"><input type="color" id="sc${idx}" value="${l.sc}"></div><input type="range" id="sw${idx}" min="0" max="1000" value="${l.sw*100}"><input type="range" id="so${idx}" min="0" max="100" value="${l.so*100}"><span class="text-[8px] text-gray-500 font-mono text-right uppercase">Str</span></div><div class="grid grid-cols-[40px_1fr_1fr_1fr_24px] gap-2 items-center h-4"><div class="color-well" style="background-color:${l.shC}"><input type="color" id="shC${idx}" value="${l.shC}"></div><input type="range" id="shB${idx}" min="0" max="40" value="${l.shB}" title="Blur"><input type="range" id="shO${idx}" min="0" max="20" value="${l.shO}" title="Offset"><input type="range" id="ld${idx}" min="0" max="360" value="${l.ld}" title="Direction"><span class="text-[8px] text-gray-500 font-mono text-right uppercase">Fx</span></div></div>`;
+                container.appendChild(card); 
+                document.getElementById(`blendBtn${idx}`).onclick = (e) => showBlendDropdown(e.target, l);
+                ['vis','c','o','sc','sw','so','shB','shO','shC','ld'].forEach(key => { const el = document.getElementById(key+idx); if(el) el.oninput = (e) => { if(key === 'vis') l.vis = e.target.checked; else if(['c', 'sc', 'shC'].includes(key)) { l[key] = e.target.value; updateColorWell(el); if(key==='c') card.style.borderLeftColor = l.c; } else if(['shB', 'shO', 'ld'].includes(key)) l[key] = parseFloat(e.target.value); else l[key] = e.target.value / 100; markDirty(); }; });
+            });
+        }
+
+        function showBlendDropdown(target, currentLayer) {
+            const menu = document.getElementById('blendDropdown'), rect = target.getBoundingClientRect(); 
+            menu.style.top = rect.bottom + 'px'; menu.style.left = rect.left + 'px'; menu.style.width = rect.width + 'px'; menu.style.display = 'block'; menu.innerHTML = '';
+            const originalValue = currentLayer.b;
+            let finalized = false;
+            BLEND_MODES.forEach(mode => { 
+                const item = document.createElement('div'); item.className = `dropdown-item ${originalValue === mode ? 'active' : ''}`; item.textContent = mode.replace('-',' '); 
+                item.onmouseenter = () => { if(!finalized) { currentLayer.b = mode; markDirty(); } }; 
+                item.onclick = (e) => { 
+                    e.stopPropagation(); 
+                    finalized = true;
+                    currentLayer.b = mode; 
+                    target.textContent = mode.toUpperCase(); 
+                    menu.style.display = 'none'; 
+                    markDirty(); 
+                }; 
+                menu.appendChild(item); 
+            });
+            const close = (e) => { 
+                if(!menu.contains(e.target) && e.target !== target) { 
+                    if(!finalized) currentLayer.b = originalValue; 
+                    menu.style.display = 'none'; 
+                    document.removeEventListener('mousedown', close); 
+                    markDirty(); 
+                } 
+            };
+            document.addEventListener('mousedown', close);
+        }
+
+        function showTopoDropdown(target) {
+            const menu = document.getElementById('topoDropdown'), rect = target.getBoundingClientRect(); 
+            menu.style.top = rect.bottom + 'px'; menu.style.left = rect.left + 'px'; menu.style.width = rect.width + 'px'; menu.style.display = 'block'; menu.innerHTML = '';
+            const originalValue = cfg.gridType;
+            let topoHandler = null;
+            LATTICES.forEach(lat => {
+                const item = document.createElement('div'); item.className = `dropdown-item ${originalValue === lat.id ? 'active' : ''}`;
+                item.innerHTML = `<span>${lat.label}</span><div id="prev_${lat.id}" class="topo-preview"></div>`;
+                item.onmouseenter = () => { cfg.gridType = lat.id; invalidateGeomCache(); };
+                item.onclick = (e) => { e.stopPropagation(); cfg.gridType = lat.id; document.getElementById('gridTypeLabel').textContent = lat.label.toUpperCase(); document.getElementById('truncControl').classList.toggle('hidden', cfg.gridType !== 'truncsquare'); menu.style.display = 'none'; document.removeEventListener('mousedown', topoHandler); invalidateGeomCache(); };
+                menu.appendChild(item);
+                const pCvs = document.createElement('canvas'); pCvs.width = 88; pCvs.height = 56; document.getElementById(`prev_${lat.id}`).appendChild(pCvs);
+                const pCtx = pCvs.getContext('2d'); const tDim = getUnitCellDimensions(lat.id); const tScale = 44 / tDim.w;
+                const tempCfg = JSON.parse(JSON.stringify(cfg)); tempCfg.gridType = lat.id; tempCfg.bgColor = '#000'; renderTile(pCtx, 88, 56, tScale, tempCfg);
+            });
+            topoHandler = (e) => { if(!menu.contains(e.target) && e.target !== target) { cfg.gridType = originalValue; menu.style.display = 'none'; document.removeEventListener('mousedown', topoHandler); invalidateGeomCache(); } };
+            document.addEventListener('mousedown', topoHandler);
+        }
+
+        function syncLabels() {
+            coreControlDefs.forEach(d => { const v = document.getElementById(d.id+'Val'); if(v) v.innerText = (cfg[d.id] * (d.unitMul||1)).toFixed(d.unitMul?0:1) + d.unit; });
+            ['mod_rot', 'mod_round', 'mod_exp', 'mod_offset', 'animTempo', 'iterations', 'lightDir'].forEach(id => { const v = document.getElementById(id+'Val'); if(v) v.innerText = (id==='animTempo') ? cfg[id].toFixed(1) : (id==='iterations' ? cfg[id] : (id==='lightDir' ? cfg[id]+'°' : Math.round(cfg[id]*100) + '%')); });
+            const resSlider = document.getElementById('exportResSlider'); if(resSlider) document.getElementById('exportResVal').innerText = `${Math.pow(2, parseInt(resSlider.value))} PX`;
+        }
+
+        function syncUI() {
+            Object.keys(cfg).forEach(id => { const el = document.getElementById(id); if (el && el.type !== 'color') { if (el.type === 'checkbox') el.checked = cfg[id]; else if (el.type === 'range') { const def = coreControlDefs.find(d => d.id === id); el.value = def ? cfg[id] / def.mult : (['animTempo','iterations','lightDir'].includes(id) ? cfg[id] : cfg[id] * 100); } else el.value = cfg[id]; } });
+            const bgInp = document.querySelector('input#bgColor'); if(bgInp) { bgInp.value = cfg.bgColor; updateColorWell(bgInp); }
+            const lat = LATTICES.find(l => l.id === cfg.gridType); if(lat) document.getElementById('gridTypeLabel').textContent = lat.label.toUpperCase();
+            document.getElementById('truncControl').classList.toggle('hidden', cfg.gridType !== 'truncsquare');
+            syncLabels();
+        }
+
+        function rebuildLayers() {
+            const newLayers = []; const getOld = (id) => layerCfgs.find(l => l.id === id);
+            newLayers.push(getOld('base') || { id: 'base', name: 'Base Grid', vis: true, c: '#1f2937', o: 0.1, sc: '#374151', sw: 1, so: 1, b: 'source-over', shB: 0, shO: 0, shC: '#000000', ld: 0 });
+            newLayers.push(getOld('dual') || { id: 'dual', name: 'Dual Grid', vis: false, c: '#10b981', o: 0.1, sc: '#34d399', sw: 1, so: 1, b: 'overlay', shB: 0, shO: 0, shC: '#000000', ld: 0 });
+            for (let i = 1; i <= cfg.iterations; i++) { 
+                const pal = generatePalette(); 
+                newLayers.push(getOld(`ag${i}`) || { id: `ag${i}`, name: `Geom ${i}`, vis: true, c: pal[0], o: 0.3, sc: pal[1], sw: 1, so: 1, b: 'source-over', shB: 10, shO: 5, shC: '#000000', ld: 0 });
+                newLayers.push(getOld(`ad${i}`) || { id: `ad${i}`, name: `Dual ${i}`, vis: false, c: pal[2], o: 0.3, sc: pal[3], sw: 1, so: 1, b: 'screen', shB: 10, shO: 5, shC: '#000000', ld: 0 });
+            }
+            layerCfgs = newLayers; setupLayerUI(); markDirty();
+        }
+
+        function savePresetToFile() {
+            const data = JSON.stringify({ cfg, layerCfgs }, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.download = `seamless_vector_${Date.now()}.svg`;
-            link.href = URL.createObjectURL(new Blob([svg], {type: 'image/svg+xml'}));
-            link.click();
-        };
+            link.href = url; link.download = `pia_preset_${Date.now()}.json`; link.click();
+            URL.revokeObjectURL(url);
+            showToast("Preset Downloaded");
+        }
 
-        window.onresize = resize;
-        setupUI(); resize(); loop();
+        function loadPresetFromFile() {
+            const input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (re) => {
+                    try {
+                        const d = JSON.parse(re.target.result);
+                        if (d.cfg && d.layerCfgs) {
+                            Object.assign(cfg, d.cfg);
+                            layerCfgs = d.layerCfgs;
+                            setupLayerUI(); syncUI(); invalidateGeomCache(); markDirty();
+                            showToast("Preset Imported");
+                        } else { showToast("Invalid Preset File"); }
+                    } catch (err) { console.error("Import error", err); showToast("Failed to Read Preset"); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function exportImage(type) {
+            const resW = Math.pow(2, parseInt(document.getElementById('exportResSlider').value)), dim = getUnitCellDimensions();
+            const target = document.createElement('canvas'); target.width = resW; target.height = Math.round(resW * (dim.h / dim.w));
+            const eCtx = target.getContext('2d'); setFiltering(eCtx, cfg.filterMode); renderTile(eCtx, target.width, target.height, resW / dim.w);
+            const link = document.createElement('a'); link.download = `pia_tile_${Date.now()}.${type}`; link.href = target.toDataURL(`image/${type}`); link.click(); showToast(`${type.toUpperCase()} EXPORTED`);
+        }
+
+        function exportSVG() {
+            const dim = getUnitCellDimensions(), baseData = generateBaseGrid(dim), activeData = generateActiveGeom(baseData), lfo = cfg.autoAnim ? Math.sin(animT * 0.007 * cfg.animTempo) * 0.5 + 0.5 : 0, curRounding = cfg.rounding + (lfo * cfg.mod_round * 0.8);
+            let svg = `<svg width="${dim.w}" height="${dim.h}" viewBox="0 0 ${dim.w} ${dim.h}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background:${cfg.bgColor}">`; svg += `<defs>`;
+            const buildPath = (list) => { let d = ""; list.forEach(item => { const pts = item.pts; if(pts.length < 3) return; if(curRounding < 0.01) d += `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ') + " Z "; else { for(let i=0; i<pts.length; i++) { const p1 = pts[i], p0 = pts[(i-1+pts.length)%pts.length], p2 = pts[(i+1)%pts.length]; const v1 = {x:p0.x-p1.x,y:p0.y-p1.y}, v2 = {x:p2.x-p1.x,y:p2.y-p1.y}, l1 = Math.sqrt(v1.x*v1.x+v1.y*v1.y), l2 = Math.sqrt(v2.x*v2.x+v2.y*v2.y); const r = Math.min(l1,l2)*0.5*curRounding, s = {x:p1.x+v1.x/l1*r, y:p1.y+v1.y/l1*r}, e = {x:p1.x+v2.x/l2*r, y:p1.y+v2.y/l2*r}; d += (i===0 ? `M ${s.x} ${s.y} ` : `L ${s.x} ${s.y} `) + `Q ${p1.x} ${p1.y}, ${e.x} ${e.y} `; } d += "Z "; } }); return d; };
+            const drawLayerToDefs = (id, data, l) => { const pathData = buildPath(data), hasSh = (l.shB > 0 || l.shO !== 0) && cfg.enableFX; if(hasSh) { const lightAngle = rad((l.ld||0) + cfg.lightDir); svg += `<filter id="f_${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceAlpha" stdDeviation="${l.shB/2}" result="blur"/><feOffset in="blur" dx="${Math.cos(lightAngle)*l.shO}" dy="${Math.sin(lightAngle)*l.shO}" result="offsetBlur"/><feFlood flood-color="${l.shC}" flood-opacity="0.6" result="colorBlur"/><feComposite in="colorBlur" in2="offsetBlur" operator="in" result="shadow"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`; } svg += `<symbol id="${id}"><path d="${pathData}" fill="${l.c}" fill-opacity="${l.o}" stroke="${l.sc}" stroke-width="${l.sw}" stroke-opacity="${l.so||1}" ${hasSh ? `filter="url(#f_${id})"` : ''} /></symbol>`; };
+            const layersToExport = []; const baseL = layerCfgs.find(l=>l.id==='base'); if(baseL && baseL.vis) layersToExport.push({id:'base', data:baseData.faces, cfg:baseL}); const dualL = layerCfgs.find(l=>l.id==='dual'); if(dualL && dualL.vis) layersToExport.push({id:'dual', data:baseData.duals, cfg:dualL});
+            for(let i=0; i<cfg.iterations; i++) { const agL = layerCfgs.find(l=>l.id===`ag${i+1}`); if(agL && agL.vis) layersToExport.push({id:`ag${i+1}`, data:activeData.activeGeoms[i], cfg:agL}); const adL = layerCfgs.find(l=>l.id===`ad${i+1}`); if(adL && adL.vis) layersToExport.push({id:`ad${i+1}`, data:activeData.activeDuals[i], cfg:adL}); }
+            layersToExport.forEach(l => drawLayerToDefs(l.id, l.data, l.cfg)); svg += `</defs>`;
+            layersToExport.forEach(l => { svg += `<g style="mix-blend-mode:${l.cfg.b}">`; for(let ty=-1; ty<=1; ty++) for(let tx=-1; tx<=1; tx++) svg += `<use xlink:href="#${l.id}" x="${tx * dim.w}" y="${ty * dim.h}" />`; svg += `</g>`; });
+            svg += `</svg>`; const link = document.createElement('a'); link.download = `pia_tile_${Date.now()}.svg`; link.href = URL.createObjectURL(new Blob([svg], {type: 'image/svg+xml'})); link.click(); showToast("SVG EXPORTED");
+        }
+
+        window.onload = () => {
+            setupCoreUI(); setupLayerUI(); syncUI();
+            const rsz = document.getElementById('resizer'), sdb = document.getElementById('sidebar');
+            let dragging = false; rsz.onmousedown = () => dragging = true; document.onmouseup = () => dragging = false; document.onmousemove = (e) => { if(dragging) { sdb.style.width = Math.max(320, Math.min(e.clientX, 600)) + 'px'; resize(); } };
+            document.getElementById('gridSelector').onclick = (e) => showTopoDropdown(e.currentTarget);
+            document.getElementById('bgColor').oninput = (e) => { cfg.bgColor = e.target.value; updateColorWell(e.target); markDirty(); };
+            document.getElementById('iterations').oninput = (e) => { cfg.iterations = parseInt(e.target.value); syncLabels(); rebuildLayers(); };
+            document.getElementById('lightDir').oninput = (e) => { cfg.lightDir = parseInt(e.target.value); markDirty(); syncLabels(); };
+            document.getElementById('enableFX').onchange = (e) => { cfg.enableFX = e.target.checked; markDirty(); };
+            document.getElementById('singleTile').onchange = (e) => { cfg.singleTile = e.target.checked; markDirty(); };
+            document.getElementById('filterMode').onchange = (e) => { cfg.filterMode = e.target.value; markDirty(); };
+            document.getElementById('exportResSlider').oninput = () => syncLabels();
+            const ppBtn = document.getElementById('playPauseBtn'); ppBtn.onclick = (e) => { e.stopPropagation(); cfg.autoAnim = !cfg.autoAnim; ppBtn.innerText = cfg.autoAnim ? '⏸' : '▶'; markDirty(); };
+            document.getElementById('btnRandGrid').onclick = () => { cfg.gridType = LATTICES[Math.floor(Math.random()*LATTICES.length)].id; cfg.polySides = 3 + Math.floor(Math.random()*13); cfg.expansion = 0.1 + Math.random(); cfg.polyRot = Math.random() * 360; cfg.rounding = Math.random() * 1.0; cfg.spike = (Math.random() - 0.5) * 0.8; cfg.offsetX = (Math.random() - 0.5) * 0.4; cfg.offsetY = (Math.random() - 0.5) * 0.4; cfg.polyMirror = Math.random() > 0.5; cfg.latParam1 = 0.1 + Math.random() * 0.35; invalidateGeomCache(); syncUI(); markDirty(); };
+            document.getElementById('btnRandLFO').onclick = () => { cfg.animTempo = 0.1 + Math.random() * 9.9; cfg.mod_rot = Math.random(); cfg.mod_round = Math.random(); cfg.mod_exp = Math.random(); cfg.mod_offset = Math.random(); syncUI(); markDirty(); };
+            document.getElementById('btnRandLayers').onclick = () => { const pal = generatePalette(); cfg.bgColor = pal[0]; layerCfgs.forEach((l, idx) => { l.c = pal[Math.floor(Math.random()*pal.length)]; l.sc = pal[Math.floor(Math.random()*pal.length)]; l.o = idx === 0 ? 0.1 : Math.random() * 0.4; l.so = 0.5 + Math.random() * 0.5; l.sw = 0.5 + Math.random() * 3; l.b = idx === 0 ? 'source-over' : BLEND_MODES[Math.floor(Math.random()*BLEND_MODES.length)]; l.shB = Math.random() < 0.5 ? 0 : Math.random() * 20; l.shO = Math.random() * 8; l.ld = Math.floor(Math.random() * 360); }); const bgInp = document.querySelector('input#bgColor'); if(bgInp) { bgInp.value = cfg.bgColor; updateColorWell(bgInp); } setupLayerUI(); markDirty(); };
+            document.getElementById('randBtn').onclick = () => { document.getElementById('btnRandGrid').onclick(); document.getElementById('btnRandLFO').onclick(); document.getElementById('btnRandLayers').onclick(); };
+            document.getElementById('btnOpenEvo').onclick = openEvolution; document.getElementById('btnEvolveNow').onclick = openEvolution; document.getElementById('btnRefreshEvo').onclick = openEvolution; document.getElementById('btnCloseEvo').onclick = () => { document.getElementById('evoOverlay').style.display = 'none'; };
+            document.getElementById('exportPng').onclick = () => exportImage('png'); document.getElementById('exportBmp').onclick = () => exportImage('bmp'); document.getElementById('exportSvg').onclick = exportSVG;
+            document.getElementById('btnSavePreset').onclick = savePresetToFile; document.getElementById('btnLoadPreset').onclick = loadPresetFromFile;
+            ['mod_rot', 'mod_round', 'mod_exp', 'mod_offset', 'animTempo', 'polyMirror', 'latParam1'].forEach(id => { const el = document.getElementById(id); if(el) el.oninput = (e) => { if(id === 'latParam1') { cfg[id] = e.target.value / 100; invalidateGeomCache(); } else if(id === 'animTempo') { cfg[id] = parseFloat(e.target.value); } else cfg[id] = e.target.type === 'checkbox' ? e.target.checked : parseFloat(e.target.value) / 100; markDirty(); syncLabels(); }; });
+            window.onresize = resize; resize(); loop();
+        };
+        function loop() { if(cfg.autoAnim) { animT++; render(); } requestAnimationFrame(loop); }
     </script>
 </body>
 </html>
