@@ -1282,7 +1282,7 @@
       rsz.onmousedown = () => drg = true; 
       document.onmouseup = () => drg = false;
       document.onmousemove = (e) => { if (drg) { sdb.style.width = Math.max(320, Math.min(e.clientX, 600)) + "px"; resize(); } };
-      state.layers = createRandomStack();
+      state.layers = [createLayer('base')];
       refreshLayerList();
       selectLayer(state.layers[state.layers.length-1].id);
       document.getElementById("btnSavePreset").onclick = () => {
