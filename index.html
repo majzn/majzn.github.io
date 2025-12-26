@@ -1,12 +1,12 @@
+
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>INDEX</title>
     <style>
-         :root {
+        :root {
             --bg: #FFFFFF;
             --fg: #000000;
             --accent-default: #000000;
@@ -14,159 +14,101 @@
             --gap: 16px;
             --grid-min: 240px;
         }
-        
-        * {
-            box-sizing: border-box;
+        * { box-sizing: border-box; }
+        body { 
+            font-family: Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--fg);
+            margin: 0; padding: 2.0rem; line-height: 1.0;
+            -webkit-font-smoothing: antialiased; 
+            background-image: url('tile.bmp'); background-repeat: repeat; 
+            background-size: auto; background-attachment: fixed;
         }
+        .container { max-width: 720px; margin: 0 auto; }
+        header { margin-bottom: 3rem; border-bottom: var(--border-w) solid var(--fg); padding-bottom: 4px; }
+        h1 { font-size: 2rem; font-weight: 900; margin: 0; }
         
-        body {
-            font-family: Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            color: var(--fg);
-            margin: 0;
-            padding: 2.0rem;
-            line-height: 1.0;
-            -webkit-font-smoothing: antialiased;
-            background-image: url('tile.bmp');
-            background-repeat: repeat;
-            background-size: auto;
-            background-attachment: fixed;
-        }
-        
-        .container {
-            max-width: 720px;
-            margin: 0 auto;
-        }
-        
-        header {
-            margin-bottom: 3rem;
-            border-bottom: var(--border-w) solid var(--fg);
-            padding-bottom: 4px;
-        }
-        
-        h1 {
-            font-size: 2rem;
-            font-weight: 900;
-            margin: 0;
-        }
-        
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr));
-            gap: var(--gap);
-        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr)); gap: var(--gap); }
         
         .card {
-            border: var(--border-w) solid var(--item-accent);
+            border: var(--border-w) solid var(--item-accent); 
             padding: 0.5rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            background: var(--item-bg);
-            transition: transform 0.5s ease;
+            display: flex; flex-direction: column; justify-content: space-between;
+            background: var(--item-bg); transition: transform 0.5s ease;
             color: #FFFFFF;
         }
-        
-        .card:hover {
-            transform: translateY(-2px);
+        .card:hover { transform: translateY(-2px); }
+
+        .title { 
+            font-size: 1.5rem; font-weight: 800; margin: 0.0rem 0 1.0rem 0; 
+            line-height: 1.0; color: var(--item-accent); /* Matched to border colour */
         }
         
-        .title {
-            font-size: 1.5rem;
-            font-weight: 800;
-            margin: 0.0rem 0 1.0rem 0;
-            line-height: 1.0;
-            color: var(--item-accent);
-            /* Matched to border colour */
-        }
-        
-        .card-actions {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        
-        .main-link,
-        .docs-btn {
-            text-decoration: none;
-            font-size: 0.7rem;
-            font-weight: 900;
-            padding: 0.25rem 0.25rem;
-            border: 2px solid var(--fg);
-            text-transform: uppercase;
+        .card-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .main-link, .docs-btn {
+            text-decoration: none; font-size: 0.7rem; font-weight: 900;
+            padding: 0.25rem 0.25rem; border: 2px solid var(--fg); text-transform: uppercase;
             transition: all 0.5s;
         }
-        
-        .main-link {
-            border-color: var(--item-accent);
-            color: var(--item-accent);
+        .main-link { border-color: var(--item-accent); color: var(--item-accent); }
+        .main-link:hover { background: var(--item-accent); color: var(--item-bg); }
+        .docs-btn { color: #FFFFFF; border-color: #FFFFFF; opacity: 0.6; }
+        .docs-btn:hover { opacity: 1; background: #FFFFFF; color: var(--item-bg); }
+
+        .footer { 
+            display: flex; justify-content: space-between; align-items: flex-end;
+            padding-top: 4px; border-top: 2px solid rgba(128,128,128,0.15);
+            font-size: 1.0rem; font-family: monospace;
         }
-        
-        .main-link:hover {
-            background: var(--item-accent);
-            color: var(--item-bg);
-        }
-        
-        .docs-btn {
-            color: #FFFFFF;
-            border-color: #FFFFFF;
-            opacity: 0.6;
-        }
-        
-        .docs-btn:hover {
-            opacity: 1;
-            background: #FFFFFF;
-            color: var(--item-bg);
-        }
-        
-        .footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            padding-top: 4px;
-            border-top: 2px solid rgba(128, 128, 128, 0.15);
-            font-size: 1.0rem;
-            font-family: monospace;
-        }
-        
-        .path,
-        .date {
-            opacity: 0.5;
-            color: #FFFFFF;
-        }
+        .path, .date { opacity: 0.5; color: #FFFFFF; }
     </style>
 </head>
-
 <body>
     <div class="container">
-        <header>
-            <h1>INDEX</h1>
-        </header>
+        <header><h1>INDEX</h1></header>
         <div class="grid">
-            <div class="card" style="--item-accent: #51637d; --item-bg: #162335">
-                <h2 class="title">TILER</h2>
-                <div class="card-actions">
-                    <a href="tiler.html" class="main-link">Open</a>
-
-                </div>
-                <div class="footer">
-                    <span class="path">tiler.html</span>
-                    <span class="date">25.12.22</span>
-                </div>
+        <div class="card" style="--item-accent: #f9fafb; --item-bg: #00264b">
+            <h2 class="title">HTML EDITOR</h2>
+            <div class="card-actions">
+                <a href="html_editor.html" class="main-link">Open</a>
+                
             </div>
-            <div class="card" style="--item-accent: #68566f; --item-bg: #2c1735">
-                <h2 class="title">WAVES</h2>
-                <div class="card-actions">
-                    <a href="waves.html" class="main-link">Open</a>
-
-                </div>
-                <div class="footer">
-                    <span class="path">waves.html</span>
-                    <span class="date">25.12.17</span>
-                </div>
+            <div class="footer">
+                <span class="path">html_editor.html</span>
+                <span class="date">25.12.18</span>
             </div>
         </div>
+        <div class="card" style="--item-accent: #748297; --item-bg: #12223a">
+            <h2 class="title">TILER</h2>
+            <div class="card-actions">
+                <a href="tiler.html" class="main-link">Open</a>
+                
+            </div>
+            <div class="footer">
+                <span class="path">tiler.html</span>
+                <span class="date">25.12.23</span>
+            </div>
+        </div>
+        <div class="card" style="--item-accent: #635f76; --item-bg: #1b1636">
+            <h2 class="title">TILER V2</h2>
+            <div class="card-actions">
+                <a href="tiler_v2.html" class="main-link">Open</a>
+                
+            </div>
+            <div class="footer">
+                <span class="path">tiler_v2.html</span>
+                <span class="date">25.12.26</span>
+            </div>
+        </div>
+        <div class="card" style="--item-accent: #68566f; --item-bg: #2c1735">
+            <h2 class="title">WAVES</h2>
+            <div class="card-actions">
+                <a href="waves.html" class="main-link">Open</a>
+                
+            </div>
+            <div class="footer">
+                <span class="path">waves.html</span>
+                <span class="date">25.12.17</span>
+            </div>
+        </div></div>
     </div>
 </body>
-
 </html>

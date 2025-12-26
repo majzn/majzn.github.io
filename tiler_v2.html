@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiling Studio Modular v25.0</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap");
+    :root {
+      --c-bg: #050505;
+      --c-surf: #111111;
+      --c-surf-light: #1a1a1a;
+      --c-bord: #262626;
+      --c-acc: #3b82f6;
+      --c-acc-h: #60a5fa;
+      --c-text: #a1a1aa;
+      --c-text-hi: #fafafa;
+      --c-danger: #ef4444;
+    }
+    body {
+      background-color: var(--c-bg);
+      color: var(--c-text);
+      font-family: "Inter", sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      font-size: 11px;
+      margin: 0;
+    }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--c-bg); }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #444; }
+    .panel {
+      width: 340px;
+      min-width: 320px;
+      max-width: 500px;
+      background: var(--c-surf);
+      border-right: 1px solid var(--c-bord);
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      position: relative;
+      box-shadow: 5px 0 20px rgba(0, 0, 0, 0.5);
+      height: 100%;
+    }
+    .resizer {
+      position: absolute;
+      right: -3px;
+      top: 0;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 60;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .resizer:hover { opacity: 1; background: var(--c-acc); }
+    .scroll-y { overflow-y: auto; flex: 1; display: flex; flex-direction: column; }
+    .no-shrink { flex-shrink: 0; }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--c-surf-light);
+      padding: 8px 12px;
+      border-top: 1px solid var(--c-bord);
+      border-bottom: 1px solid var(--c-bord);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+    }
+    .section-head:hover { background: #222; }
+    .section-head span {
+      font-weight: 700;
+      color: var(--c-text-hi);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-icon { transition: transform 0.2s; font-size: 8px; }
+    .section-head.collapsed .section-icon { transform: rotate(-90deg); }
+    .section-body { display: block; padding: 12px; }
+    .section-body.collapsed { display: none !important; }
+    .ctrl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; height: 24px; }
+    .ctrl-row label {
+      font-weight: 500;
+      color: #888;
+      font-size: 10px;
+      width: 80px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .val {
+      font-family: "JetBrains Mono", monospace;
+      text-align: right;
+      color: var(--c-acc);
+      font-size: 10px;
+      width: 40px;
+      flex-shrink: 0;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      background: transparent;
+      width: 100%;
+      cursor: pointer;
+      height: 18px;
+      flex: 1;
+    }
+    input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 3px; background: #333; border-radius: 2px; }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 10px;
+      width: 10px;
+      background: #ccc;
+      margin-top: -3.5px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px var(--c-surf);
+      transition: all 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { background: var(--c-acc); transform: scale(1.2); }
+    .inp-select {
+      background: #222;
+      border: 1px solid #333;
+      color: var(--c-text-hi);
+      font-size: 10px;
+      padding: 4px 6px;
+      width: 100%;
+      outline: none;
+      border-radius: 3px;
+      transition: border 0.2s;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .inp-select:hover { border-color: var(--c-acc); }
+    
+    .custom-select-container { position: relative; width: 100%; }
+    .custom-select-trigger {
+        background: #222; border: 1px solid #333; color: var(--c-text-hi);
+        font-size: 10px; padding: 4px 6px; border-radius: 3px; cursor: pointer;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .custom-select-trigger:hover { border-color: var(--c-acc); }
+    .custom-select-options {
+        position: absolute; bottom: 100%; left: 0; right: 0;
+        background: #1a1a1a; border: 1px solid #333; border-radius: 3px;
+        max-height: 200px; overflow-y: auto; z-index: 100; display: none;
+        box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+    }
+    .custom-select-container.open .custom-select-options { display: block; }
+    .custom-option { padding: 6px 8px; cursor: pointer; color: #aaa; transition: background 0.1s; }
+    .custom-option:hover { background: var(--c-acc); color: white; }
+    .custom-option.selected { color: var(--c-acc-h); font-weight: bold; }
+    .custom-option:hover.selected { color: white; }
+
+    .layer-list { display: flex; flex-direction: column-reverse; gap: 2px; min-height: 50px; padding: 4px; background: #0c0c0c; border: 1px solid #222; border-radius: 4px; margin-bottom: 8px; }
+    .layer-item {
+      background: #181818; border: 1px solid #262626; border-radius: 3px;
+      padding: 6px 8px; display: flex; align-items: center; gap: 8px;
+      cursor: pointer; user-select: none; transition: all 0.15s;
+    }
+    .layer-item:hover { background: #222; }
+    .layer-item.active { background: #222; border-color: var(--c-acc); }
+    .layer-item.dragging { opacity: 0.5; border: 1px dashed var(--c-acc); }
+    .layer-drag-handle { cursor: grab; color: #555; font-size: 14px; display: flex; align-items: center; }
+    .layer-drag-handle:hover { color: #ccc; }
+    .layer-info { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+    .layer-name { font-weight: 700; font-size: 10px; color: #eee; }
+    .layer-type { font-size: 8px; color: #666; text-transform: uppercase; font-weight: 600; }
+    .layer-controls { display: flex; align-items: center; gap: 4px; }
+    .btn {
+      border: none; padding: 6px 12px; border-radius: 3px; font-weight: 600;
+      font-size: 10px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;
+      transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary { background: var(--c-acc); color: white; width: 100%; padding: 8px; }
+    .btn-primary:hover { background: var(--c-acc-h); }
+    .btn-sec { background: #222; color: #ccc; border: 1px solid #333; flex: 1; }
+    .btn-sec:hover { background: #333; color: white; border-color: #555; }
+    .btn-icon { background: none; border: none; color: #666; cursor: pointer; padding: 4px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+    .btn-icon:hover { color: var(--c-acc); background: #222; }
+    .btn-danger:hover { color: var(--c-danger); background: #2a1111; }
+    .btn-xs { padding: 2px 6px; font-size: 9px; height: 20px; }
+    .color-well {
+      width: 36px; height: 18px; background: #222; position: relative;
+      overflow: hidden; cursor: pointer; border: 1px solid #333; border-radius: 2px; flex-shrink: 0;
+    }
+    .color-well input { position: absolute; top: -10px; left: -10px; width: 200%; height: 200%; opacity: 0; cursor: pointer; }
+    #canvasContainer {
+      flex: 1; position: relative;
+      background-image: linear-gradient(45deg, #080808 25%, transparent 25%),
+        linear-gradient(-45deg, #080808 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #080808 75%),
+        linear-gradient(-45deg, transparent 75%, #080808 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      background-color: #050505;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    canvas { box-shadow: 0 0 50px rgba(0, 0, 0, 0.8); }
+    .hidden { display: none !important; }
+    .chk { accent-color: var(--c-acc); cursor: pointer; width: 14px; height: 14px; }
+    .prop-group { margin-bottom: 12px; border: 1px solid #222; border-radius: 4px; padding: 8px; background: #151515; }
+    .prop-title { font-size: 9px; font-weight: 800; color: #555; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+    #evoOverlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.95); z-index: 1000;
+      display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px;
+      backdrop-filter: blur(15px);
+    }
+    .evo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; width: 100%; max-width: 1200px; height: 80%; overflow-y: auto; padding: 10px; }
+    .evo-thumb {
+      background: #111; border: 2px solid #333; border-radius: 8px;
+      overflow: hidden; cursor: pointer; transition: all 0.2s; position: relative;
+      aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center;
+    }
+    .evo-thumb:hover { border-color: var(--c-acc); transform: scale(1.05); z-index: 10; box-shadow: 0 0 30px rgba(59, 130, 246, 0.4); }
+    .evo-thumb canvas { width: 100%; height: 100%; pointer-events: none; }
+    .evo-score {
+      position: absolute; bottom: 8px; right: 8px; background: rgba(0, 0, 0, 0.8);
+      padding: 2px 6px; border-radius: 4px; color: var(--c-acc);
+      font-family: "JetBrains Mono"; font-size: 10px; font-weight: 800; border: 1px solid #333;
+    }
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; background: var(--c-acc);
+      color: white; padding: 8px 16px; border-radius: 4px; font-weight: 600;
+      transform: translateY(100px); transition: transform 0.3s; z-index: 2000;
+      box-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
+    }
+    .toast.show { transform: translateY(0); }
+  </style>
+</head>
+<body>
+  <div id="sidebar" class="panel">
+    <div id="resizer" class="resizer"></div>
+    <div class="no-shrink p-4 pb-2 border-b border-[#262626] p-4" style="padding: 16px;">
+      <h1 class="text-sm font-black text-white flex items-center gap-2 tracking-wide mb-1" style="margin: 0 0 8px 0; font-size: 14px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+        <div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 2px;"></div>
+        TILING STUDIO
+        <span style="font-size: 9px; color: #666; background: #111; padding: 2px 4px; border-radius: 3px; text-transform: uppercase;">MODULAR</span>
+      </h1>
+      <div style="display: flex; gap: 8px;">
+        <button id="btnSavePreset" class="btn btn-sec">Save</button>
+        <button id="btnLoadPreset" class="btn btn-sec">Load</button>
+      </div>
+    </div>
+    <div class="section-head" onclick="toggleSection(this)">
+      <span><div class="section-icon">▼</div> Evolution</span>
+    </div>
+    <div class="section-body">
+      <div class="ctrl-row mb-2">
+          <button id="btnEvo" class="btn btn-primary" style="background: linear-gradient(90deg, #3b82f6, #8b5cf6);">🧬 Open Evolution Engine</button>
+      </div>
+      <div class="ctrl-row">
+          <button class="btn btn-sec" onclick="randomizeStack()">🎲 Randomize Params</button>
+      </div>
+    </div>
+    <div class="section-head" onclick="toggleSection(this)">
+        <span><div class="section-icon">▼</div> Export & View</span>
+    </div>
+    <div class="section-body">
+        <div class="ctrl-row">
+            <label>Filter</label>
+            <select id="filterMode" class="inp-select" onchange="updateGlobal('filterMode', this.value)">
+              <option value="nearest">Pixelated</option>
+              <option value="bilinear" selected>Smooth</option>
+              <option value="bicubic">High Quality</option>
+            </select>
+        </div>
+        <div class="ctrl-row">
+             <label>Preview</label>
+             <div style="display:flex; align-items:center; gap:8px;">
+               <input type="checkbox" id="singleTile" class="chk" onchange="updateGlobal('singleTile', this.checked)">
+               <span style="font-size:10px; color:#888;">Single Tile Only</span>
+             </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-top: 8px;">
+            <button class="btn btn-sec" onclick="exportImage('png')">PNG</button>
+            <button class="btn btn-sec" onclick="exportImage('bmp')">BMP</button>
+            <button class="btn btn-sec" onclick="exportSVG()">SVG</button>
+        </div>
+    </div>
+    <div class="section-head" onclick="toggleSection(this)">
+      <span><div class="section-icon">▼</div> Global Settings</span>
+    </div>
+    <div class="section-body">
+      <div class="ctrl-row">
+        <label>Zoom</label>
+        <input type="range" id="zoom" min="20" max="800" step="1" value="120" oninput="updateGlobal('zoom', this.value)">
+        <span id="zoomVal" class="val">120</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Light Dir</label>
+        <input type="range" id="lightDir" min="0" max="360" step="1" value="45" oninput="updateGlobal('lightDir', this.value)">
+        <span id="lightDirVal" class="val">45°</span>
+      </div>
+      <div class="ctrl-row">
+        <label>BG Color</label>
+        <div class="color-well flex-1" style="background-color: #050505" id="bgWell">
+          <input type="color" id="bgColor" value="#050505" oninput="updateGlobal('bgColor', this.value)">
+        </div>
+      </div>
+    </div>
+    <div class="section-head" onclick="toggleSection(this)">
+      <span><div class="section-icon">▼</div> Layer Stack</span>
+      <div class="flex gap-1" onclick="event.stopPropagation()">
+        <button class="btn btn-xs btn-sec" onclick="addLayer('base')">+Base</button>
+        <button class="btn btn-xs btn-sec" onclick="addLayer('active')">+Active</button>
+        <button class="btn btn-xs btn-sec" onclick="addLayer('dual')">+Dual</button>
+      </div>
+    </div>
+    <div class="section-body" style="padding-bottom: 0;">
+      <div id="layerList" class="layer-list">
+      </div>
+    </div>
+    <div class="scroll-y">
+      <div class="section-head" style="position: sticky; top: 0; z-index: 10;" onclick="toggleSection(this)">
+        <span><div class="section-icon">▼</div> Layer Properties</span>
+        <span id="selectedLayerLabel" style="color: var(--c-acc); font-weight: 800;">NONE</span>
+      </div>
+      <div id="layerControls" class="section-body" style="min-height: 200px;">
+        <div style="padding: 20px; text-align: center; color: #444;">Select a layer to edit</div>
+      </div>
+    </div>
+  </div>
+  <div id="canvasContainer">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="evoOverlay">
+    <h2 style="color:white; margin-bottom: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between; width: 100%; max-width: 1200px;">
+      Evolutionary Selection
+      <button class="btn btn-sec" onclick="closeEvo()">Close</button>
+    </h2>
+    <div style="margin-bottom: 20px; display: flex; gap: 20px; color: #888; font-size: 10px; font-weight: 600;">
+       <div>CHAOS: <input type="range" id="evo_chaos" min="0" max="100" value="50" style="width: 80px; vertical-align: middle;"></div>
+       <div>COMPLEXITY: <input type="range" id="evo_complex" min="0" max="100" value="50" style="width: 80px; vertical-align: middle;"></div>
+       <div>MUTATION: <input type="range" id="evo_mutation" min="0" max="100" value="40" style="width: 80px; vertical-align: middle;"></div>
+    </div>
+    <div id="evoGrid" class="evo-grid"></div>
+    <button class="btn btn-primary" style="width: 200px; margin-top: 20px;" onclick="runEvolution()">Mutate Next Gen</button>
+  </div>
+  <div id="toast" class="toast">Notification</div>
+  <script>
+    const BLEND_MODES = ["source-over", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "hard-light", "difference", "exclusion"];
+    const LATTICES = [
+      { id: "square", label: "Square" },
+      { id: "hex", label: "Hexagonal" },
+      { id: "tri", label: "Triangular" },
+      { id: "cairo", label: "Cairo Pentagonal" },
+      { id: "tetrille", label: "Tetrille (3,4,6,4)" },
+      { id: "truncsquare", label: "Truncated Square" },
+      { id: "rhombic", label: "Rhombic" }
+    ];
+    const LAYER_TYPES = [
+      { id: "base", label: "Base Grid" },
+      { id: "active", label: "Active Geom" },
+      { id: "dual", label: "Dual Grid" }
+    ];
+    const state = {
+      global: {
+        zoom: 120, bgColor: "#050505", lightDir: 45, filterMode: "bilinear", singleTile: false, autoAnim: false
+      },
+      layers: [], 
+      selectedLayerId: null
+    };
+    let geometryCache = new Map();
+    let isDirty = true;
+    let cvs, ctx, offCanvas, offCtx;
+    
+    // Helpers
+    const rad = deg => (deg * Math.PI) / 180;
+    const uid = () => Math.random().toString(36).substr(2, 9);
+    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+    const getRGBA = (h, a) => {
+      const r = parseInt(h.slice(1, 3), 16), g = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16);
+      return `rgba(${r},${g},${b},${a})`;
+    };
+    
+    function showToast(msg) {
+      const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2000);
+    }
+    function updateColorWell(input) { if (input.parentNode) input.parentNode.style.backgroundColor = input.value; }
+    function toggleSection(head) {
+      head.classList.toggle("collapsed");
+      head.nextElementSibling.classList.toggle("collapsed");
+    }
+
+    // Geometry Core
+    function getUnitCellDimensions(params) {
+      const s = 100;
+      const gridType = params.gridType || "square";
+      const morph = params.morph === undefined ? 0.33 : params.morph;
+      switch (gridType) {
+        case "hex": return { w: s * 3, h: s * Math.sqrt(3) };
+        case "tri": return { w: s, h: s * Math.sqrt(3) };
+        case "tetrille": return { w: s * 3, h: s * Math.sqrt(3) };
+        case "cairo": return { w: s * 2, h: s * 2 };
+        case "truncsquare": return { w: s, h: s }; 
+        case "rhombic":
+          const w = s * Math.sqrt(3);
+          const hTop = s * morph * 1.5;
+          const hSide = s * (1 - morph) * 1.5;
+          return { w: w, h: (hTop + hSide) * 2 };
+        default: return { w: s, h: s }; // square
+      }
+    }
+    
+    function hashCoord(p) {
+      const x = (Math.round(p.x * 1000) + 20000000) & 0x3ffffff;
+      const y = (Math.round(p.y * 1000) + 20000000) & 0x3ffffff;
+      return x + y * 67108864;
+    }
+
+    function generateBase(params) {
+      const dim = getUnitCellDimensions(params);
+      const pad = 2.0;
+      const s = 100;
+      // Expand bounds slightly to catch edges for seamless tiling
+      const b = { x1: -dim.w * pad, x2: dim.w * pad + dim.w, y1: -dim.h * pad, y2: dim.h * pad + dim.h };
+      let faces = [];
+      const gt = params.gridType;
+      
+      if (gt === "square") {
+        for (let y = Math.floor(b.y1 / s) * s; y < b.y2; y += s)
+          for (let x = Math.floor(b.x1 / s) * s; x < b.x2; x += s)
+            faces.push({ pts: [{ x, y }, { x: x + s, y }, { x: x + s, y: y + s }, { x, y: y + s }] });
+      } else if (gt === "hex") {
+        const h = (s * Math.sqrt(3)) / 2;
+        for (let r = Math.floor(b.y1 / (h * 2)) - 2; r * h * 2 < b.y2 + h; r++)
+          for (let c = Math.floor(b.x1 / (s * 1.5)) - 2; c * s * 1.5 < b.x2 + s; c++) {
+            const cx = c * s * 1.5, cy = r * h * 2 + (Math.abs(c) % 2 ? h : 0);
+            const pts = [];
+            for (let i = 0; i < 6; i++) pts.push({ x: cx + s * Math.cos((i * Math.PI) / 3), y: cy + s * Math.sin((i * Math.PI) / 3) });
+            faces.push({ pts });
+          }
+      } else if (gt === "tri") {
+        const h = (s * Math.sqrt(3)) / 2;
+        for (let r = Math.floor(b.y1 / h) - 1; r * h < b.y2 + h; r++) {
+          const off = Math.abs(r) % 2 ? s / 2 : 0;
+          for (let c = Math.floor(b.x1 / s) - 1; c * s < b.x2 + s; c++) {
+            const x = c * s + off;
+            faces.push({ pts: [{ x, y: r * h }, { x: x + s, y: r * h }, { x: x + s / 2, y: (r + 1) * h }] });
+            faces.push({ pts: [{ x: x + s, y: r * h }, { x: x + s * 1.5, y: (r + 1) * h }, { x: x + s / 2, y: (r + 1) * h }] });
+          }
+        }
+      } else if (gt === "cairo") {
+        const d = s * (params.morph || 0.35);
+        for (let j = Math.floor(b.y1 / s) - 1; j * s < b.y2; j++) {
+          for (let i = Math.floor(b.x1 / s) - 1; i * s < b.x2; i++) {
+            const x = i * s, y = j * s, midX = x + s / 2, midY = y + s / 2;
+            if ((i + j) % 2 === 0) {
+              const pT = { x: midX, y: midY - d }, pB = { x: midX, y: midY + d };
+              faces.push({ pts: [pT, pB, { x, y: y + s }, { x: x - s / 2 + d, y: y + s / 2 }, { x, y }] });
+              faces.push({ pts: [pT, pB, { x: x + s, y: y + s }, { x: x + s + s / 2 - d, y: y + s / 2 }, { x: x + s, y }] });
+            } else {
+              const pL = { x: midX - d, y: midY }, pR = { x: midX + d, y: midY };
+              faces.push({ pts: [pL, pR, { x: x + s, y }, { x: x + s / 2, y: y - s / 2 + d }, { x, y }] });
+              faces.push({ pts: [pL, pR, { x: x + s, y: y + s }, { x: x + s / 2, y: y + s + s / 2 - d }, { x, y: y + s }] });
+            }
+          }
+        }
+      } else if (gt === "tetrille") {
+         const h = s * Math.sqrt(3);
+        for (let r = Math.floor(b.y1 / h) - 1; r * h < b.y2 + h; r++)
+          for (let c = Math.floor(b.x1 / (s * 1.5)) - 1; c * s * 1.5 < b.x2 + s; c++) {
+            const cx = c * s * 1.5, cy = r * h + (Math.abs(c) % 2 ? h / 2 : 0);
+            for (let i = 0; i < 6; i++) {
+              const a = (i * Math.PI) / 3;
+              faces.push({ pts: [{ x: cx, y: cy }, { x: cx + s * 0.5 * Math.cos(a), y: cy + s * 0.5 * Math.sin(a) }, { x: cx + s * 0.866 * Math.cos(a + Math.PI / 6), y: cy + s * 0.866 * Math.sin(a + Math.PI / 6) }, { x: cx + s * 0.5 * Math.cos(a + Math.PI / 3), y: cy + s * 0.5 * Math.sin(a + Math.PI / 3) }] });
+            }
+          }
+      } else if (gt === "truncsquare") {
+         const k = s * (params.morph || 0.33);
+        for (let y = Math.floor(b.y1 / s) * s; y < b.y2; y += s)
+          for (let x = Math.floor(b.x1 / s) * s; x < b.x2; x += s) {
+            faces.push({ pts: [{ x: x + k, y }, { x: x + s - k, y }, { x: x + s, y: y + k }, { x: x + s, y: y + s - k }, { x: x + s - k, y: y + s }, { x: x + k, y: y + s }, { x: x, y: y + s - k }, { x: x, y: y + k }] });
+            faces.push({ pts: [{ x: x + s - k, y: y + s }, { x: x + s, y: y + s - k }, { x: x + s + k, y: y + s }, { x: x + s, y: y + s + k }] });
+          }
+      } else if (gt === "rhombic") {
+        const m = params.morph === undefined ? 0.33 : params.morph;
+        const dx = s * Math.sqrt(3) / 2;
+        const hTop = s * m * 1.5;
+        const hSide = s * (1 - m) * 1.5;
+        const rowH = hTop + hSide;
+        const colW = dx * 2;
+        for (let r = Math.floor(b.y1 / rowH) - 2; r * rowH < b.y2 + rowH * 2; r++) {
+          const isOdd = Math.abs(r) % 2 === 1;
+          const xOff = isOdd ? dx : 0;
+          const cy = r * rowH;
+          for (let c = Math.floor((b.x1 - xOff) / colW) - 1; c * colW + xOff < b.x2 + colW; c++) {
+            const cx = c * colW + xOff;
+            const vUL = { x: -dx, y: -hTop };
+            const vUR = { x: dx,  y: -hTop };
+            const vDn = { x: 0,   y: hSide };
+            faces.push({ pts: [{x:cx, y:cy}, {x:cx+vUL.x, y:cy+vUL.y}, {x:cx, y:cy - hTop * 2}, {x:cx+vUR.x, y:cy+vUR.y}]});
+            faces.push({ pts: [{x:cx, y:cy}, {x:cx+vUL.x, y:cy+vUL.y}, {x:cx+vUL.x, y:cy+vUL.y+vDn.y}, {x:cx+vDn.x, y:cy+vDn.y}]});
+            faces.push({ pts: [{x:cx, y:cy}, {x:cx+vUR.x, y:cy+vUR.y}, {x:cx+vUR.x, y:cy+vUR.y+vDn.y}, {x:cx+vDn.x, y:cy+vDn.y}]});
+          }
+        }
+      }
+      return faces;
+    }
+
+    function generateDual(inputGeom) {
+      if (!inputGeom || inputGeom.length === 0) return [];
+      const vertMap = new Map();
+      inputGeom.forEach((f, fIdx) => {
+        if(!f.pts || f.pts.length < 3) return;
+        f.pts.forEach((p) => {
+          const vK = hashCoord(p);
+          if (!vertMap.has(vK)) vertMap.set(vK, { p, f: [] });
+          vertMap.get(vK).f.push(fIdx);
+        });
+      });
+      const duals = [];
+      vertMap.forEach((v) => {
+        if (v.f.length < 3) return;
+        const pts = [];
+        v.f.forEach((fi) => {
+             const f = inputGeom[fi];
+             let cx = 0, cy = 0;
+             f.pts.forEach(pt => { cx += pt.x; cy += pt.y; });
+             cx /= f.pts.length; cy /= f.pts.length;
+             pts.push({ x: cx, y: cy, a: Math.atan2(cy - v.p.y, cx - v.p.x) });
+        });
+        pts.sort((a, b) => a.a - b.a);
+        duals.push({ pts });
+      });
+      return duals;
+    }
+
+    function generateActive(inputGeom, params) {
+      if (!inputGeom || inputGeom.length === 0) return [];
+      const sides = Math.max(3, Math.floor(params.sides));
+      const rotA = rad(params.rot);
+      const expVal = params.expand;
+      const biasY = 0.5 + params.panY;
+      const shX = params.panX;
+      const source = [];
+      inputGeom.forEach(face => {
+         const pts = face.pts;
+         if(!pts || pts.length < 2) return;
+         for(let j=0; j<pts.length; j++){
+            const p1 = pts[j];
+            const p2 = pts[(j+1)%pts.length];
+            const dx = p2.x - p1.x, dy = p2.y - p1.y;
+            const len = Math.sqrt(dx*dx + dy*dy);
+            if(len < 0.001) continue;
+            const ang = Math.atan2(dy, dx);
+            const R = (len * expVal * 0.5) / Math.sin(Math.PI / sides);
+            const flat = R * Math.cos(Math.PI / sides);
+            const cx = p1.x + dx * biasY - (dy / len) * shX * len;
+            const cy = p1.y + dy * biasY + (dx / len) * shX * len;
+            const process = (centerX, centerY) => {
+               const newPoly = [];
+               for (let i = 0; i < sides; i++) {
+                  const a = ang + Math.PI / 2 + rotA + (i * 2 * Math.PI) / sides;
+                  const am = a + Math.PI / sides;
+                  newPoly.push({ x: centerX + R * Math.cos(a), y: centerY + R * Math.sin(a) });
+                  newPoly.push({ x: centerX + (flat + params.spike * R) * Math.cos(am), y: centerY + (flat + params.spike * R) * Math.sin(am) });
+               }
+               source.push({ pts: newPoly });
+            };
+            process(cx, cy);
+            if(params.mirror){
+                const cxm = p1.x + dx * biasY - (dy / len) * -shX * len;
+                const cym = p1.y + dy * biasY + (dx / len) * -shX * len;
+                process(cxm, cym);
+            }
+         }
+      });
+      return source;
+    }
+
+    // Pipeline
+    function calculateLayerGeometry(index) {
+      const l = state.layers[index];
+      let sourceGeom = null;
+      let parentSig = "";
+      if (l.type !== 'base') {
+         const parentIdx = index - 1;
+         if (parentIdx >= 0) {
+            if (!geometryCache.has(state.layers[parentIdx].id)) {
+               calculateLayerGeometry(parentIdx);
+            }
+            sourceGeom = geometryCache.get(state.layers[parentIdx].id);
+            parentSig = geometryCache.get(state.layers[parentIdx].id + "_sig");
+         }
+      }
+      const selfSig = JSON.stringify(l.params) + l.type;
+      const fullSig = parentSig + "|" + selfSig;
+      if (geometryCache.has(l.id + "_sig") && geometryCache.get(l.id + "_sig") === fullSig && geometryCache.has(l.id)) {
+        return; 
+      }
+      let geom = [];
+      try {
+        if (l.type === 'base') geom = generateBase(l.params);
+        else if (l.type === 'dual') geom = generateDual(sourceGeom);
+        else if (l.type === 'active') geom = generateActive(sourceGeom, l.params);
+      } catch(e) { console.error("Geom Gen Error", e); }
+      geometryCache.set(l.id, geom || []);
+      geometryCache.set(l.id + "_sig", fullSig);
+    }
+
+    function drawPath(ctx, list, rounding, isClosed = true) {
+      if (!list || list.length === 0) return;
+      ctx.beginPath();
+      const isSharp = rounding < 0.01;
+      list.forEach(item => {
+        const pts = item.pts;
+        if (pts.length < 2) return;
+        if (isSharp) {
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+          if(isClosed) ctx.closePath();
+        } else {
+           const pLen = pts.length;
+           for (let i = 0; i < pLen; i++) {
+             const p1 = pts[i];
+             const p0 = pts[(i === 0 ? pLen - 1 : i - 1)];
+             const p2 = pts[(i === pLen - 1 ? 0 : i + 1)];
+             const v1x = p0.x - p1.x, v1y = p0.y - p1.y;
+             const v2x = p2.x - p1.x, v2y = p2.y - p1.y;
+             const l1 = Math.sqrt(v1x*v1x + v1y*v1y), l2 = Math.sqrt(v2x*v2x + v2y*v2y);
+             const r = Math.min(l1, l2) * 0.5 * rounding;
+             const sx = p1.x + (v1x/l1)*r, sy = p1.y + (v1y/l1)*r;
+             const ex = p1.x + (v2x/l2)*r, ey = p1.y + (v2y/l2)*r;
+             if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+             ctx.quadraticCurveTo(p1.x, p1.y, ex, ey);
+           }
+           ctx.closePath();
+        }
+      });
+      ctx.fill();
+      if(ctx.lineWidth > 0) ctx.stroke();
+    }
+
+    function renderLayer(ctx, layer, geom, w, h, scale) {
+      if (!geom || geom.length === 0) return;
+      const st = layer.style;
+      const rounding = layer.params.rounding || 0;
+      ctx.save();
+      ctx.globalCompositeOperation = st.blend || "source-over";
+      if (state.global.filterMode !== 'nearest' && (st.shadowBlur > 0 || st.shadowOff > 0)) {
+         ctx.shadowBlur = st.shadowBlur * scale;
+         ctx.shadowColor = st.shadowColor;
+         const la = rad((st.lightDir || 0) + state.global.lightDir);
+         ctx.shadowOffsetX = Math.cos(la) * st.shadowOff * scale;
+         ctx.shadowOffsetY = Math.sin(la) * st.shadowOff * scale;
+      }
+      ctx.translate(w/2, h/2);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = getRGBA(st.fill, st.fillOp);
+      ctx.strokeStyle = getRGBA(st.stroke, st.strokeOp);
+      ctx.lineWidth = st.strokeWidth;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      drawPath(ctx, geom, rounding);
+      ctx.restore();
+    }
+
+    function renderScene(targetCtx, w, h, scale) {
+      targetCtx.fillStyle = state.global.bgColor;
+      targetCtx.fillRect(0, 0, w, h);
+      state.layers.forEach((l, i) => calculateLayerGeometry(i));
+      const sortedLayers = [...state.layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+      sortedLayers.forEach(l => {
+         if (!l.visible) return;
+         const g = geometryCache.get(l.id);
+         renderLayer(targetCtx, l, g, w, h, scale);
+      });
+    }
+
+    function renderMain() {
+      if (!isDirty && !state.global.autoAnim) return;
+      const dpr = window.devicePixelRatio || 1;
+      const zoom = state.global.zoom / 100;
+      const scale = Math.max(0.1, zoom * dpr);
+      const baseL = state.layers.find(l => l.type === 'base');
+      const dim = baseL ? getUnitCellDimensions(baseL.params) : { w: 100, h: 100 };
+      
+      // Use ceil to avoid sub-pixel gaps in tiling
+      const expW = Math.ceil(dim.w * scale);
+      const expH = Math.ceil(dim.h * scale);
+      
+      if (expW < 1 || expH < 1) return;
+
+      if (offCanvas.width !== expW || offCanvas.height !== expH) {
+         offCanvas.width = expW; offCanvas.height = expH;
+      }
+      renderScene(offCtx, expW, expH, scale);
+      
+      ctx.fillStyle = state.global.bgColor;
+      ctx.fillRect(0, 0, cvs.width, cvs.height);
+      const fMode = state.global.filterMode;
+      ctx.imageSmoothingEnabled = fMode !== 'nearest';
+      if (fMode === 'bicubic') ctx.imageSmoothingQuality = "high";
+      
+      if (state.global.singleTile) {
+         ctx.drawImage(offCanvas, cvs.width/2 - expW/2, cvs.height/2 - expH/2);
+      } else {
+         const pat = ctx.createPattern(offCanvas, "repeat");
+         if(pat) {
+            ctx.save();
+            const matrix = new DOMMatrix();
+            // Center alignment
+            matrix.translateSelf(cvs.width/2 - expW/2, cvs.height/2 - expH/2);
+            pat.setTransform(matrix);
+            ctx.fillStyle = pat;
+            ctx.fillRect(0, 0, cvs.width, cvs.height);
+            ctx.restore();
+         }
+      }
+      isDirty = false;
+      if(state.global.autoAnim) requestAnimationFrame(renderMain);
+    }
+
+    // Layer Management
+    function getLayerDefaults(type) {
+        let params = {};
+        if (type === 'base') params = { gridType: "square", morph: 0.33 };
+        else if (type === 'active') params = { sides: 4, expand: 0.5, spike: 0, rot: 0, panX: 0, panY: 0, rounding: 0, mirror: false };
+        else if (type === 'dual') params = { rounding: 0 };
+        return params;
+    }
+    function createLayer(type, name) {
+      const l = {
+        id: uid(),
+        type: type, 
+        name: name || (type === 'base' ? 'Base Grid' : type === 'active' ? 'Active Geom' : 'Dual Grid'),
+        visible: true,
+        zIndex: state.layers.length,
+        params: getLayerDefaults(type),
+        style: {
+          fill: "#3b82f6", fillOp: 0.2, stroke: "#60a5fa", strokeOp: 1, strokeWidth: 1,
+          blend: "source-over", shadowBlur: 0, shadowOff: 0, shadowColor: "#000000", lightDir: 0
+        }
+      };
+      if (type === 'base') {
+         l.style.fill = "#1f2937"; l.style.stroke = "#374151"; l.style.fillOp = 0.1;
+      } else if (type === 'dual') {
+         l.style.fill = "#10b981"; l.style.stroke = "#34d399"; l.style.blend = "overlay";
+      }
+      return l;
+    }
+    function addLayer(type) {
+      const l = createLayer(type);
+      state.layers.push(l);
+      refreshLayerList();
+      selectLayer(l.id);
+      markDirty();
+    }
+    function changeLayerType(id, newType) {
+        const l = state.layers.find(i => i.id === id);
+        if(!l || l.type === newType) return;
+        l.type = newType;
+        l.params = getLayerDefaults(newType);
+        if (newType === 'base') l.name = 'Base Grid';
+        else if (newType === 'active') l.name = 'Active Geom';
+        else if (newType === 'dual') l.name = 'Dual Grid';
+        invalidateCache(); 
+        refreshLayerList();
+        selectLayer(id);
+        markDirty();
+    }
+    function removeLayer(id, e) {
+      e.stopPropagation();
+      state.layers = state.layers.filter(l => l.id !== id);
+      if (state.selectedLayerId === id) selectLayer(null);
+      refreshLayerList();
+      invalidateCache();
+      markDirty();
+    }
+    function updateLayerParam(id, key, val) {
+      const l = state.layers.find(i => i.id === id);
+      if (!l) return;
+      if (key in l.style) l.style[key] = val;
+      else if (key === 'zIndex') l.zIndex = val;
+      else l.params[key] = val;
+      markDirty();
+    }
+    function updateGlobal(key, val) {
+      state.global[key] = key === 'singleTile' || key === 'autoAnim' ? val : parseFloat(val);
+      if (key === 'zoom') document.getElementById('zoomVal').innerText = val;
+      if (key === 'lightDir') document.getElementById('lightDirVal').innerText = val + "°";
+      if (key === 'bgColor') updateColorWell(document.getElementById('bgColor'));
+      markDirty();
+    }
+    function selectLayer(id) {
+      state.selectedLayerId = id;
+      document.querySelectorAll('.layer-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.id === id);
+      });
+      renderLayerControls(id);
+    }
+    function invalidateCache() {
+      geometryCache.clear();
+      markDirty();
+    }
+    function markDirty() { 
+        isDirty = true; 
+        if (!state.global.autoAnim) requestAnimationFrame(renderMain); 
+    }
+
+    // UI Builders
+    function refreshLayerList() {
+      const list = document.getElementById("layerList");
+      list.innerHTML = "";
+      [...state.layers].reverse().forEach((l, revIdx) => {
+         const idx = state.layers.length - 1 - revIdx; 
+         const item = document.createElement("div");
+         item.className = `layer-item ${state.selectedLayerId === l.id ? 'active' : ''}`;
+         item.dataset.id = l.id;
+         item.dataset.idx = idx; 
+         item.draggable = true;
+         const isDependent = l.type !== 'base';
+         const hasSource = idx > 0;
+         const statusDot = (isDependent && !hasSource) ? '<span style="color:red; font-size:12px;">⚠</span>' : '';
+         item.innerHTML = `
+           <div class="layer-drag-handle">≡</div>
+           <div class="layer-info">
+             <div class="layer-name">${l.name} ${statusDot}</div>
+             <div class="layer-type">${l.type} • Z:${l.zIndex||0}</div>
+           </div>
+           <div class="layer-controls">
+             <input type="checkbox" class="chk" ${l.visible ? 'checked' : ''} onchange="toggleVis('${l.id}', event)">
+             <button class="btn btn-icon btn-danger" onclick="removeLayer('${l.id}', event)">×</button>
+           </div>
+         `;
+         item.onclick = () => selectLayer(l.id);
+         item.addEventListener('dragstart', handleDragStart);
+         item.addEventListener('dragenter', handleDragEnter);
+         item.addEventListener('dragover', handleDragOver);
+         item.addEventListener('dragleave', handleDragLeave);
+         item.addEventListener('drop', handleDrop);
+         item.addEventListener('dragend', handleDragEnd);
+         list.appendChild(item);
+      });
+    }
+    window.toggleVis = (id, e) => {
+       const l = state.layers.find(i => i.id === id);
+       if(l) l.visible = e.target.checked;
+       markDirty();
+    };
+
+    // Drag & Drop
+    let dragSrcEl = null;
+    function handleDragStart(e) {
+       this.classList.add('dragging');
+       dragSrcEl = this;
+       e.dataTransfer.effectAllowed = 'move';
+       e.dataTransfer.setData('text/html', this.innerHTML);
+    }
+    function handleDragOver(e) { e.preventDefault(); return false; }
+    function handleDragEnter(e) { this.classList.add('over'); }
+    function handleDragLeave(e) { this.classList.remove('over'); }
+    function handleDragEnd(e) {
+       this.classList.remove('dragging');
+       document.querySelectorAll('.layer-item').forEach(item => item.classList.remove('over'));
+    }
+    function handleDrop(e) {
+       e.stopPropagation();
+       if (dragSrcEl !== this) {
+          const srcIdx = parseInt(dragSrcEl.dataset.idx);
+          const tgtIdx = parseInt(this.dataset.idx);
+          if(!isNaN(srcIdx) && !isNaN(tgtIdx)) {
+              const item = state.layers.splice(srcIdx, 1)[0];
+              state.layers.splice(tgtIdx, 0, item);
+              invalidateCache();
+              refreshLayerList();
+              markDirty();
+          }
+       }
+       return false;
+    }
+
+    // Custom UI Controls
+    function createCustomSelect(key, label, options, currentVal, onChange, onPreview) {
+        const container = document.createElement('div');
+        container.className = 'ctrl-row';
+        container.style.position = 'relative';
+        const labelEl = document.createElement('label'); labelEl.innerText = label;
+        const wrapper = document.createElement('div'); wrapper.className = 'custom-select-container';
+        const trigger = document.createElement('div'); trigger.className = 'custom-select-trigger';
+        const currOpt = options.find(o => o.v === currentVal) || options[0];
+        trigger.innerHTML = `<span>${currOpt ? currOpt.l : currentVal}</span><span>▼</span>`;
+        const optsList = document.createElement('div'); optsList.className = 'custom-select-options';
+        let committedVal = currentVal;
+        options.forEach(opt => {
+            const div = document.createElement('div');
+            div.className = `custom-option ${opt.v === committedVal ? 'selected' : ''}`;
+            div.innerText = opt.l;
+            div.onclick = (e) => {
+                e.stopPropagation();
+                trigger.querySelector('span').innerText = opt.l;
+                wrapper.classList.remove('open');
+                committedVal = opt.v; 
+                optsList.querySelectorAll('.custom-option').forEach(s => s.classList.remove('selected'));
+                div.classList.add('selected');
+                onChange(opt.v);
+            };
+            div.onmouseenter = () => {
+                optsList.querySelectorAll('.custom-option').forEach(el => el.classList.remove('selected'));
+                div.classList.add('selected');
+                if (onPreview) onPreview(opt.v);
+            };
+            optsList.appendChild(div);
+        });
+        wrapper.appendChild(trigger);
+        wrapper.appendChild(optsList);
+        container.appendChild(labelEl);
+        container.appendChild(wrapper);
+        trigger.onclick = (e) => {
+            e.stopPropagation();
+            document.querySelectorAll('.custom-select-container.open').forEach(el => { if(el !== wrapper) el.classList.remove('open'); });
+            wrapper.classList.toggle('open');
+        };
+        optsList.onmouseleave = () => {
+             const cOpt = options.find(o => o.v === committedVal);
+             optsList.querySelectorAll('.custom-option').forEach(el => {
+                 el.classList.toggle('selected', el.innerText === (cOpt ? cOpt.l : ''));
+             });
+             trigger.querySelector('span').innerText = cOpt ? cOpt.l : committedVal;
+             if (onPreview) onPreview(committedVal); 
+        };
+        return container;
+    }
+    document.addEventListener('click', () => { document.querySelectorAll('.custom-select-container.open').forEach(el => el.classList.remove('open')); });
+
+    function renderLayerControls(id) {
+       const container = document.getElementById("layerControls");
+       const label = document.getElementById("selectedLayerLabel");
+       container.innerHTML = "";
+       const l = state.layers.find(i => i.id === id);
+       if (!l) {
+          label.innerText = "NONE";
+          container.innerHTML = `<div style="padding:20px; color:#666; text-align:center;">Select a layer</div>`;
+          return;
+       }
+       label.innerText = l.name.toUpperCase();
+       
+       // Layer Type
+       const typeDiv = document.createElement('div');
+       typeDiv.className = 'ctrl-row';
+       let typeOpts = LAYER_TYPES.map(o => `<option value="${o.id}" ${o.id===l.type?'selected':''}>${o.label}</option>`).join('');
+       typeDiv.innerHTML = `<label>Layer Type</label><select class="inp-select">${typeOpts}</select>`;
+       typeDiv.querySelector('select').onchange = (e) => changeLayerType(id, e.target.value);
+       container.appendChild(typeDiv);
+
+       const createRange = (key, label, min, max, step, def, isStyle=false, unit='') => {
+          const val = isStyle ? l.style[key] : (key === 'zIndex' ? l.zIndex : l.params[key]);
+          const safeVal = val === undefined ? def : val;
+          const div = document.createElement('div');
+          div.className = 'ctrl-row';
+          div.innerHTML = `<label>${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${safeVal}"><span class="val">${parseFloat(safeVal).toFixed(2)}${unit}</span>`;
+          const input = div.querySelector('input');
+          const span = div.querySelector('.val');
+          input.oninput = (e) => {
+             const v = parseFloat(e.target.value);
+             span.innerText = v.toFixed(2) + unit;
+             updateLayerParam(id, key, v);
+             if(key === 'zIndex') refreshLayerList();
+          };
+          return div;
+       };
+       const createColor = (key, label, isStyle=false) => {
+          const val = isStyle ? l.style[key] : l.params[key];
+          const div = document.createElement('div');
+          div.className = 'ctrl-row';
+          div.innerHTML = `<label>${label}</label><div class="color-well flex-1" style="background-color:${val}"><input type="color" value="${val}"></div>`;
+          const input = div.querySelector('input');
+          input.oninput = (e) => {
+             updateColorWell(input);
+             updateLayerParam(id, key, e.target.value);
+          };
+          return div;
+       };
+       const createSelect = (key, label, opts, isStyle=false) => {
+          const val = isStyle ? l.style[key] : l.params[key];
+          const div = document.createElement('div');
+          div.className = 'ctrl-row';
+          let optHtml = opts.map(o => `<option value="${o.v}" ${o.v===val?'selected':''}>${o.l}</option>`).join('');
+          div.innerHTML = `<label>${label}</label><select class="inp-select">${optHtml}</select>`;
+          div.querySelector('select').onchange = (e) => {
+             const v = isNaN(e.target.value) ? e.target.value : parseFloat(e.target.value);
+             updateLayerParam(id, key, v);
+             if(key === 'gridType') { invalidateCache(); renderLayerControls(id); }
+          };
+          return div;
+       };
+       const createBool = (key, label) => {
+          const val = l.params[key];
+          const div = document.createElement('div');
+          div.className = 'ctrl-row';
+          div.innerHTML = `<label>${label}</label><input type="checkbox" class="chk" ${val?'checked':''}>`;
+          div.querySelector('input').onchange = (e) => updateLayerParam(id, key, e.target.checked);
+          return div;
+       };
+
+       const groupGeom = document.createElement('div');
+       groupGeom.className = 'prop-group';
+       groupGeom.innerHTML = `<div class="prop-title">Geometry Parameters</div>`;
+       if (l.type === 'base') {
+          groupGeom.appendChild(createSelect('gridType', 'Lattice', LATTICES.map(x => ({v:x.id, l:x.label}))));
+          if (["truncsquare", "cairo", "rhombic"].includes(l.params.gridType)) {
+             groupGeom.appendChild(createRange('morph', 'Morph', 0, 1.0, 0.01, 0.33));
+          }
+       } else if (l.type === 'active') {
+          groupGeom.appendChild(createRange('sides', 'Poly Sides', 3, 16, 1, 4, false));
+          groupGeom.appendChild(createRange('expand', 'Expansion', 0.1, 2.0, 0.01, 0.5));
+          groupGeom.appendChild(createRange('spike', 'Spike', -1, 1, 0.01, 0));
+          groupGeom.appendChild(createRange('rot', 'Rotation', 0, 360, 1, 0, false, '°'));
+          groupGeom.appendChild(createRange('panX', 'Pan X', -0.5, 0.5, 0.01, 0));
+          groupGeom.appendChild(createRange('panY', 'Pan Y', -0.5, 0.5, 0.01, 0));
+          groupGeom.appendChild(createBool('mirror', 'Mirror Alt'));
+       }
+       groupGeom.appendChild(createRange('rounding', 'Rounding', 0, 1, 0.01, 0));
+       container.appendChild(groupGeom);
+
+       const groupStyle = document.createElement('div');
+       groupStyle.className = 'prop-group';
+       groupStyle.innerHTML = `<div class="prop-title">Appearance & Style</div>`;
+       groupStyle.appendChild(createRange('zIndex', 'Draw Order', -10, 50, 1, 0)); 
+       groupStyle.appendChild(createColor('fill', 'Fill Color', true));
+       groupStyle.appendChild(createRange('fillOp', 'Fill Opacity', 0, 1, 0.01, 1, true));
+       groupStyle.appendChild(createColor('stroke', 'Stroke Color', true));
+       groupStyle.appendChild(createRange('strokeWidth', 'Stroke Width', 0, 10, 0.1, 1, true));
+       groupStyle.appendChild(createRange('strokeOp', 'Stroke Op', 0, 1, 0.01, 1, true));
+       
+       const blendOpts = BLEND_MODES.map(m=>({v:m, l:m}));
+       const blendSelect = createCustomSelect('blend', 'Blend Mode', blendOpts, l.style.blend, 
+           (val) => updateLayerParam(id, 'blend', val),
+           (previewVal) => {
+                const original = l.style.blend;
+                l.style.blend = previewVal;
+                isDirty = true;
+                if(!state.global.autoAnim) renderMain();
+                if(previewVal === original) return; 
+           }
+       );
+       groupStyle.appendChild(blendSelect);
+       container.appendChild(groupStyle);
+
+       const groupFX = document.createElement('div');
+       groupFX.className = 'prop-group';
+       groupFX.innerHTML = `<div class="prop-title">Shadow & Depth</div>`;
+       groupFX.appendChild(createColor('shadowColor', 'Shad Color', true));
+       groupFX.appendChild(createRange('shadowBlur', 'Blur Radius', 0, 50, 1, 0, true));
+       groupFX.appendChild(createRange('shadowOff', 'Offset Dist', 0, 30, 1, 0, true));
+       groupFX.appendChild(createRange('lightDir', 'Light Angle', 0, 360, 1, 0, true, '°'));
+       container.appendChild(groupFX);
+    }
+
+    // Evolution & Randomization
+    function getRandomPalette() {
+       const h = Math.random() * 360;
+       return [
+          hslToHex(h, 60, 20),
+          hslToHex(h, 60, 80),
+          hslToHex((h+180)%360, 60, 50),
+          hslToHex((h+30)%360, 70, 60),
+          hslToHex((h+210)%360, 70, 40)
+       ];
+    }
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = (s * Math.min(l, 1 - l)) / 100;
+      const f = (n) => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, "0");
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    }
+    function createRandomStack() {
+       const stack = [];
+       const complexity = clamp(document.getElementById("evo_complex").value / 100, 0, 1);
+       const chaos = clamp(document.getElementById("evo_chaos").value / 100, 0, 1);
+       const palette = getRandomPalette();
+       const base = createLayer('base');
+       base.params.gridType = LATTICES[Math.floor(Math.random() * LATTICES.length)].id;
+       base.style.fill = palette[0];
+       base.style.stroke = palette[1];
+       base.style.fillOp = 0.1 + Math.random() * 0.2;
+       base.zIndex = 0;
+       stack.push(base);
+       const numActive = 1 + Math.floor(Math.random() * (2 + complexity * 3));
+       for(let i=0; i<numActive; i++) {
+          const type = Math.random() > 0.6 ? 'dual' : 'active';
+          const l = createLayer(type);
+          l.zIndex = i + 1;
+          const colIdx = 2 + (i % (palette.length - 2));
+          l.style.fill = palette[colIdx];
+          l.style.stroke = palette[(colIdx + 1) % palette.length];
+          l.style.fillOp = clamp(0.3 + Math.random() * 0.4, 0, 1);
+          l.style.strokeOp = clamp(0.5 + Math.random() * 0.5, 0, 1);
+          l.style.blend = Math.random() < chaos ? BLEND_MODES[Math.floor(Math.random()*BLEND_MODES.length)] : "source-over";
+          if (type === 'active') {
+             l.params.sides = 3 + Math.floor(Math.random() * (4 + chaos * 6));
+             l.params.expand = clamp(0.2 + Math.random() * 0.8, 0.1, 2.0);
+             l.params.rot = Math.random() * 360;
+             l.params.spike = clamp((Math.random()-0.5) * chaos, -1, 1);
+             l.params.panX = clamp((Math.random()-0.5) * chaos * 0.5, -0.5, 0.5);
+             l.params.panY = clamp((Math.random()-0.5) * chaos * 0.5, -0.5, 0.5);
+             l.params.mirror = Math.random() < chaos;
+          }
+          if(Math.random() > 0.5) {
+             l.style.shadowBlur = Math.random() * 20 * chaos;
+             l.style.shadowOff = Math.random() * 10 * chaos;
+          }
+          stack.push(l);
+       }
+       return stack;
+    }
+    function mutateState(inputLayers, strength) {
+       const newLayers = JSON.parse(JSON.stringify(inputLayers));
+       newLayers.forEach(l => {
+       l.id = uid(); // Assign new Unique ID
+        });
+       const palette = getRandomPalette(); 
+       newLayers.forEach(l => {
+          if (Math.random() < strength) {
+             if (Math.random() < 0.3) {
+                 l.style.fill = palette[Math.floor(Math.random()*palette.length)];
+             }
+             if (Math.random() < 0.5) l.style.fillOp = clamp(l.style.fillOp + (Math.random()-0.5)*0.3, 0, 1);
+             if (Math.random() < 0.2) l.style.blend = BLEND_MODES[Math.floor(Math.random()*BLEND_MODES.length)];
+             if (Math.random() < 0.3) {
+                 l.style.shadowBlur = Math.max(0, l.style.shadowBlur + (Math.random()-0.5)*5);
+                 l.style.shadowOff = Math.max(0, l.style.shadowOff + (Math.random()-0.5)*3);
+             }
+          }
+          if (Math.random() < strength) {
+             if (l.type === 'active') {
+                l.params.expand = clamp(l.params.expand + (Math.random()-0.5) * 0.2, 0.1, 2.0);
+                l.params.rot += (Math.random()-0.5) * 30;
+                l.params.spike = clamp(l.params.spike + (Math.random()-0.5) * 0.1, -1, 1);
+                if(Math.random() < 0.1) l.params.sides = Math.max(3, l.params.sides + (Math.random()>0.5?1:-1));
+                l.params.panX = clamp(l.params.panX + (Math.random()-0.5) * 0.05, -0.5, 0.5);
+                l.params.panY = clamp(l.params.panY + (Math.random()-0.5) * 0.05, -0.5, 0.5);
+             }
+             if (l.type === 'base' && Math.random() < 0.05) {
+                l.params.gridType = LATTICES[Math.floor(Math.random()*LATTICES.length)].id;
+             }
+          }
+       });
+       return newLayers;
+    }
+    function randomizeStack() {
+       const chaos = clamp(document.getElementById("evo_chaos").value / 100, 0, 1);
+       const palette = getRandomPalette();
+       state.layers.forEach((l, i) => {
+          const colIdx = i % palette.length;
+          l.style.fill = palette[colIdx];
+          l.style.stroke = palette[(colIdx + 1) % palette.length];
+          l.style.fillOp = clamp(0.1 + Math.random() * 0.4, 0, 1);
+          l.style.strokeOp = clamp(0.5 + Math.random() * 0.5, 0, 1);
+          l.style.blend = Math.random() < chaos ? BLEND_MODES[Math.floor(Math.random()*BLEND_MODES.length)] : "source-over";
+          if(Math.random() < chaos) {
+             l.style.shadowBlur = Math.random() * 20;
+             l.style.shadowOff = Math.random() * 10;
+          } else {
+             l.style.shadowBlur = 0; l.style.shadowOff = 0;
+          }
+          if(l.type === 'base') {
+              if(Math.random() < chaos) l.params.gridType = LATTICES[Math.floor(Math.random()*LATTICES.length)].id;
+              if (["truncsquare", "cairo", "rhombic"].includes(l.params.gridType)) l.params.morph = clamp(0.2 + Math.random() * 0.3, 0, 1);
+          } else if(l.type === 'active') {
+              l.params.sides = 3 + Math.floor(Math.random() * (4 + chaos * 6));
+              l.params.expand = clamp(0.2 + Math.random() * 0.8, 0.1, 2.0);
+              l.params.rot = Math.random() * 360;
+              l.params.spike = clamp((Math.random()-0.5) * chaos, -1, 1);
+              l.params.panX = clamp((Math.random()-0.5) * chaos * 0.5, -0.5, 0.5);
+              l.params.panY = clamp((Math.random()-0.5) * chaos * 0.5, -0.5, 0.5);
+              l.params.mirror = Math.random() < chaos;
+          }
+          l.params.rounding = clamp(Math.random() * 0.5 * chaos, 0, 1);
+       });
+       refreshLayerList();
+       if(state.selectedLayerId) selectLayer(state.selectedLayerId);
+       invalidateCache();
+       markDirty();
+       showToast("Parameters Randomized!");
+    }
+    function runEvolution() {
+       const grid = document.getElementById("evoGrid");
+       grid.innerHTML = "";
+       const strength = document.getElementById("evo_mutation").value / 100;
+       for (let i = 0; i < 12; i++) {
+          const thumb = document.createElement("div");
+          thumb.className = "evo-thumb";
+          const mutatedLayers = mutateState(state.layers, strength);
+          const cvsT = document.createElement("canvas");
+          cvsT.width = 300; cvsT.height = 200;
+          const ctxT = cvsT.getContext("2d");
+          const backupLayers = state.layers;
+          state.layers = mutatedLayers;
+          invalidateCache(); 
+          renderScene(ctxT, 300, 200, 0.4); 
+          thumb.appendChild(cvsT);
+          thumb.onclick = () => {
+             state.layers = mutatedLayers;
+             closeEvo();
+             refreshLayerList();
+             invalidateCache();
+             if(state.layers.length > 0) selectLayer(state.layers[state.layers.length-1].id);
+             markDirty();
+          };
+          grid.appendChild(thumb);
+          state.layers = backupLayers;
+          invalidateCache();
+       }
+    }
+    function closeEvo() { document.getElementById('evoOverlay').style.display = 'none'; }
+    document.getElementById('btnEvo').onclick = () => {
+       document.getElementById('evoOverlay').style.display = 'flex';
+       runEvolution();
+    };
+
+    // Export / Setup
+    function exportImage(type) {
+       renderMain(); // Force fresh render
+       const link = document.createElement('a');
+       link.download = `tiling_${Date.now()}.${type}`;
+       link.href = offCanvas.toDataURL(`image/${type}`);
+       link.click();
+       showToast(`${type.toUpperCase()} Exported`);
+    }
+    function exportSVG() {
+       const dim = getUnitCellDimensions(state.layers[0]?.params || {});
+       let svg = `<svg width="${dim.w}" height="${dim.h}" viewBox="0 0 ${dim.w} ${dim.h}" xmlns="http://www.w3.org/2000/svg" style="background:${state.global.bgColor}">`;
+       svg += `<defs>`;
+       state.layers.forEach((l, i) => calculateLayerGeometry(i));
+       const sortedLayers = [...state.layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+       sortedLayers.forEach(l => {
+          if(!l.visible) return;
+          const geom = geometryCache.get(l.id);
+          if(!geom) return;
+          let d = "";
+          geom.forEach(g => {
+             const pts = g.pts;
+             if(pts.length < 2) return;
+             d += `M ${pts[0].x} ${pts[0].y} `;
+             for(let k=1; k<pts.length; k++) d += `L ${pts[k].x} ${pts[k].y} `;
+             d += "Z ";
+          });
+          const hasSh = (l.style.shadowBlur > 0 || l.style.shadowOff > 0);
+          if (hasSh) {
+             const la = rad((l.style.lightDir||0) + state.global.lightDir);
+             const offX = Math.cos(la) * l.style.shadowOff;
+             const offY = Math.sin(la) * l.style.shadowOff;
+             svg += `<filter id="f_${l.id}"><feGaussianBlur in="SourceAlpha" stdDeviation="${l.style.shadowBlur/2}"/><feOffset dx="${offX}" dy="${offY}"/><feFlood flood-color="${l.style.shadowColor}"/><feComposite operator="in" in2="SourceGraphic"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+          }
+          svg += `<path d="${d}" fill="${l.style.fill}" fill-opacity="${l.style.fillOp}" stroke="${l.style.stroke}" stroke-width="${l.style.strokeWidth}" stroke-opacity="${l.style.strokeOp}" style="mix-blend-mode:${l.style.blend}" ${hasSh?`filter="url(#f_${l.id})"`:''} />`;
+       });
+       svg += `</defs>`;
+       svg += "</svg>";
+       const blob = new Blob([svg], {type:"image/svg+xml"});
+       const url = URL.createObjectURL(blob);
+       const link = document.createElement("a");
+       link.download = `tiling_${Date.now()}.svg`;
+       link.href = url;
+       link.click();
+    }
+    
+    window.onload = () => {
+      cvs = document.getElementById("canvas");
+      ctx = cvs.getContext("2d", { alpha: false });
+      offCanvas = document.createElement("canvas");
+      offCtx = offCanvas.getContext("2d");
+      const rsz = document.getElementById("resizer"), sdb = document.getElementById("sidebar");
+      let drg = false;
+      rsz.onmousedown = () => drg = true; 
+      document.onmouseup = () => drg = false;
+      document.onmousemove = (e) => { if (drg) { sdb.style.width = Math.max(320, Math.min(e.clientX, 600)) + "px"; resize(); } };
+      state.layers = createRandomStack();
+      refreshLayerList();
+      selectLayer(state.layers[state.layers.length-1].id);
+      document.getElementById("btnSavePreset").onclick = () => {
+         const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+         const a = document.createElement("a");
+         a.href = URL.createObjectURL(blob);
+         a.download = "preset.json";
+         a.click();
+      };
+      document.getElementById("btnLoadPreset").onclick = () => {
+         const inp = document.createElement("input"); inp.type="file"; inp.accept=".json";
+         inp.onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (re) => {
+               try {
+                  const d = JSON.parse(re.target.result);
+                  state.global = d.global;
+                  state.layers = d.layers;
+                  document.getElementById("zoom").value = state.global.zoom;
+                  document.getElementById("zoomVal").innerText = state.global.zoom;
+                  updateColorWell(document.getElementById("bgColor"));
+                  refreshLayerList();
+                  invalidateCache();
+                  markDirty();
+               } catch(e) { alert("Invalid Preset"); }
+            };
+            reader.readAsText(e.target.files[0]);
+         };
+         inp.click();
+      };
+      window.onresize = resize;
+      resize();
+      renderMain();
+    };
+    function resize() {
+      const c = document.getElementById("canvasContainer");
+      cvs.width = c.clientWidth;
+      cvs.height = c.clientHeight;
+      markDirty();
+    }
+</script>
+</body>
+</html>
