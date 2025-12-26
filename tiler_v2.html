@@ -644,30 +644,60 @@
       if(ctx.lineWidth > 0) ctx.stroke();
     }
 
-    function renderLayer(ctx, layer, geom, w, h, scale) {
-      if (!geom || geom.length === 0) return;
-      const st = layer.style;
-      const rounding = layer.params.rounding || 0;
-      ctx.save();
-      ctx.globalCompositeOperation = st.blend || "source-over";
-      if (state.global.filterMode !== 'nearest' && (st.shadowBlur > 0 || st.shadowOff > 0)) {
-         ctx.shadowBlur = st.shadowBlur * scale;
-         ctx.shadowColor = st.shadowColor;
-         const la = rad((st.lightDir || 0) + state.global.lightDir);
-         ctx.shadowOffsetX = Math.cos(la) * st.shadowOff * scale;
-         ctx.shadowOffsetY = Math.sin(la) * st.shadowOff * scale;
-      }
-      ctx.translate(w/2, h/2);
-      ctx.scale(scale, scale);
-      ctx.fillStyle = getRGBA(st.fill, st.fillOp);
-      ctx.strokeStyle = getRGBA(st.stroke, st.strokeOp);
-      ctx.lineWidth = st.strokeWidth;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      drawPath(ctx, geom, rounding);
-      ctx.restore();
-    }
+function renderLayer(ctx, layer, geom, w, h, scale) {
+  if (!geom || geom.length === 0) return;
+  const st = layer.style;
+  const rounding = layer.params.rounding || 0;
 
+  // 1. Define a "Buffer" to capture shadow blur and offset
+  // We add extra space based on the blur radius and offset to prevent clipping
+  const shadowPadding = (st.shadowBlur + Math.abs(st.shadowOff)) * scale + 10;
+  
+  // Create a scratchpad large enough for the tile PLUS the shadow buffer
+  const scratch = document.createElement('canvas');
+  scratch.width = w + shadowPadding * 2;
+  scratch.height = h + shadowPadding * 2;
+  const sCtx = scratch.getContext('2d');
+
+  sCtx.save();
+  // Move to the center of our oversized scratchpad
+  sCtx.translate(scratch.width / 2, scratch.height / 2);
+  sCtx.scale(scale, scale);
+  
+  sCtx.fillStyle = getRGBA(st.fill, st.fillOp);
+  sCtx.strokeStyle = getRGBA(st.stroke, st.strokeOp);
+  sCtx.lineWidth = st.strokeWidth;
+  sCtx.lineJoin = "round";
+  sCtx.lineCap = "round";
+
+  // 2. 3x3 Geometry Grid (Draws adjacent shapes so their shadows bleed in)
+  for (let x = -1; x <= 1; x++) {
+    for (let y = -1; y <= 1; y++) {
+      sCtx.save();
+      sCtx.translate((x * w) / scale, (y * h) / scale);
+      drawPath(sCtx, geom, rounding, true);
+      if (st.strokeWidth > 0) sCtx.stroke();
+      sCtx.restore();
+    }
+  }
+  sCtx.restore();
+
+  // 3. Draw to the Tile Context with Shadow + Blend mode
+  ctx.save();
+  ctx.globalCompositeOperation = st.blend || "source-over";
+
+  if (state.global.filterMode !== 'nearest' && (st.shadowBlur > 0 || st.shadowOff > 0)) {
+    ctx.shadowBlur = st.shadowBlur * scale;
+    ctx.shadowColor = st.shadowColor;
+    const la = rad((st.lightDir || 0) + state.global.lightDir);
+    ctx.shadowOffsetX = Math.cos(la) * st.shadowOff * scale;
+    ctx.shadowOffsetY = Math.sin(la) * st.shadowOff * scale;
+  }
+
+  // Offset the oversized scratchpad back so the center tile aligns perfectly
+  ctx.drawImage(scratch, -shadowPadding, -shadowPadding);
+  ctx.restore();
+}
     function renderScene(targetCtx, w, h, scale) {
       targetCtx.fillStyle = state.global.bgColor;
       targetCtx.fillRect(0, 0, w, h);
@@ -681,48 +711,51 @@
     }
 
     function renderMain() {
-      if (!isDirty && !state.global.autoAnim) return;
-      const dpr = window.devicePixelRatio || 1;
-      const zoom = state.global.zoom / 100;
-      const scale = Math.max(0.1, zoom * dpr);
-      const baseL = state.layers.find(l => l.type === 'base');
-      const dim = baseL ? getUnitCellDimensions(baseL.params) : { w: 100, h: 100 };
-      
-      // Use ceil to avoid sub-pixel gaps in tiling
-      const expW = Math.ceil(dim.w * scale);
-      const expH = Math.ceil(dim.h * scale);
-      
-      if (expW < 1 || expH < 1) return;
+  if (!isDirty && !state.global.autoAnim) return;
+  const dpr = window.devicePixelRatio || 1;
+  const zoom = state.global.zoom / 100;
+  const scale = Math.max(0.1, zoom * dpr);
+  const baseL = state.layers.find(l => l.type === 'base');
+  const dim = baseL ? getUnitCellDimensions(baseL.params) : { w: 100, h: 100 };
+  
+  const expW = Math.ceil(dim.w * scale);
+  const expH = Math.ceil(dim.h * scale);
+  
+  if (expW < 1 || expH < 1) return;
 
-      if (offCanvas.width !== expW || offCanvas.height !== expH) {
-         offCanvas.width = expW; offCanvas.height = expH;
-      }
-      renderScene(offCtx, expW, expH, scale);
-      
-      ctx.fillStyle = state.global.bgColor;
-      ctx.fillRect(0, 0, cvs.width, cvs.height);
-      const fMode = state.global.filterMode;
-      ctx.imageSmoothingEnabled = fMode !== 'nearest';
-      if (fMode === 'bicubic') ctx.imageSmoothingQuality = "high";
-      
-      if (state.global.singleTile) {
-         ctx.drawImage(offCanvas, cvs.width/2 - expW/2, cvs.height/2 - expH/2);
-      } else {
-         const pat = ctx.createPattern(offCanvas, "repeat");
-         if(pat) {
-            ctx.save();
-            const matrix = new DOMMatrix();
-            // Center alignment
-            matrix.translateSelf(cvs.width/2 - expW/2, cvs.height/2 - expH/2);
-            pat.setTransform(matrix);
-            ctx.fillStyle = pat;
-            ctx.fillRect(0, 0, cvs.width, cvs.height);
-            ctx.restore();
-         }
-      }
-      isDirty = false;
-      if(state.global.autoAnim) requestAnimationFrame(renderMain);
-    }
+  if (offCanvas.width !== expW || offCanvas.height !== expH) {
+     offCanvas.width = expW; offCanvas.height = expH;
+  }
+  
+  // 1. Render the individual tile
+  renderScene(offCtx, expW, expH, scale);
+  
+  // 2. Clear the MAIN visible canvas with the background color
+  ctx.save();
+  ctx.fillStyle = state.global.bgColor; // This ensures the whole screen changes
+  ctx.fillRect(0, 0, cvs.width, cvs.height);
+  
+  const fMode = state.global.filterMode;
+  ctx.imageSmoothingEnabled = fMode !== 'nearest';
+  if (fMode === 'bicubic') ctx.imageSmoothingQuality = "high";
+  
+  if (state.global.singleTile) {
+     ctx.drawImage(offCanvas, cvs.width/2 - expW/2, cvs.height/2 - expH/2);
+  } else {
+     const pat = ctx.createPattern(offCanvas, "repeat");
+     if(pat) {
+        const matrix = new DOMMatrix();
+        matrix.translateSelf(cvs.width/2 - expW/2, cvs.height/2 - expH/2);
+        pat.setTransform(matrix);
+        ctx.fillStyle = pat;
+        ctx.fillRect(0, 0, cvs.width, cvs.height);
+     }
+  }
+  ctx.restore();
+  
+  isDirty = false;
+  if(state.global.autoAnim) requestAnimationFrame(renderMain);
+}
 
     // Layer Management
     function getLayerDefaults(type) {
@@ -789,12 +822,14 @@
       markDirty();
     }
     function updateGlobal(key, val) {
-      state.global[key] = key === 'singleTile' || key === 'autoAnim' ? val : parseFloat(val);
-      if (key === 'zoom') document.getElementById('zoomVal').innerText = val;
-      if (key === 'lightDir') document.getElementById('lightDirVal').innerText = val + "°";
-      if (key === 'bgColor') updateColorWell(document.getElementById('bgColor'));
-      markDirty();
-    }
+  state.global[key] = (key === 'singleTile' || key === 'autoAnim') ? val : (isNaN(val) ? val : parseFloat(val));
+  if (key === 'zoom') document.getElementById('zoomVal').innerText = val;
+  if (key === 'lightDir') document.getElementById('lightDirVal').innerText = val + "°";
+  if (key === 'bgColor') {
+      document.getElementById('bgWell').style.backgroundColor = val;
+  }
+  markDirty();
+}
     function selectLayer(id) {
       state.selectedLayerId = id;
       document.querySelectorAll('.layer-item').forEach(el => {
