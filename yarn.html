@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KnitScape IDE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        body { font-family: 'Inter', system-ui, sans-serif; user-select: none; }
+        
+        .canvas-stack {
+            position: relative; width: 100%; height: 100%; overflow: hidden;
+            background-color: #e5e7eb;
+            background-image: radial-gradient(#9ca3af 1px, transparent 1px);
+            background-size: 20px 20px;
+            touch-action: none;
+        }
+        .canvas-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        .grid-container {
+            display: grid; gap: 1px; background-color: #cbd5e1;
+            border: 1px solid #94a3b8; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            touch-action: none;
+        }
+        .grid-cell {
+            width: 24px; height: 24px; background-color: #ffffff;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; color: #334155; transition: background-color 0.05s;
+        }
+        .grid-cell:hover { background-color: #f1f5f9; }
+        .grid-cell.tile-border-right { border-right: 2px solid #64748b; }
+        .grid-cell.tile-border-bottom { border-bottom: 2px solid #64748b; }
+        
+        /* Stitch Symbols */
+        .stitch-K::after { content: ''; }
+        .stitch-P::after { content: ''; width: 10px; height: 2px; background-color: #334155; }
+        .stitch-T::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background-color: #10b981; }
+        .stitch-M { color: #f59e0b; font-weight: bold; }
+        .stitch-M::after { content: 'V'; font-size: 10px;}
+        .stitch-SC::after { content: '+'; font-weight: bold; font-size: 14px; color: #3b82f6; }
+        .stitch-DC::after { content: 'T'; font-weight: bold; font-size: 12px; color: #ef4444; }
+        .stitch-CH::after { content: '○'; font-weight: bold; font-size: 10px; color: #f59e0b; }
+        .stitch-SL::after { content: '●'; font-weight: bold; font-size: 8px; color: #10b981; }
+        
+        .tool-btn { position: relative; overflow: hidden; }
+        .tool-btn.active { border-color: #3b82f6; background-color: #1e293b; }
+        .tool-btn.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #3b82f6; }
+        
+        .row-header {
+            width: 20px; height: 24px; margin-bottom: 1px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 9px; color: white; cursor: pointer; border-radius: 2px;
+            font-family: monospace; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            transition: filter 0.1s;
+        }
+        .row-header:hover { filter: brightness(1.1); }
+        
+        .status-dot { height: 6px; width: 6px; border-radius: 50%; display: inline-block; }
+        .status-live { background-color: #22c55e; box-shadow: 0 0 6px #22c55e; }
+        .status-idle { background-color: #6b7280; }
+        input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col overflow-hidden">
+
+    <header class="h-12 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0 z-30 shadow-md">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="bg-blue-600 p-1 rounded text-white text-xs"><i class="fa-solid fa-mitten"></i></div>
+                <h1 class="text-sm font-bold tracking-wide text-gray-100">KnitScape</h1>
+            </div>
+            
+            <div class="flex bg-gray-900 rounded-lg p-0.5 border border-gray-700">
+                <button onclick="app.setMode('knit')" id="mode-knit" class="px-3 py-1 text-[10px] uppercase font-bold rounded transition-colors text-white bg-gray-700 shadow">Knit</button>
+                <button onclick="app.setMode('crochet')" id="mode-crochet" class="px-3 py-1 text-[10px] uppercase font-bold rounded transition-colors text-gray-400 hover:text-white">Crochet</button>
+            </div>
+
+            <div class="relative">
+                <button id="presetBtn" onclick="app.togglePresets(event)" class="flex items-center space-x-2 text-[10px] uppercase font-bold text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded border border-gray-600 transition-colors">
+                    <i class="fa-solid fa-book-open"></i><span>Presets</span>
+                </button>
+                <div id="presetsMenu" class="hidden absolute top-full left-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded shadow-xl z-50 overflow-hidden">
+                    <div id="presetsList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <button onclick="app.exportImage()" class="text-[10px] uppercase font-bold text-gray-400 hover:text-white transition bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded border border-gray-600">
+                <i class="fa-solid fa-camera mr-1"></i> PNG
+            </button>
+            <button onclick="app.exportJSON()" class="text-[10px] uppercase font-bold text-gray-400 hover:text-white transition bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded border border-gray-600">
+                <i class="fa-solid fa-download mr-1"></i> Save
+            </button>
+            <label class="text-[10px] uppercase font-bold text-gray-400 hover:text-white transition bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded border border-gray-600 cursor-pointer">
+                <i class="fa-solid fa-upload mr-1"></i> Load
+                <input type="file" class="hidden" onchange="app.importJSON(this)" accept=".json">
+            </label>
+            <div class="w-px h-6 bg-gray-700 mx-1"></div>
+            <div class="flex items-center space-x-2 text-[10px] uppercase font-bold tracking-wider text-gray-400 bg-gray-900 px-2 py-1 rounded border border-gray-700">
+                <span id="simStatus" class="status-dot status-idle"></span>
+                <span id="simStatusText">Ready</span>
+            </div>
+            <button onclick="app.resetPattern()" class="text-[10px] uppercase font-bold text-red-400 hover:text-red-300 transition bg-gray-900 hover:bg-gray-800 px-2 py-1 rounded border border-gray-700">
+                <i class="fa-solid fa-trash mr-1"></i> Clear
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        <aside class="w-[320px] flex flex-col border-r border-gray-700 bg-gray-800 z-20 shadow-2xl overflow-hidden">
+            <div class="p-3 border-b border-gray-700">
+                <span class="text-[10px] font-bold uppercase text-gray-500 block mb-2 tracking-wider">Stitch Type</span>
+                <div id="toolbar" class="grid grid-cols-4 gap-1"></div>
+            </div>
+
+            <div class="p-3 border-b border-gray-700 bg-gray-800/50">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Yarn Palette</span>
+                    <button onclick="app.addYarn()" class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div id="yarnList" class="space-y-1 max-h-[100px] overflow-y-auto pr-1 custom-scrollbar"></div>
+            </div>
+
+            <div class="flex-1 overflow-auto p-4 bg-gray-900 relative flex justify-center items-start custom-scrollbar">
+                <div class="flex flex-row select-none" onmouseleave="app.endPaint()">
+                    <div id="rowHeaders" class="flex flex-col pt-[1px] mr-1"></div>
+                    <div id="patternGrid" class="grid-container" onmousedown="app.startPaint(event)" onmouseup="app.endPaint()"></div>
+                </div>
+            </div>
+
+            <div class="p-3 border-t border-gray-700 bg-gray-800 space-y-3 overflow-y-auto custom-scrollbar">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[9px] uppercase font-bold text-gray-500 block mb-1">Grid Size</label>
+                        <div class="flex space-x-2">
+                            <div class="relative flex-1">
+                                <span class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-500 font-bold">W</span>
+                                <input type="number" id="gridWidth" value="12" min="4" max="60" class="w-full bg-gray-900 border border-gray-600 rounded py-1 pl-5 pr-1 text-xs focus:border-blue-500 outline-none" onchange="app.resizeGrid()">
+                            </div>
+                            <div class="relative flex-1">
+                                <span class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-500 font-bold">H</span>
+                                <input type="number" id="gridHeight" value="16" min="4" max="100" class="w-full bg-gray-900 border border-gray-600 rounded py-1 pl-5 pr-1 text-xs focus:border-blue-500 outline-none" onchange="app.resizeGrid()">
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[9px] uppercase font-bold text-gray-500 block mb-1">Pattern Tile</label>
+                        <div class="flex space-x-2">
+                            <div class="relative flex-1">
+                                <span class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-500 font-bold">W</span>
+                                <input type="number" id="tileWidth" value="0" min="0" max="30" class="w-full bg-gray-900 border border-gray-600 rounded py-1 pl-5 pr-1 text-xs focus:border-blue-500 outline-none" onchange="app.updateTile()">
+                            </div>
+                            <div class="relative flex-1">
+                                <span class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-500 font-bold">H</span>
+                                <input type="number" id="tileHeight" value="0" min="0" max="30" class="w-full bg-gray-900 border border-gray-600 rounded py-1 pl-5 pr-1 text-xs focus:border-blue-500 outline-none" onchange="app.updateTile()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="syncRepeats" class="w-3 h-3 rounded bg-gray-700 border-gray-500 text-blue-500 focus:ring-0" checked onchange="app.renderGrid()">
+                        <span class="text-[10px] font-bold text-gray-400">Sync Repeats</span>
+                    </label>
+                </div>
+
+                <div class="pt-2 border-t border-gray-700">
+                    <label class="text-[9px] uppercase font-bold text-gray-500 block mb-1">Simulation Settings</label>
+                    
+                    <div class="space-y-2">
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-[9px] text-gray-400">Tension</span><span class="text-[9px] text-gray-500" id="valTension">0.2</span></div>
+                            <input type="range" id="simTension" min="0.01" max="0.5" step="0.01" value="0.2" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="app.updatePhysics()">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-[9px] text-gray-400">Yarn Thickness</span><span class="text-[9px] text-gray-500" id="valThickness">0.24</span></div>
+                            <input type="range" id="simThickness" min="0.05" max="0.5" step="0.01" value="0.24" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="app.updatePhysics()">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="text-[9px] text-gray-400">Stitch Gauge</span><span class="text-[9px] text-gray-500" id="valGauge">1.66</span></div>
+                            <input type="range" id="simGauge" min="0.5" max="3.0" step="0.1" value="1.66" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500" oninput="app.updatePhysics()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <section class="flex-1 flex flex-col relative">
+            <div id="sim-container" class="canvas-stack">
+                <canvas id="back" class="canvas-layer"></canvas>
+                <canvas id="mid" class="canvas-layer"></canvas>
+                <canvas id="front" class="canvas-layer"></canvas>
+            </div>
+
+            <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+                <button id="relaxBtn" onclick="app.toggleRelax()" class="group bg-white/90 hover:bg-white backdrop-blur border border-gray-300 shadow-xl rounded-full px-5 py-2.5 flex items-center transition-all hover:scale-105 active:scale-95">
+                    <div class="mr-3 bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <i id="relaxIcon" class="fa-solid fa-water"></i>
+                    </div>
+                    <div class="flex flex-col items-start">
+                        <span id="relaxText" class="text-xs font-bold text-gray-800">Relax Yarn</span>
+                        <span class="text-[9px] font-medium text-gray-500 uppercase tracking-wide">Physics Sim</span>
+                    </div>
+                </button>
+            </div>
+            
+            <div class="absolute top-4 right-4 text-[10px] text-gray-500 bg-white/80 backdrop-blur px-3 py-2 rounded-lg border border-gray-200 pointer-events-none select-none z-10 shadow-sm flex flex-col gap-1 items-end">
+                <div class="flex items-center gap-2"><i class="fa-solid fa-hand-pointer text-blue-500"></i> Left Click: Tug (When Relaxed)</div>
+                <div class="flex items-center gap-2"><i class="fa-solid fa-arrows-up-down-left-right text-gray-600"></i> Middle Click: Pan & Zoom</div>
+                <div class="flex items-center gap-2"><i class="fa-solid fa-magnifying-glass text-gray-600"></i> Scroll: Zoom</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+    /* --- CONSTANTS --- */
+    const X_PADDING = 1;
+    const Y_PADDING = 0;
+    const SPREAD = 0.88;
+    const ALPHA_DECAY = 0.05;
+    const ALPHA_MIN = 0.001;
+    const HEIGHT_SHRINK = 0.7;
+    
+    // UI Ops
+    const KNIT="K", PURL="P", TUCK="T", MISS="M";
+    
+    // Internal Ops
+    const OP_KNIT="K", OP_PURL="P", OP_TUCK="T", OP_MISS="M";
+    const ECN="ECN", PCN="PCN", ACN="ACN", UACN="UACN";
+
+    /* --- DATA STRUCTURES --- */
+    class Pattern {
+        constructor(gridData, mode) {
+            this.height = gridData.length;
+            this.width = gridData[0].length;
+            this.mode = mode;
+            this.ops = gridData.flat();
+        }
+        op(x, y) {
+            if (x > this.width - 1 || x < 0 || y > this.height - 1 || y < 0) return -1;
+            const invertedY = (this.height - 1) - y;
+            const uiOp = this.ops[x + invertedY * this.width];
+            return this.mapOp(uiOp);
+        }
+        mapOp(uiOp) {
+            if (this.mode === 'knit') return uiOp; 
+            switch(uiOp) {
+                case 'SC': return OP_KNIT;
+                case 'DC': return OP_KNIT; 
+                case 'SL': return OP_PURL;
+                case 'CH': return OP_MISS;
+                default: return OP_KNIT;
+            }
+        }
+        pad(xPad, yPad) {
+            const newW = this.width + xPad * 2;
+            const newH = this.height + yPad * 2;
+            const topologyGrid = [];
+            for(let y=0; y<newH; y++) {
+                const row = [];
+                for(let x=0; x<newW; x++) {
+                    const ox = x - xPad;
+                    const oy = y - yPad;
+                    if (ox >= 0 && ox < this.width && oy >= 0 && oy < this.height) {
+                        row.push(this.op(ox, (this.height - 1) - oy));
+                    } else {
+                        row.push(OP_KNIT);
+                    }
+                }
+                topologyGrid.push(row);
+            }
+            return {
+                width: newW, height: newH,
+                op: (x, y) => topologyGrid[y][x]
+            };
+        }
+    }
+
+    class ContactNeighborhood {
+        constructor(m, n) {
+            this.width = 2 * m;
+            this.height = n + 1;
+            this.contacts = Array.from({ length: this.width * this.height }, () => [null, ECN, [null, null]]);
+            for (let i = 0; i < this.width; i++) {
+                this.setAV(i, 0, PCN);
+                this.setMV(i, 0, [0, 0]);
+            }
+        }
+        getST(i, j) { return this.neighborhood(i, j)[0]; }
+        setSt(i, j, st) { this.neighborhood(i, j)[0] = st; }
+        getAV(i, j) { return this.neighborhood(i, j)[1]; }
+        setAV(i, j, cnType) { this.neighborhood(i, j)[1] = cnType; }
+        getMV(i, j) { return this.neighborhood(i, j)[2]; }
+        setMV(i, j, mv) { this.neighborhood(i, j)[2] = mv; }
+        getDeltaI(i, j) { return this.neighborhood(i, j)[2][0]; }
+        getDeltaJ(i, j) { return this.neighborhood(i, j)[2][1]; }
+        setDeltaJ(i, j, deltaJ) { this.neighborhood(i, j)[2][1] = deltaJ; }
+        neighborhood(i, j) { return this.contacts[j * this.width + i]; }
+    }
+
+    class ProcessModel {
+        constructor(patternWrapper) {
+            this.width = patternWrapper.width;
+            this.height = patternWrapper.height;
+            this.instructions = patternWrapper;
+            this.cn = new ContactNeighborhood(this.width, this.height);
+            this.populate();
+        }
+        populate() {
+            let movingRight = true;
+            for (let n = 0; n < this.height; n++) {
+                if (movingRight) {
+                    for (let m = 0; m < this.width; m++) this.handleOp(2 * m, n, this.instructions.op(m, n), 1);
+                } else {
+                    for (let m = this.width - 1; m >= 0; m--) this.handleOp(2 * m + 1, n, this.instructions.op(m, n), -1);
+                }
+                movingRight = !movingRight;
+            }
+        }
+        handleOp(i, j, op, offset) {
+            if (op == OP_KNIT || op == OP_PURL) {
+                this.kpLower(i, j, op); this.kpLower(i+offset, j, op);
+                this.kpUpper(i, j); this.kpUpper(i+offset, j);
+            } else if (op == OP_TUCK || op == OP_MISS) {
+                this.tmLower(i, j); this.tmLower(i+offset, j);
+                this.tmUpper(i, j, op); this.tmUpper(i+offset, j, op);
+            }
+        }
+        kpLower(i, j, op) {
+            this.cn.setSt(i, j, op);
+            if (this.cn.getAV(i, j) == PCN && this.cn.getMV(i, j)[0] == 0) this.cn.setAV(i, j, ACN);
+            if (this.cn.getAV(i, j) == UACN) {
+                if ((this.cn.getAV(i+1, j-1) == ACN && this.cn.getMV(i+1, j-1)[1] == 0) || (this.cn.getAV(i-1, j-1) == ACN && this.cn.getMV(i-1, j-1)[1] == 0)) this.cn.setAV(i, j, ACN);
+                if (this.cn.getAV(i, j-1) == PCN) this.cn.setAV(i, j-1, ACN);
+            }
+        }
+        kpUpper(i, j) {
+            this.cn.setMV(i, j+1, [0, 0]);
+            this.cn.setAV(i, j+1, this.cn.getAV(i, j) == ACN ? PCN : UACN);
+            if (this.cn.getAV(i, j) == UACN) {
+                let s = 0;
+                while(j-s >= 0) {
+                    if (this.cn.getAV(i, j-s) === PCN) { this.cn.setAV(i, j-s, ACN); break; }
+                    s++;
+                }
+            }
+        }
+        tmLower(i, j) {
+            const AV = this.cn.getAV(i, j);
+            if (AV == PCN || AV == UACN) this.cn.setDeltaJ(i, j, 1);
+            else if (AV == ECN) {
+                let s = 0;
+                while(true) {
+                    const dj = this.cn.getMV(i, j-s)[1];
+                    if (dj > 0) { this.cn.setDeltaJ(i, j-s, dj+1); break; }
+                    s++; if(s > 100) break;
+                }
+            }
+        }
+        tmUpper(i, j, op) {
+            this.cn.setAV(i, j+1, op == OP_TUCK ? UACN : ECN);
+            this.cn.setMV(i, j+1, op == OP_TUCK ? [0,0] : [0,-1]);
+        }
+    }
+
+    class YarnModel {
+        constructor(cns) {
+            this.width = cns.width;
+            this.height = cns.height;
+            this.cns = cns;
+            this.contactNodes = cns.contacts.map((cn, i) => ({ index: i, st: cn[0], cn: cn[1], mv: cn[2] }));
+            this.yarnPath = this.tracePath(cns);
+        }
+        tracePath(DS) {
+            let i = 0, j = 0, leg = true, row = 0;
+            const path = [];
+            while(j < DS.height) {
+                const right = row % 2 == 0;
+                const side = (right === (i%2==0)) ? "F" : "L";
+                let add = false;
+                if (leg) add = (DS.getST(i, j) == OP_KNIT || DS.getST(i, j) == OP_PURL);
+                else {
+                    const AV = DS.getAV(i, j);
+                    if (AV != ECN) {
+                        if (AV == UACN) {
+                             const final = this.finalLoc(i, j, DS);
+                             if (path.length > 0 && path[path.length-1][1] < final.j) {
+                                 DS.setAV(i, j, ACN); add = true;
+                             }
+                        } else add = true;
+                    }
+                }
+                if (add) {
+                    if (leg) path.push([i, j, row, side+"L"]);
+                    else {
+                        const f = this.finalLoc(i, j, DS);
+                        path.push([f.i, f.j, row, side+"H"]);
+                    }
+                }
+                let iNext = i, jNext = j, legNext = leg;
+                if(leg) {
+                    if(right) { if(i%2==0) { jNext++; legNext=false; } else iNext++; }
+                    else { if(i%2==0) iNext--; else { jNext++; legNext=false; } }
+                } else {
+                    if(right) { if(i%2==0) iNext++; else { jNext--; legNext=true; } }
+                    else { if(i%2==0) { jNext--; legNext=true; } else iNext--; }
+                }
+                if(iNext < 0 || iNext >= DS.width) {
+                    iNext = i; jNext = j+1; legNext = true; row++;
+                }
+                i = iNext; j = jNext; leg = legNext;
+            }
+            return path;
+        }
+        finalLoc(i, j, DS) {
+            const [di, dj] = DS.getMV(i, j);
+            if (j == DS.height-1) return {i, j};
+            if (di != 0) return this.finalRec(i+di, j, DS);
+            return this.finalRec(i, j+dj, DS);
+        }
+        finalRec(i, j, DS) {
+            if (DS.getST(i, j) == OP_KNIT || DS.getST(i, j) == OP_PURL) return {i, j};
+            if (j == DS.height-1) return {i, j};
+            return this.finalRec(i, j+DS.getDeltaJ(i, j), DS);
+        }
+        yarnPathToLinks() {
+            if (!this.yarnPath.length) return [];
+            let source = 0;
+            let last = this.yarnPath[0][3];
+            const links = [];
+            this.yarnPath.forEach(([i, j, r, type], idx) => {
+                if (idx == 0) return;
+                let target = j * this.width + i;
+                let linkType = last + type;
+                links.push({
+                    source: source, target: target, linkType,
+                    row: r, index: idx-1,
+                    layer: this.calcLayer(source, target, linkType)
+                });
+                source = target; last = type;
+            });
+            return links;
+        }
+        calcLayer(s, t, type) {
+            const nS = this.contactNodes[s];
+            const nT = this.contactNodes[t];
+            if (nS.st == OP_KNIT && nT.st == OP_KNIT) return (type=="LHLL"||type=="FLFH") ? "front" : "back";
+            if (nS.st == OP_PURL && nT.st == OP_PURL) return (type=="LHLL"||type=="FLFH") ? "back" : "front";
+            return "mid";
+        }
+        makeNice() {
+            return this.yarnPath.map(([i, j, r, type]) => ({
+                cnIndex: j * this.width + i,
+                i, j, row: r, cnType: type, normal: [0,0]
+            }));
+        }
+    }
+
+    /* --- SIMULATION FACTORY --- */
+    function createSimulation(pattern, yarnSequence, palette, settings) {
+        let relaxed = false;
+        const dpi = window.devicePixelRatio || 1;
+        const paddedWrapper = pattern.pad(X_PADDING, Y_PADDING);
+        const pModel = new ProcessModel(paddedWrapper);
+        const yModel = new YarnModel(pModel.cn);
+        const nodes = yModel.contactNodes;
+        const yarnPath = yModel.makeNice();
+        const links = yModel.yarnPathToLinks();
+        
+        const container = document.getElementById("sim-container");
+        const bbox = container.getBoundingClientRect();
+        
+        // Logical Dimensions (CSS Pixels)
+        const logicalWidth = bbox.width;
+        const logicalHeight = bbox.height;
+        
+        // Physical Dimensions (Device Pixels)
+        const canvasWidth = logicalWidth * dpi;
+        const canvasHeight = logicalHeight * dpi;
+
+        const ctxs = ['back', 'mid', 'front'].map(id => {
+            const c = document.getElementById(id);
+            c.width = canvasWidth; c.height = canvasHeight;
+            return c.getContext('2d');
+        });
+
+        // Initialize Transform
+        let transform = d3.zoomTransform(container);
+
+        // Layout Nodes in LOGICAL pixels
+        const stitchWidth = Math.min((logicalWidth * 0.9) / paddedWrapper.width, ((logicalHeight * 0.9) / paddedWrapper.height) * settings.gauge);
+        const halfStitch = stitchWidth / 2;
+        const stitchHeight = stitchWidth / settings.gauge;
+        const yarnWidth = stitchWidth * settings.thickness;
+        
+        const offsetX = yarnWidth + (logicalWidth - paddedWrapper.width * stitchWidth) / 2;
+        const offsetY = -yarnWidth + (logicalHeight - paddedWrapper.height * stitchHeight) / 2;
+
+        nodes.forEach((n, idx) => {
+            const i = idx % yModel.width;
+            const j = (idx - i) / yModel.width;
+            n.i = i; n.j = j;
+            n.x = offsetX + i * halfStitch;
+            n.y = offsetY + (yModel.height - j) * stitchHeight;
+            n.initialX = n.x; n.initialY = n.y;
+            n.vx = 0; n.vy = 0;
+        });
+
+        // Physics Force
+        function yarnForce(alpha) {
+            links.forEach(l => {
+                const s = nodes[l.source], t = nodes[l.target];
+                const dx = t.x - s.x, dy = t.y - s.y;
+                let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                let targetDist = 30;
+                if (l.linkType == "FLFH" || l.linkType == "LHLL") targetDist = stitchHeight * HEIGHT_SHRINK;
+                const str = (dist - targetDist) / dist * alpha * settings.tension;
+                const fx = dx * str, fy = dy * str;
+                if (!s.fixed) { s.vx += fx; s.vy += fy; }
+                if (!t.fixed) { t.vx -= fx; t.vy -= fy; }
+            });
+        }
+
+        const sim = d3.forceSimulation(nodes)
+            .alphaDecay(ALPHA_DECAY)
+            .alphaMin(ALPHA_MIN)
+            .force("yarn", yarnForce)
+            .on("tick", draw)
+            .stop(); 
+
+        // ZOOM BEHAVIOR (Middle Mouse + Wheel)
+        const zoomBehavior = d3.zoom()
+            .scaleExtent([0.1, 8])
+            .filter(event => event.button === 1 || event.type === 'wheel') // Middle Button or Wheel
+            .on("zoom", event => {
+                transform = event.transform;
+                draw();
+            });
+
+        d3.select("#sim-container").call(zoomBehavior);
+        // Sync Initial Transform
+        if (transform.k !== 1 || transform.x !== 0) d3.select("#sim-container").call(zoomBehavior.transform, transform);
+
+        // DRAG BEHAVIOR (Left Mouse - Interaction)
+        const dragBehavior = d3.drag()
+            .filter(event => event.button === 0) // Left Button Only
+            .subject(event => {
+                // Map CSS pointer to LOGICAL node coords (inverse transform)
+                const [x, y] = transform.invert(d3.pointer(event, container));
+                return d3.least(nodes, n => (n.x - x) ** 2 + (n.y - y) ** 2);
+            })
+            .on("start", (event) => {
+                if(!relaxed) return;
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+                sim.alphaTarget(0.3).restart();
+            })
+            .on("drag", (event) => {
+                if(!relaxed) return;
+                // event.x/y from d3.drag is already transformed if container has transform? 
+                // No, event.x/y is relative to parent subject.
+                // We use the event coordinate directly which D3 calculates based on subject
+                event.subject.fx = event.x; 
+                event.subject.fy = event.y;
+            })
+            .on("end", (event) => {
+                if(!relaxed) return;
+                event.subject.fx = null;
+                event.subject.fy = null;
+                sim.alphaTarget(0);
+            });
+        
+        d3.select("#sim-container").call(dragBehavior);
+
+        function getYarnColor(row) {
+            if (row < Y_PADDING || row >= paddedWrapper.height - Y_PADDING) return "rgba(0,0,0,0.1)"; 
+            const seqIndex = (row - Y_PADDING) % yarnSequence.length;
+            const yarnId = yarnSequence[seqIndex];
+            return palette[yarnId] || "#000";
+        }
+
+        function draw() {
+            ctxs.forEach(ctx => {
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+                ctx.save();
+                // 1. Scale for DPI (Physical -> Logical)
+                ctx.scale(dpi, dpi);
+                // 2. Apply Pan/Zoom Transform (Logical -> View)
+                ctx.translate(transform.x, transform.y);
+                ctx.scale(transform.k, transform.k);
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            });
+
+            // Recompute Normals
+            if (yarnPath.length > 1) {
+                for(let k=0; k<yarnPath.length; k++) {
+                    const prev = nodes[yarnPath[Math.max(0, k-1)].cnIndex];
+                    const next = nodes[yarnPath[Math.min(yarnPath.length-1, k+1)].cnIndex];
+                    if(!prev || !next) continue;
+                    let dx = prev.x - next.x;
+                    let dy = prev.y - next.y;
+                    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+                    let flip = false;
+                    const node = yarnPath[k];
+                    if (node.cnType.includes('H')) flip = (node.row%2==0); else flip = (node.row%2!=0);
+                    const nx = (dy/len) * SPREAD * (flip ? -1 : 1);
+                    const ny = (-dx/len) * SPREAD * (flip ? -1 : 1);
+                    yarnPath[k].normal = [nx, ny];
+                }
+            }
+
+            const curve = d3.line().curve(d3.curveCatmullRomOpen)
+                .x(d => nodes[d.cnIndex].x + (yarnWidth/2) * d.normal[0])
+                .y(d => nodes[d.cnIndex].y + (yarnWidth/2) * d.normal[1]);
+
+            const batch = { front: {}, mid: {}, back: {} };
+            links.forEach(l => {
+                if (l.index <= 0 || l.index >= yarnPath.length - 3) return;
+                const color = getYarnColor(l.row);
+                if (!batch[l.layer][color]) batch[l.layer][color] = [];
+                const ptr = [yarnPath[l.index-1], yarnPath[l.index], yarnPath[l.index+1], yarnPath[l.index+2]];
+                batch[l.layer][color].push(curve(ptr));
+            });
+
+            [batch.back, batch.mid, batch.front].forEach((layerObj, i) => {
+                const ctx = ctxs[i];
+                Object.entries(layerObj).forEach(([color, paths]) => {
+                    const p = new Path2D(paths.join(" "));
+                    ctx.lineWidth = yarnWidth + 2; ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.stroke(p);
+                    ctx.lineWidth = yarnWidth; ctx.strokeStyle = color; ctx.stroke(p);
+                    ctx.lineWidth = yarnWidth * 0.3; ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.stroke(p);
+                });
+                ctx.restore();
+            });
+        }
+
+        return {
+            draw,
+            updateTransform: (t) => { transform = t; draw(); },
+            resetLayout: () => { 
+                sim.stop(); 
+                relaxed=false; 
+                nodes.forEach(n => { n.x = n.initialX; n.y = n.initialY; n.vx=0; n.vy=0; n.fx=null; n.fy=null; });
+                draw();
+            },
+            relax: () => {
+                if(relaxed) return;
+                relaxed = true;
+                sim.alpha(1).restart();
+            },
+            destroy: () => { sim.stop(); },
+            isRelaxed: () => relaxed,
+            setSettings: (s) => { 
+                // Only tension is dynamic in physics, others need re-init usually, 
+                // but we can hack it if we wanted. For robustness, main loop handles re-init.
+                if(relaxed) sim.alpha(0.3).restart(); 
+            },
+            getCanvas: () => document.getElementById('front') // For export
+        }
+    }
+
+    class App {
+        constructor() {
+            this.gridWidth = 12;
+            this.gridHeight = 16;
+            this.tileWidth = 0;
+            this.tileHeight = 0;
+            this.mode = 'knit';
+            this.currentTool = 'K';
+            this.yarns = [{ id: 'A', color: '#3b82f6' }, { id: 'B', color: '#ef4444' }];
+            this.rowAssignments = Array(100).fill('A'); 
+            this.gridData = []; 
+            this.sim = null;
+            this.updateTimer = null;
+            this.isPainting = false;
+            
+            // Physics Settings
+            this.settings = { tension: 0.2, thickness: 0.24, gauge: 1.66 };
+
+            this.initGrid();
+            this.renderYarnList();
+            this.renderToolbar();
+            this.setupWindowEvents();
+            
+            // Ensure immediate render
+            setTimeout(() => this.runSimulation(), 100);
+            const resizeObserver = new ResizeObserver(() => {
+                if(this.sim) this.sim.draw();
+                else this.queueUpdate();
+            });
+            resizeObserver.observe(document.getElementById('sim-container'));
+        }
+
+        resetToGridMode() {
+            const btn = document.getElementById('relaxBtn');
+            const icon = document.getElementById('relaxIcon');
+            const txt = document.getElementById('relaxText');
+            txt.innerText = "Relax Yarn";
+            icon.className = "fa-solid fa-water";
+            btn.classList.remove('ring-2', 'ring-blue-400');
+        }
+
+        setMode(mode) {
+            if (this.mode === mode) return;
+            this.mode = mode;
+            const btnKnit = document.getElementById('mode-knit');
+            const btnCrochet = document.getElementById('mode-crochet');
+            if (mode === 'knit') {
+                btnKnit.className = "px-3 py-1 text-[10px] uppercase font-bold rounded transition-colors text-white bg-gray-700 shadow";
+                btnCrochet.className = "px-3 py-1 text-[10px] uppercase font-bold rounded transition-colors text-gray-400 hover:text-white";
+                this.currentTool = 'K';
+            } else {
+                btnCrochet.className = "px-3 py-1 text-[10px] uppercase font-bold rounded transition-colors text-white bg-gray-700 shadow";
+                btnKnit.className = "px-3 py-1 text-[10px] uppercase font-bold rounded transition-colors text-gray-400 hover:text-white";
+                this.currentTool = 'SC';
+            }
+            this.initGrid();
+            this.renderToolbar();
+            this.updatePresetsMenu();
+        }
+
+        renderToolbar() {
+            const bar = document.getElementById('toolbar');
+            bar.innerHTML = '';
+            let tools = this.mode === 'knit' ? 
+                [ { id: 'K', label: 'Knit', icon: '<span class="text-xs text-gray-400"></span>' }, { id: 'P', label: 'Purl', icon: '<div class="w-3 h-0.5 bg-gray-800"></div>' }, { id: 'T', label: 'Tuck', icon: '<div class="w-2 h-2 rounded-full bg-green-500"></div>' }, { id: 'M', label: 'Miss', icon: '<span class="text-yellow-600 font-bold text-xs">V</span>' } ] : 
+                [ { id: 'SC', label: 'Single', icon: '<span class="text-blue-500 font-bold text-base">+</span>' }, { id: 'DC', label: 'Double', icon: '<span class="text-red-500 font-bold text-sm">T</span>' }, { id: 'CH', label: 'Chain', icon: '<span class="text-yellow-500 font-bold text-xs">○</span>' }, { id: 'SL', label: 'Slip', icon: '<span class="text-green-500 font-bold text-[10px]">●</span>' } ];
+            tools.forEach(t => {
+                const btn = document.createElement('button');
+                btn.className = `tool-btn flex flex-col items-center justify-center p-2 rounded border border-gray-600 hover:bg-gray-700 transition group ${this.currentTool === t.id ? 'active' : ''}`;
+                btn.onclick = () => this.setTool(t.id);
+                btn.innerHTML = `<div class="w-6 h-6 bg-white border border-gray-400 flex items-center justify-center mb-1 rounded-sm">${t.icon}</div><span class="text-[10px] font-bold group-hover:text-white text-gray-300">${t.label}</span>`;
+                bar.appendChild(btn);
+            });
+        }
+
+        updatePresetsMenu() {
+            const list = document.getElementById('presetsList');
+            list.innerHTML = '';
+            let presets = this.mode === 'knit' ? 
+                [ { id: 'stockinette', label: 'Stockinette' }, { id: 'garter', label: 'Garter Stitch' }, { id: 'rib1x1', label: '1x1 Ribbing' }, { id: 'seed', label: 'Seed Stitch' }, { id: 'mosaic', label: 'Mosaic (Color)' }, { id: 'tuck', label: 'Tuck/Brioche' } ] : 
+                [ { id: 'crochet_basic', label: 'Basic SC Grid' }, { id: 'crochet_mesh', label: 'Filet Mesh' } ];
+            presets.forEach(p => {
+                const b = document.createElement('button');
+                b.className = "block w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-blue-600 hover:text-white border-b border-gray-700/50 transition-colors";
+                b.innerText = p.label;
+                b.onclick = () => this.loadPreset(p.id);
+                list.appendChild(b);
+            });
+        }
+
+        initGrid() {
+            const fill = this.mode === 'knit' ? 'K' : 'SC';
+            this.gridData = Array.from({length: this.gridHeight}, () => Array(this.gridWidth).fill(fill));
+            this.renderGrid();
+            this.queueUpdate();
+        }
+
+        setupWindowEvents() {
+            window.addEventListener('click', (e) => {
+                const btn = document.getElementById('presetBtn');
+                const menu = document.getElementById('presetsMenu');
+                if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) menu.classList.add('hidden');
+            });
+        }
+
+        togglePresets(e) {
+            e.stopPropagation();
+            this.updatePresetsMenu();
+            document.getElementById('presetsMenu').classList.toggle('hidden');
+        }
+
+        loadPreset(type) {
+            document.getElementById('presetsMenu').classList.add('hidden');
+            this.yarns = [{ id: 'A', color: '#3b82f6' }, { id: 'B', color: '#ef4444' }];
+            this.renderYarnList();
+            if (type.startsWith('crochet_') && this.mode !== 'crochet') this.setMode('crochet');
+            else if (!type.startsWith('crochet_') && this.mode !== 'knit') this.setMode('knit');
+
+            if (type === 'crochet_basic') {
+                 this.gridWidth = 12; this.gridHeight = 12; this.gridData = Array.from({length: 12}, () => Array(12).fill('SC'));
+            } else if (type === 'crochet_mesh') {
+                 this.gridWidth = 12; this.gridHeight = 12; this.gridData = [];
+                 for(let y=0; y<12; y++) {
+                     const row = []; for(let x=0; x<12; x++) { if (y%2==0 && x%2==0) row.push('CH'); else row.push('DC'); }
+                     this.gridData.push(row);
+                 }
+            } else {
+                switch(type) {
+                    case 'stockinette': this.gridWidth = 12; this.gridHeight = 16; this.rowAssignments.fill('A'); this.gridData = Array.from({length: 16}, () => Array(12).fill(KNIT)); break;
+                    case 'garter': this.gridWidth = 12; this.gridHeight = 16; this.rowAssignments.fill('A'); this.gridData = []; for(let y=0; y<16; y++) this.gridData.push(Array(12).fill((y % 2 === 0) ? KNIT : PURL)); break;
+                    case 'rib1x1': this.gridWidth = 14; this.gridHeight = 16; this.rowAssignments.fill('A'); this.gridData = []; for(let y=0; y<16; y++) { const row = []; for(let x=0; x<14; x++) row.push(x%2===0 ? KNIT : PURL); this.gridData.push(row); } break;
+                    case 'seed': this.gridWidth = 12; this.gridHeight = 16; this.rowAssignments.fill('A'); this.gridData = []; for(let y=0; y<16; y++) { const row = []; const offset = y%2; for(let x=0; x<12; x++) row.push((x+offset)%2===0 ? KNIT : PURL); this.gridData.push(row); } break;
+                    case 'mosaic': this.gridWidth = 12; this.gridHeight = 18; for(let i=0; i<50; i++) this.rowAssignments[i] = (Math.floor(i/2) % 2 === 0) ? 'A' : 'B'; this.gridData = []; for(let y=0; y<18; y++) { const ly = (18 - 1) - y; const row = []; const isColorA = (Math.floor(ly/2) % 2 === 0); for(let x=0; x<12; x++) { if(isColorA) row.push(KNIT); else { if (x % 4 === 0) row.push(MISS); else row.push(KNIT); } } this.gridData.push(row); } break;
+                    case 'tuck': this.gridWidth = 12; this.gridHeight = 16; this.rowAssignments.fill('A'); this.gridData = []; for(let y=0; y<16; y++) { const ly = 15 - y; const row = []; for(let x=0; x<12; x++) { if (ly % 2 === 0) row.push(x%2===0 ? KNIT : TUCK); else row.push(KNIT); } this.gridData.push(row); } break;
+                }
+            }
+            document.getElementById('gridWidth').value = this.gridWidth; document.getElementById('gridHeight').value = this.gridHeight;
+            this.renderGrid(); this.queueUpdate();
+        }
+
+        renderYarnList() {
+            const list = document.getElementById('yarnList'); list.innerHTML = '';
+            this.yarns.forEach((y, idx) => {
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between bg-gray-900 p-1.5 rounded border border-gray-700";
+                item.innerHTML = `<div class="flex items-center space-x-2"><input type="color" value="${y.color}" class="w-5 h-5 rounded border-none cursor-pointer bg-transparent" onchange="app.updateYarnColor('${y.id}', this.value)"><span class="text-[10px] font-bold text-gray-300">Yarn ${y.id}</span></div>${this.yarns.length > 1 ? `<button onclick="app.removeYarn('${y.id}')" class="text-gray-500 hover:text-red-400 px-1"><i class="fa-solid fa-xmark text-[10px]"></i></button>` : ''}`;
+                list.appendChild(item);
+            });
+        }
+
+        renderGrid() {
+            const gridEl = document.getElementById('patternGrid'); const rowHeaderEl = document.getElementById('rowHeaders');
+            gridEl.style.gridTemplateColumns = `repeat(${this.gridWidth}, 24px)`; gridEl.innerHTML = ''; rowHeaderEl.innerHTML = '';
+            this.gridData.forEach((row, y) => {
+                const logicRow = (this.gridHeight - 1) - y;
+                const yarnId = this.rowAssignments[logicRow] || this.yarns[0].id;
+                const yarn = this.yarns.find(y => y.id === yarnId) || this.yarns[0];
+                const header = document.createElement('div');
+                header.className = 'row-header'; header.innerText = logicRow + 1; header.style.backgroundColor = yarn.color;
+                header.onclick = () => this.cycleRowYarn(logicRow);
+                rowHeaderEl.appendChild(header);
+                
+                row.forEach((stitch, x) => {
+                    const cell = document.createElement('div');
+                    cell.className = `grid-cell stitch-${stitch}`;
+                    cell.dataset.x = x; cell.dataset.y = y;
+                    if (this.tileWidth > 0 && (x + 1) % this.tileWidth === 0) cell.classList.add('tile-border-right');
+                    if (this.tileHeight > 0 && (y + 1) % this.tileHeight === 0) cell.classList.add('tile-border-bottom');
+                    gridEl.appendChild(cell);
+                });
+            });
+        }
+
+        startPaint(e) { if(e.button === 0) { this.isPainting = true; this.handlePaintEvent(e); } }
+        endPaint() { this.isPainting = false; }
+        handlePaintEvent(e) {
+            if (e.target.classList.contains('grid-cell')) {
+                const x = parseInt(e.target.dataset.x);
+                const y = parseInt(e.target.dataset.y);
+                this.paint(x, y);
+            }
+        }
+
+        paint(x, y) {
+            if (this.gridData[y][x] !== this.currentTool) {
+                const doSync = document.getElementById('syncRepeats').checked && this.tileWidth > 0 && this.tileHeight > 0;
+                if (doSync) {
+                    const baseX = x % this.tileWidth;
+                    const baseY = y % this.tileHeight;
+                    for(let ty = baseY; ty < this.gridHeight; ty += this.tileHeight) {
+                        for(let tx = baseX; tx < this.gridWidth; tx += this.tileWidth) {
+                            this.gridData[ty][tx] = this.currentTool;
+                        }
+                    }
+                    this.renderGrid();
+                } else {
+                    this.gridData[y][x] = this.currentTool;
+                    const idx = y * this.gridWidth + x;
+                    const cell = document.getElementById('patternGrid').children[idx];
+                    cell.className = `grid-cell stitch-${this.currentTool}`;
+                    if (this.tileWidth > 0 && (x + 1) % this.tileWidth === 0) cell.classList.add('tile-border-right');
+                    if (this.tileHeight > 0 && (y + 1) % this.tileHeight === 0) cell.classList.add('tile-border-bottom');
+                }
+                this.queueUpdate();
+            }
+        }
+
+        cycleRowYarn(rowIndex) {
+            const currentId = this.rowAssignments[rowIndex] || this.yarns[0].id;
+            const idx = this.yarns.findIndex(y => y.id === currentId);
+            const nextIdx = (idx + 1) % this.yarns.length;
+            this.rowAssignments[rowIndex] = this.yarns[nextIdx].id;
+            this.renderGrid(); this.queueUpdate();
+        }
+
+        setTool(t) {
+            this.currentTool = t;
+            document.querySelectorAll('.tool-btn').forEach(b => {
+                if(b.innerHTML.includes(t)) b.classList.add('active'); else b.classList.remove('active');
+            });
+        }
+
+        addYarn() {
+            const id = String.fromCharCode(65 + this.yarns.length);
+            this.yarns.push({ id, color: '#888888' });
+            this.renderYarnList();
+        }
+
+        removeYarn(id) {
+            this.yarns = this.yarns.filter(y => y.id !== id);
+            this.renderYarnList(); this.renderGrid(); this.queueUpdate();
+        }
+
+        updateYarnColor(id, color) {
+            const y = this.yarns.find(y => y.id === id);
+            if(y) { y.color = color; this.renderGrid(); this.runSimulation(true); }
+        }
+
+        resizeGrid() {
+            const w = parseInt(document.getElementById('gridWidth').value);
+            const h = parseInt(document.getElementById('gridHeight').value);
+            const newGrid = [];
+            const fill = this.mode === 'knit' ? 'K' : 'SC';
+            for(let y=0; y<h; y++) {
+                const row = [];
+                for(let x=0; x<w; x++) {
+                    if(y < this.gridData.length && x < this.gridData[0].length) row.push(this.gridData[y][x]);
+                    else row.push(fill);
+                }
+                newGrid.push(row);
+            }
+            this.gridWidth = w; this.gridHeight = h;
+            this.gridData = newGrid;
+            this.renderGrid(); this.queueUpdate();
+        }
+
+        updateTile() {
+            this.tileWidth = parseInt(document.getElementById('tileWidth').value) || 0;
+            this.tileHeight = parseInt(document.getElementById('tileHeight').value) || 0;
+            this.renderGrid();
+        }
+
+        updatePhysics() {
+            this.settings.tension = parseFloat(document.getElementById('simTension').value);
+            this.settings.thickness = parseFloat(document.getElementById('simThickness').value);
+            this.settings.gauge = parseFloat(document.getElementById('simGauge').value);
+            
+            document.getElementById('valTension').innerText = this.settings.tension;
+            document.getElementById('valThickness').innerText = this.settings.thickness;
+            document.getElementById('valGauge').innerText = this.settings.gauge;
+            
+            this.runSimulation(true);
+        }
+
+        resetPattern() {
+            const fill = this.mode === 'knit' ? 'K' : 'SC';
+            this.gridData = Array.from({length: this.gridHeight}, () => Array(this.gridWidth).fill(fill));
+            this.renderGrid(); this.queueUpdate();
+        }
+
+        toggleRelax() {
+            if(!this.sim) return;
+            const btn = document.getElementById('relaxBtn');
+            const icon = document.getElementById('relaxIcon');
+            const txt = document.getElementById('relaxText');
+            if(this.sim.isRelaxed()) {
+                this.sim.resetLayout();
+                txt.innerText = "Relax Yarn"; icon.className = "fa-solid fa-water";
+                btn.classList.remove('ring-2', 'ring-blue-400');
+            } else {
+                this.sim.relax();
+                txt.innerText = "Reset Layout"; icon.className = "fa-solid fa-rotate-left";
+                btn.classList.add('ring-2', 'ring-blue-400');
+            }
+        }
+
+        queueUpdate() {
+            if(this.updateTimer) clearTimeout(this.updateTimer);
+            const status = document.getElementById('simStatus');
+            const txt = document.getElementById('simStatusText');
+            status.className = "status-dot status-idle"; txt.innerText = "Updating...";
+            this.updateTimer = setTimeout(() => {
+                if(this.sim) this.sim.destroy();
+                this.resetToGridMode();
+                this.runSimulation();
+                status.className = "status-dot status-live"; txt.innerText = "Live";
+            }, 200);
+        }
+
+        runSimulation(redrawOnly = false) {
+            if(this.sim && !redrawOnly) { this.sim.destroy(); }
+            const yarnSequence = this.rowAssignments.slice(0, this.gridHeight);
+            const palette = {};
+            this.yarns.forEach(y => palette[y.id] = y.color);
+
+            if (!redrawOnly) {
+                try {
+                    const pattern = new Pattern(this.gridData, this.mode);
+                    this.sim = createSimulation(pattern, yarnSequence, palette, this.settings);
+                } catch(e) { console.error(e); }
+            } else if (this.sim) {
+                const wasRelaxed = this.sim.isRelaxed();
+                if (wasRelaxed) this.resetToGridMode();
+                const pattern = new Pattern(this.gridData, this.mode);
+                this.sim = createSimulation(pattern, yarnSequence, palette, this.settings);
+            }
+        }
+
+        exportJSON() {
+            const data = {
+                gridData: this.gridData,
+                yarns: this.yarns,
+                rowAssignments: this.rowAssignments,
+                mode: this.mode,
+                width: this.gridWidth,
+                height: this.gridHeight
+            };
+            const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = "knitscape_pattern.json";
+            a.click();
+        }
+
+        importJSON(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = JSON.parse(e.target.result);
+                this.gridData = data.gridData;
+                this.yarns = data.yarns;
+                this.rowAssignments = data.rowAssignments;
+                this.mode = data.mode;
+                this.gridWidth = data.width;
+                this.gridHeight = data.height;
+                
+                // Refresh UI
+                this.setMode(this.mode); // Will call initGrid, so we overwrite data after
+                this.gridData = data.gridData; // Restore data
+                document.getElementById('gridWidth').value = this.gridWidth;
+                document.getElementById('gridHeight').value = this.gridHeight;
+                this.renderYarnList();
+                this.renderGrid();
+                this.queueUpdate();
+            };
+            reader.readAsText(file);
+        }
+
+        exportImage() {
+            // Very basic export of the front canvas
+            const canvas = document.getElementById('front'); // actually we need to composite all 3
+            // Create composite
+            const c = document.createElement('canvas');
+            c.width = canvas.width; c.height = canvas.height;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = "#e5e7eb";
+            ctx.fillRect(0,0,c.width, c.height);
+            ctx.drawImage(document.getElementById('back'), 0, 0);
+            ctx.drawImage(document.getElementById('mid'), 0, 0);
+            ctx.drawImage(document.getElementById('front'), 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = 'knitscape_render.png';
+            link.href = c.toDataURL();
+            link.click();
+        }
+    }
+
+    document.addEventListener('mouseover', (e) => {
+        if(app.isPainting) app.handlePaintEvent(e);
+    });
+
+    const app = new App();
+    </script>
+</body>
+</html>
