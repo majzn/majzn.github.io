@@ -507,6 +507,8 @@
             <button class="hud-btn" id="hud-step" title="Step Frame (Right Arrow)"><svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/></svg></button>
             <button class="hud-btn" id="hud-reset" title="Restart (R)"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
             <div class="hud-sep"></div>
+            <button class="hud-btn" id="hud-fit" title="Fit Camera"><svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M15 3l2.3 2.3-2.89 2.87 1.42 1.42L18.7 6.7 21 9V3zM3 9l2.3-2.3 2.87 2.89 1.42-1.42L6.7 5.3 9 3H3zm6 12l-2.3-2.3 2.89-2.87-1.42-1.42L5.3 17.3 3 15v6zm12-6l-2.3 2.3-2.87-2.89-1.42 1.42 2.89 2.87L15 21h6z"/></svg></button>
+            <div class="hud-sep"></div>
             <div class="hud-stat"><span class="stat-label">Gen</span><span class="stat-val" id="hud-gen">0</span></div>
             <div class="hud-stat"><span class="stat-label">FPS</span><span class="stat-val" id="hud-fps">0</span></div>
             <div class="hud-sep"></div>
@@ -604,7 +606,6 @@ class SimulationEngine {
         
         let changedCount = 0;
         
-        // Massive Optimization: Remove % operator from loop by handling logic
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < w; x++) {
                 let ni = 0;
@@ -651,7 +652,6 @@ class SimulationEngine {
         if (!this.gridA) return 0;
         const grid = this.getCurrentGrid();
         let h = 0x811c9dc5;
-        // Simple FNV-1a like hashing for grid state
         for(let i = 0; i < this.size; i++) {
             h ^= grid[i];
             h = Math.imul(h, 0x01000193);
@@ -714,7 +714,7 @@ class Renderer {
         this.ctx = canvas.getContext('2d', { alpha: false });
         this.overlayCtx = overlayCanvas.getContext('2d');
         this.engine = engine;
-        this.heatmapEngine = engine; // Separate reference for heatmap accumulation
+        this.heatmapEngine = engine;
         this.offCanvas = document.createElement('canvas');
         this.offCtx = this.offCanvas.getContext('2d', { alpha: false });
         this.imageData = null;
@@ -738,6 +738,24 @@ class Renderer {
         this.overlayCtx.scale(p, p);
         this.ctx.imageSmoothingEnabled = false;
         this.overlayCtx.imageSmoothingEnabled = false;
+    }
+    
+    fitToScreen(gridW, gridH) {
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return; 
+        
+        const padding = 40;
+        const availW = rect.width - padding;
+        const availH = rect.height - padding;
+        
+        let zoom = Math.min(availW / gridW, availH / gridH);
+        zoom = Math.max(0.1, zoom); 
+        
+        const x = (rect.width - gridW * zoom) / 2;
+        const y = (rect.height - gridH * zoom) / 2;
+        
+        this.cam = { x, y, zoom };
+        this.draw(); 
     }
 
     updateOffscreen() {
@@ -788,14 +806,14 @@ class Renderer {
         this.ctx.fillStyle = '#09090b';
         this.ctx.fillRect(0, 0, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
         
-        if (this.heatmapMode) return; // In heatmap mode, main canvas is blank background
+        if (this.heatmapMode) return; 
 
         if (!this.engine.w) return;
         this.ctx.save();
         this.ctx.translate(this.cam.x, this.cam.y);
         this.ctx.scale(this.cam.zoom, this.cam.zoom);
         this.ctx.drawImage(this.offCanvas, 0, 0);
-        if (this.cam.zoom > 10) {
+        if (this.cam.zoom > 4) {
             this.ctx.beginPath();
             this.ctx.lineWidth = 0.5 / this.cam.zoom;
             this.ctx.strokeStyle = '#333';
@@ -810,7 +828,6 @@ class Renderer {
     drawHeatmapOverlay() {
         this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
         if (document.getElementById('overlay-canvas').style.display === 'none') return;
-        // Always draw from heatmapEngine (Main App Sim) regardless of current live engine
         const { w, h, heatmapBuffer } = this.heatmapEngine;
         if (!w) return;
         
@@ -837,18 +854,16 @@ class Renderer {
             if (val > 0) {
                 const norm = (val - minHeat) / range;
                 const idx = i*4;
-                // Heatmap Gradient: Blue -> Green -> Red -> White
-                // Simple implementation:
                 let r=0, g=0, b=0;
-                if (norm < 0.25) { // Dark Blue to Blue
+                if (norm < 0.25) { 
                     b = 128 + norm * 4 * 127;
-                } else if (norm < 0.5) { // Blue to Green
+                } else if (norm < 0.5) { 
                     b = 255 * (1 - (norm-0.25)*4);
                     g = 255 * ((norm-0.25)*4);
-                } else if (norm < 0.75) { // Green to Red
+                } else if (norm < 0.75) { 
                     g = 255 * (1 - (norm-0.5)*4);
                     r = 255 * ((norm-0.5)*4);
-                } else { // Red to White
+                } else { 
                     r = 255;
                     g = 255 * ((norm-0.75)*4);
                     b = 255 * ((norm-0.75)*4);
@@ -867,7 +882,6 @@ class Renderer {
         this.overlayCtx.save();
         this.overlayCtx.translate(this.cam.x, this.cam.y);
         this.overlayCtx.scale(this.cam.zoom, this.cam.zoom);
-        // If heatmap mode, we want opaque normal blend on black. If overlay, screen blend.
         this.overlayCtx.globalCompositeOperation = this.heatmapMode ? 'source-over' : 'screen';
         this.overlayCtx.drawImage(tempC, 0, 0);
         this.overlayCtx.restore();
@@ -890,7 +904,6 @@ class AnalysisEngine {
         this.canvas.addEventListener('mousedown', (e) => this.handleClick(e));
         this.currentResults = [];
         this.previousResults = [];
-        // Reused instance to prevent memory churn
         this.sim = new SimulationEngine();
     }
 
@@ -913,7 +926,6 @@ class AnalysisEngine {
         btnStop.disabled = false;
         legend.style.display = 'none';
         
-        // Clear heatmap if not retaining (fresh perspective)
         if (!retain) {
             this.app.sim.heatmapBuffer.fill(0);
             this.app.renderer.drawHeatmapOverlay();
@@ -923,7 +935,6 @@ class AnalysisEngine {
         const designerState = this.app.ui.getDesignerState();
 
         try {
-            // Enable Analysis Mode to skip history recording in Sim
             this.sim.isAnalysisMode = true;
 
             for (let i = 0; i <= steps; i++) {
@@ -938,43 +949,33 @@ class AnalysisEngine {
                 
                 const code = this.app.ui.generateCode(testState);
                 
-                // Reuse Simulation Instance, update logic
                 this.sim.load(code);
-                this.sim.isAnalysisMode = true; // Ensure flag is set after load/reset
+                this.sim.isAnalysisMode = true; 
                 
-                // Cycle Detection Set
                 const historyHashes = new Set();
                 
-                // Fast Forward with Visual Updates & Optimization
                 let stableGen = 0;
                 for(let g=0; g<maxGens; g++) {
                     const changed = this.sim.step();
                     stableGen = g;
                     
-                    // Optimization 1: Check flux (Stasis)
                     if (!changed) break; 
                     
-                    // Optimization 2: Check Oscillation (Hash)
-                    // Checking every frame for large grids can be slow, checking every 2 frames is a good trade-off
                     if (g % 2 === 0) {
                         const h = this.sim.getHash();
-                        if (historyHashes.has(h)) break; // Oscillation detected
+                        if (historyHashes.has(h)) break; 
                         historyHashes.add(h);
-                        // Safe bound for hash history to prevent memory leaks in extreme cases
                         if (historyHashes.size > 100) historyHashes.clear();
                     }
 
-                    // Optional: Visual Update frequency
                     if (g % 5 === 0) {
-                        this.app.renderer.engine = this.sim; // Temporary swap engine for renderer
+                        this.app.renderer.engine = this.sim; 
                         this.app.renderer.updateOffscreen();
                         this.app.renderer.draw();
-                        // Explicitly redraw overlay from main engine buffer
                         this.app.renderer.drawHeatmapOverlay();
                     }
                 }
                 
-                // Accumulate Heatmap using FINAL state of this parameter step
                 if (this.sim.gridA) {
                     const grid = this.sim.getCurrentGrid();
                     for(let k=0; k<this.sim.size; k++) {
@@ -1009,7 +1010,6 @@ class AnalysisEngine {
             console.error("Sweep Error:", e);
         }
         
-        // Restore renderer to main engine
         this.app.renderer.engine = this.app.sim;
         this.app.renderer.updateOffscreen();
         this.app.renderer.draw();
@@ -1028,7 +1028,6 @@ class AnalysisEngine {
         ctx.fillStyle = "#0c0c0e";
         ctx.fillRect(0,0,w,h);
         
-        // Grid
         ctx.strokeStyle = "#27272a";
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1122,7 +1121,7 @@ class UIManager {
         this.setupEventListeners();
         this.setupDesigner();
         this.renderPresets();
-        this.updateSweepInputs('steps'); // Init default
+        this.updateSweepInputs('steps'); 
     }
 
     setupEventListeners() {
@@ -1183,6 +1182,7 @@ class UIManager {
         document.getElementById('hud-play').onclick = () => this.app.togglePlay();
         document.getElementById('hud-step').onclick = () => this.app.step();
         document.getElementById('hud-reset').onclick = () => this.app.reset();
+        document.getElementById('hud-fit').onclick = () => this.app.renderer.fitToScreen(this.app.sim.w, this.app.sim.h);
         document.getElementById('sim-speed').oninput = (e) => {
             this.app.stepsPerFrame = parseInt(e.target.value);
             document.getElementById('lbl-speed').innerText = e.target.value + 'x';
@@ -1207,12 +1207,9 @@ class UIManager {
         document.getElementById('btn-show-overlay').onclick = (e) => {
             const el = document.getElementById('overlay-canvas');
             const isActive = el.style.display !== 'none';
-            // Toggle Logic: If turning ON, switch renderer mode. If turning OFF, switch back.
-            // Wait, we want heatmap ONLY.
             this.app.renderer.heatmapMode = !isActive;
             el.style.display = isActive ? 'none' : 'block';
             e.target.classList.toggle('active');
-            // Force redraw to clear/show raw cells
             this.app.renderer.draw();
             if(!isActive) this.app.renderer.drawHeatmapOverlay();
         };
@@ -1227,7 +1224,6 @@ class UIManager {
         };
         document.getElementById('btn-sweep-stop').onclick = () => this.app.analysis.stop();
         
-        // Sweep Inputs Linking
         document.getElementById('sweep-increment').oninput = () => this.updateSweepInputs('inc');
         document.getElementById('sweep-steps').oninput = () => this.updateSweepInputs('steps');
         document.getElementById('sweep-start').oninput = () => this.updateSweepInputs('range');
@@ -1339,18 +1335,15 @@ class UIManager {
 
     generateCode(state) {
         let initCode = `init: () => 0`;
-        const val = state.initVal / 100; // Normalize 0-1
+        const val = state.initVal / 100; 
         
         if (state.initType === 'random') {
             initCode = `init: () => Math.random() < ${val} ? 1 : 0`;
         } else if (state.initType === 'center') {
-            // Exact center point
             initCode = `init: (x,y) => (x === Math.floor(${state.w}/2) && y === Math.floor(${state.h}/2)) ? 1 : 0`;
         } else if (state.initType === 'filled_circle') {
-            // Filled Circle based on radius (mapped from val 0-100% of half width)
             initCode = `init: (x,y) => Math.hypot(x-${state.w/2}, y-${state.h/2}) < ${val * state.w/2} ? 1 : 0`;
         } else if (state.initType === 'circle') {
-            // Hollow Ring
             const r = val * state.w/2;
             initCode = `init: (x,y) => { const d = Math.hypot(x-${state.w/2}, y-${state.h/2}); return (d > ${r} - 1 && d < ${r} + 1) ? 1 : 0; }`;
         } else if (state.initType === 'empty') {
@@ -1427,10 +1420,14 @@ class App {
         this.lastTime = 0;
         this.frameCount = 0;
         this.fpsTimer = 0;
-        const saved = localStorage.getItem('ca_code');
-        if (saved) this.loadCode(saved);
-        else this.updateFromDesigner();
-        this.loop();
+        
+        // Defer initial compile to ensure layout is ready
+        setTimeout(() => {
+            const saved = localStorage.getItem('ca_code');
+            if (saved) this.loadCode(saved);
+            else this.updateFromDesigner();
+            this.loop();
+        }, 10);
     }
     loadCode(code) { document.getElementById('code-area').value = code; this.compile(); }
     updateFromDesigner() {
@@ -1450,11 +1447,9 @@ class App {
             msg.innerText = "Compiled Successfully";
             msg.style.opacity = 1;
             setTimeout(() => msg.style.opacity = 0, 2000);
-            const container = document.getElementById('viewport');
-            const zoom = Math.min((container.offsetWidth - 40) / res.w, (container.offsetHeight - 40) / res.h);
-            this.renderer.cam = { x: (container.offsetWidth - res.w * zoom) / 2, y: (container.offsetHeight - res.h * zoom) / 2, zoom: zoom || 1 };
+            
             this.renderer.updateOffscreen();
-            this.renderer.draw();
+            this.renderer.fitToScreen(res.w, res.h);
             localStorage.setItem('ca_code', code);
         } else {
             dot.className = 'status-dot err';
@@ -1477,7 +1472,7 @@ class App {
         if (this.isRunning) {
             for (let i = 0; i < this.stepsPerFrame; i++) {
                 this.sim.step();
-                this.sim.addToHeatmap(); // Normal mode: Accumulate continuously
+                this.sim.addToHeatmap(); 
             }
             this.renderer.updateOffscreen();
             this.renderer.draw();
@@ -1491,7 +1486,6 @@ class App {
             this.fpsTimer = now;
             this.drawLiveGraph();
         }
-        // Update overlay less frequently for performance
         if (this.frameCount % 5 === 0) this.renderer.drawHeatmapOverlay();
     }
     updateHUD() { document.getElementById('hud-gen').innerText = this.sim.gen; }
