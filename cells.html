@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Universal CA IDE v5.5 (Architect)</title>
-    <meta name="description" content="Advanced Cellular Automata Environment with Parameter Sweeping and Live Analysis">
+    <title>Universal CA IDE v9.1 (Architect)</title>
+    <meta name="description" content="Advanced Cellular Automata Environment with Parameter Sweeping, Live Analysis, and Pattern Management">
     <style>
         :root {
             --bg: #09090b;
@@ -32,10 +32,8 @@
             font-size: 13px;
         }
 
-        /* Layout */
         #app-root { display: flex; width: 100%; height: 100%; }
         
-        /* Sidebar */
         #sidebar { 
             width: 400px; min-width: 320px; max-width: 600px;
             display: flex; flex-direction: column; 
@@ -43,20 +41,17 @@
             z-index: 20; 
         }
 
-        /* Resizer */
         #resizer {
             width: 4px; background: transparent; cursor: col-resize;
             margin-left: -2px; z-index: 30; transition: background 0.2s;
         }
         #resizer:hover, #resizer.active { background: var(--accent); }
 
-        /* Main View */
         #viewport { 
             flex: 1; position: relative; background: #000; 
             overflow: hidden; cursor: crosshair; touch-action: none;
         }
 
-        /* Common UI Elements */
         .panel-header {
             padding: 12px 16px; background: #111; 
             border-bottom: 1px solid var(--border);
@@ -77,17 +72,15 @@
 
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-        /* Tabs */
-        .tabs { display: flex; background: #111; border-bottom: 1px solid var(--border); }
+        .tabs { display: flex; background: #111; border-bottom: 1px solid var(--border); overflow-x: auto;}
         .tab {
             flex: 1; padding: 12px; text-align: center; cursor: pointer;
             color: #71717a; border-bottom: 2px solid transparent;
-            font-weight: 500; transition: all 0.2s;
+            font-weight: 500; transition: all 0.2s; white-space: nowrap;
         }
         .tab:hover { color: var(--text-light); background: #1c1c1c; }
         .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: #1c1c1c; }
 
-        /* Content Areas */
         .content-stack { flex: 1; position: relative; overflow: hidden; }
         .view-layer { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
@@ -96,7 +89,6 @@
         }
         .view-layer.active { display: flex; }
 
-        /* Code Editor */
         #editor-container { flex: 1; position: relative; }
         textarea.code-input {
             width: 100%; height: 100%; background: #0c0c0e;
@@ -106,7 +98,6 @@
         }
         textarea.code-input:focus { background: #09090b; }
 
-        /* Form Controls */
         .control-group { padding: 16px; border-bottom: 1px solid var(--border); }
         .group-title { 
             font-size: 11px; text-transform: uppercase; color: var(--accent); 
@@ -131,9 +122,8 @@
             padding: 0; width: 100%; height: 34px; cursor: pointer; 
             border: 1px solid var(--border); background: none;
         }
-        input[type="checkbox"] { accent-color: var(--accent); }
+        input[type="checkbox"] { accent-color: var(--accent); margin: 0; width: 16px; height: 16px; cursor:pointer; }
 
-        /* Buttons */
         .btn-toolbar { 
             padding: 8px; border-bottom: 1px solid var(--border); 
             display: flex; gap: 8px; background: #111; flex-wrap: wrap;
@@ -154,9 +144,6 @@
         .btn.toggle:hover { color: #e4e4e7; background: #27272a; }
         .btn.toggle.active { background: #27272a; color: var(--accent); border: 1px solid var(--accent); }
 
-        .legend-dot { display: inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-
-        /* Visual Grid for Rules */
         .rule-grid { 
             display: grid; grid-template-columns: repeat(9, 1fr); 
             gap: 2px; background: transparent; 
@@ -172,7 +159,6 @@
         }
         .rule-check span { font-size: 10px; font-weight: 700; }
 
-        /* Graphs */
         .canvas-container {
             background: #0c0c0e; border: 1px solid var(--border);
             height: 180px; width: 100%; position: relative; border-radius: 4px !important;
@@ -180,7 +166,6 @@
         }
         canvas.graph { width: 100%; height: 100%; display: block; }
         
-        /* Preset List */
         .preset-list { max-height: 150px; overflow-y: auto; background: #111; border-bottom: 1px solid var(--border); }
         .preset-item {
             padding: 10px 16px; border-bottom: 1px solid #27272a;
@@ -189,7 +174,6 @@
         }
         .preset-item:hover { background: #27272a; color: white; }
 
-        /* HUD Overlay */
         #hud {
             position: absolute; bottom: 20px; left: 50%; 
             transform: translateX(-50%);
@@ -217,22 +201,11 @@
         .stat-label { font-size: 9px; text-transform: uppercase; font-weight: 700; color: #52525b; }
         .stat-val { font-family: var(--font-mono); font-size: 13px; color: #e4e4e7; }
 
-        /* Scrollbars */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
-        /* Tooltip */
-        #tooltip {
-            position: fixed; pointer-events: none; z-index: 1000;
-            background: #18181b; border: 1px solid var(--accent);
-            padding: 6px 10px; border-radius: 4px !important;
-            font-size: 11px; color: white; display: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-        }
-
-        /* Overlay Messages */
         #viewport-msg {
             position: absolute; top: 20px; left: 20px;
             background: rgba(0,0,0,0.7); padding: 8px 12px;
@@ -251,27 +224,55 @@
             font-size: 9px; color: #71717a; background: rgba(0,0,0,0.5);
             padding: 4px; border-radius: 4px;
         }
+        
+        .viz-config-panel {
+            background: #202022; padding: 10px; margin-top: 8px; 
+            border-radius: 4px; border: 1px solid #333;
+        }
+
+        .pattern-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; padding: 8px; }
+        .pattern-card { 
+            background: #27272a; border: 1px solid var(--border); border-radius: 4px;
+            cursor: pointer; overflow: hidden; display: flex; flex-direction: column;
+        }
+        .pattern-card:hover { border-color: var(--accent); }
+        .pattern-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+        .pattern-thumb { width: 100%; height: 60px; background: #000; image-rendering: pixelated; }
+        .pattern-name { padding: 4px 6px; font-size: 10px; color: #e4e4e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        #selection-box {
+            position: absolute; border: 1px dashed var(--accent);
+            background: rgba(59, 130, 246, 0.2); pointer-events: none; display: none;
+        }
+        
+        #editor-canvas {
+            width: 100%; height: 200px; background: #000;
+            border: 1px solid var(--border);
+            image-rendering: pixelated;
+            cursor: crosshair;
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
 
 <div id="app-root">
-    <!-- Sidebar -->
     <div id="sidebar">
         <div class="panel-header">
-            <span>CA Architect v5.5</span>
+            <span>CA Architect v9.1</span>
             <div id="status-indicator" class="status-dot ok" title="System Ready"></div>
         </div>
 
         <div class="tabs">
             <div class="tab active" data-target="editor">Script</div>
             <div class="tab" data-target="designer">Designer</div>
+            <div class="tab" data-target="patterns">Patterns</div>
+            <div class="tab" data-target="visuals">Visuals</div>
             <div class="tab" data-target="analysis">Analysis</div>
         </div>
 
         <div class="content-stack">
             
-            <!-- Code Editor View -->
             <div id="view-editor" class="view-layer active">
                 <div class="btn-toolbar">
                     <button class="btn primary" id="btn-compile">Compile & Run (Ctrl+R)</button>
@@ -288,7 +289,6 @@
                 </div>
             </div>
 
-            <!-- Visual Designer View -->
             <div id="view-designer" class="view-layer">
                 <div id="warning-banner">
                     Warning: You have manually edited the script. Changing settings here will overwrite your custom code.
@@ -323,7 +323,7 @@
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col">
-                            <label>Density / Radius</label>
+                            <label>Density / Radius (%)</label>
                             <div class="row" style="gap:8px; margin:0">
                                 <input type="range" id="des-init-val" min="0" max="100" value="15">
                                 <span id="lbl-init-val" style="width:30px; text-align:right">15%</span>
@@ -370,30 +370,113 @@
                     <div id="panel-average" class="algo-panel" style="display:none">
                         <div class="col" style="margin-top:10px">
                             <label>Smoothing Factor (0.0 - 1.0)</label>
-                            <input type="number" id="des-smooth" value="0.5" step="0.1" max="1">
+                            <input type="number" id="des-smooth" value="0.1" step="0.1" max="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-patterns" class="view-layer">
+                <div class="control-group">
+                    <div class="group-title">Pattern Library</div>
+                    <div class="btn-toolbar" style="padding:0; border:none; margin-bottom:10px">
+                        <button class="btn toggle" id="btn-patt-capture">Capture from Grid (Box)</button>
+                        <button class="btn danger" id="btn-patt-delete" disabled>Delete</button>
+                    </div>
+                    <div class="pattern-grid" id="pattern-list"></div>
+                </div>
+                
+                <div class="control-group">
+                    <div class="group-title">Pattern Editor</div>
+                    <div class="row">
+                        <div class="col"><label>Name</label><input type="text" id="patt-edit-name" value="New Pattern"></div>
+                    </div>
+                    <div class="row">
+                        <div class="col"><label>Width</label><input type="number" id="patt-edit-w" value="10" min="1" max="100"></div>
+                        <div class="col"><label>Height</label><input type="number" id="patt-edit-h" value="10" min="1" max="100"></div>
+                        <div class="col" style="justify-content:flex-end"><button class="btn" id="btn-patt-resize">Resize</button></div>
+                    </div>
+                    
+                    <canvas id="editor-canvas"></canvas>
+                    
+                    <div class="btn-toolbar" style="padding:0; border:none; margin-top:4px">
+                        <button class="btn primary" id="btn-patt-save">Save to Library</button>
+                        <button class="btn" id="btn-patt-clear">Clear</button>
+                        <button class="btn primary" id="btn-patt-stamp" style="margin-left:auto">Stamp Tool</button>
+                    </div>
+                    
+                    <div class="row" style="margin-top:12px">
+                         <button class="btn" id="btn-patt-rot">Rotate 90°</button>
+                         <button class="btn" id="btn-patt-flip-h">Flip H</button>
+                         <button class="btn" id="btn-patt-flip-v">Flip V</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-visuals" class="view-layer">
+                <div class="control-group">
+                    <div class="group-title">Display Mode</div>
+                    <div class="col">
+                        <label>Render Method</label>
+                        <select id="viz-render-mode">
+                            <option value="standard">Standard (Crisp)</option>
+                            <option value="trails">Motion Trails</option>
+                            <option value="age">Age Heatmap</option>
+                            <option value="velocity">Velocity Map</option>
+                            <option value="neighborhood">Neighborhood Density</option>
+                        </select>
+                    </div>
+                    
+                    <div id="viz-settings-panel" class="viz-config-panel" style="display:none">
+                        <div id="viz-ctrl-trails" style="display:none">
+                            <label>Trail Decay (0.1 - 0.99)</label>
+                            <div class="row" style="gap:8px; margin:0">
+                                <input type="range" id="viz-trail-decay" min="50" max="99" value="90">
+                                <span id="lbl-trail-decay">0.90</span>
+                            </div>
+                        </div>
+                        <div id="viz-ctrl-age" style="display:none">
+                            <label>Age Cap (Generations)</label>
+                            <div class="row" style="gap:8px; margin:0">
+                                <input type="range" id="viz-age-cap" min="10" max="500" value="100">
+                                <span id="lbl-age-cap">100</span>
+                            </div>
+                        </div>
+                        <div id="viz-ctrl-velocity" style="display:none">
+                            <div class="row" style="align-items:center; gap:8px">
+                                <input type="checkbox" id="viz-vel-hide-stable">
+                                <label for="viz-vel-hide-stable" style="margin:0; cursor:pointer">Hide Stable Cells</label>
+                            </div>
+                        </div>
+                        <div id="viz-ctrl-neighborhood" style="display:none">
+                            <label style="color:#71717a; font-size:10px">Colors cells by neighbor count (0-8)</label>
                         </div>
                     </div>
                 </div>
 
                 <div class="control-group">
-                    <div class="group-title">Rendering</div>
+                    <div class="group-title">Base Colors</div>
                     <div class="row">
                         <div class="col"><label>Active Color</label><input type="color" id="des-col1" value="#3b82f6"></div>
                         <div class="col"><label>Background</label><input type="color" id="des-col0" value="#000000"></div>
                     </div>
-                    <div class="col" style="margin-top:8px">
-                        <label>Post-Processing</label>
-                        <select id="des-render-mode">
-                            <option value="standard">Standard (Crisp)</option>
-                            <option value="trails">Motion Trails</option>
-                            <option value="age">Age Heatmap</option>
-                            <option value="velocity">Velocity Map</option>
-                        </select>
+                    <div style="font-size:10px; color:#71717a; margin-top:4px">Changing base colors requires re-compilation.</div>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">Overlays</div>
+                    <div class="col" style="gap:10px">
+                        <div class="row" style="align-items:center; gap:8px; margin:0">
+                            <input type="checkbox" id="viz-show-grid">
+                            <label for="viz-show-grid" style="margin:0; cursor:pointer">Show Grid (Force)</label>
+                        </div>
+                        <div class="row" style="align-items:center; gap:8px; margin:0">
+                            <button class="btn toggle" id="btn-show-overlay" style="width:100%">Toggle Spatial Heatmap</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Analysis View -->
             <div id="view-analysis" class="view-layer">
                 <div class="control-group">
                     <div class="group-title">Run Control</div>
@@ -419,7 +502,7 @@
                         </div>
                     </div>
                     
-                    <div class="group-title" style="margin-top:12px; font-size:10px; color:#52525b">Visualization Modes</div>
+                    <div class="group-title" style="margin-top:12px; font-size:10px; color:#52525b">Plot Options</div>
                     <div class="btn-toolbar" style="border:none; padding:0; background:transparent; margin-bottom:12px">
                         <button class="btn toggle active" id="btn-viz-density">Density</button>
                         <button class="btn toggle active" id="btn-viz-entropy">Entropy</button>
@@ -438,7 +521,31 @@
                              <button class="btn" id="btn-viz-clear">Clear Data</button>
                         </div>
                     </div>
-                    <button class="btn toggle" id="btn-show-overlay" style="width:100%; margin-top:8px; border:1px solid var(--border)">Toggle Spatial Heatmap Mode</button>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">Sweep Visualization</div>
+                    <div class="row">
+                        <div class="col">
+                            <label>Overlay Metric</label>
+                            <select id="sweep-overlay-mode">
+                                <option value="occupancy">Occupancy (Probability)</option>
+                                <option value="volatility">Volatility (Changes)</option>
+                                <option value="sensitivity">Sensitivity (Flip Rate)</option>
+                            </select>
+                        </div>
+                        <div class="col">
+                            <label>Colormap</label>
+                            <select id="sweep-colormap">
+                                <option value="viridis">Viridis</option>
+                                <option value="inferno">Inferno</option>
+                                <option value="magma">Magma</option>
+                                <option value="plasma">Plasma</option>
+                                <option value="turbo">Turbo</option>
+                                <option value="grayscale">Grayscale</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="control-group">
@@ -492,20 +599,20 @@
         </div>
     </div>
 
-    <!-- Resizer Handle -->
     <div id="resizer"></div>
 
-    <!-- Viewport -->
     <div id="viewport">
         <canvas id="main-canvas"></canvas>
         <canvas id="overlay-canvas" style="position:absolute; top:0; left:0; pointer-events:none; mix-blend-mode:screen; opacity:0.8; display:none"></canvas>
+        <div id="selection-box"></div>
         <div id="viewport-msg">Simulation Paused</div>
         
-        <!-- HUD -->
         <div id="hud">
             <button class="hud-btn" id="hud-play" title="Play/Pause (Space)"><svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
             <button class="hud-btn" id="hud-step" title="Step Frame (Right Arrow)"><svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/></svg></button>
             <button class="hud-btn" id="hud-reset" title="Restart (R)"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+            <div class="hud-sep"></div>
+            <button class="hud-btn" id="hud-fit" title="Fit Camera"><svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M15 3l2.3 2.3-2.89 2.87 1.42 1.42L18.7 6.7 21 9V3zM3 9l2.3-2.3 2.87 2.89 1.42-1.42L6.7 5.3 9 3H3zm6 12l-2.3-2.3 2.89-2.87-1.42-1.42L5.3 17.3 3 15v6zm12-6l-2.3 2.3-2.87-2.89-1.42 1.42 2.89 2.87L15 21h6z"/></svg></button>
             <div class="hud-sep"></div>
             <div class="hud-stat"><span class="stat-label">Gen</span><span class="stat-val" id="hud-gen">0</span></div>
             <div class="hud-stat"><span class="stat-label">FPS</span><span class="stat-val" id="hud-fps">0</span></div>
@@ -516,16 +623,14 @@
             </div>
         </div>
     </div>
-    
-    <div id="tooltip"></div>
 </div>
 
 <script>
 const PRESETS = {
-    "Conway's Life": `return { dimensions: [200, 200], neighborhood: 'moore', init: (x, y) => Math.random() < 0.2 ? 1 : 0, getColor: (v) => v ? [59, 130, 246, 255] : [10, 10, 12, 255], update: (v, n) => { let s = 0; for(let i=0; i<n.length; i++) s += n[i]; if (v === 1) return (s === 2 || s === 3) ? 1 : 0; return s === 3 ? 1 : 0; } };`,
-    "Brian's Brain": `return { dimensions: [200, 200], neighborhood: 'moore', init: () => Math.random() < 0.4 ? 1 : 0, getColor: (v) => v === 1 ? [255,255,255,255] : (v===2 ? [100,100,100,255] : [0,0,0,255]), update: (v, n) => { if (v === 1) return 2; if (v === 2) return 0; let s = 0; for(let i=0; i<n.length; i++) if(n[i]===1) s++; return s === 2 ? 1 : 0; } };`,
-    "Cyclic Demon": `return { dimensions: [150, 150], neighborhood: 'von_neumann', init: () => Math.floor(Math.random() * 14), getColor: (v) => { const i = v/14; return [i*255, (1-i)*200, 255, 255]; }, update: (v, n) => { const next = (v + 1) % 14; let count = 0; for(let i=0; i<n.length; i++) if(n[i] === next) count++; return count >= 1 ? next : v; } };`,
-    "Reaction Diffusion": `return { dimensions: [100, 100], type: 'float', neighborhood: 'moore', range: 1, init: (x,y) => { const cx = 50, cy = 50; const d = Math.sqrt((x-cx)**2 + (y-cy)**2); return d < 10 ? 1.0 : 0.0; }, getColor: (v) => [v*255, v*50, 100, 255], update: (v, n) => { let avg = 0; for(let x of n) avg += x; avg /= n.length; return v * 0.9 + avg * 0.1 + (avg > 0.4 ? 0.01 : -0.01); } };`
+    "Conway's Life": { state: { algo: 'life', births: [3], survives: [2,3], w:200, h:200, initType: 'random', initVal: 20 }, code: `return {\n    dimensions: [200, 200],\n    neighborhood: 'moore',\n    init: (x, y) => Math.random() < 0.2 ? 1 : 0,\n    getColor: (v) => v ? [59, 130, 246, 255] : [10, 10, 12, 255],\n    update: (v, n) => {\n        let s = 0; for(let i=0; i<n.length; i++) s += n[i];\n        if (v === 1) return (s === 2 || s === 3) ? 1 : 0;\n        return s === 3 ? 1 : 0;\n    }\n};` },
+    "Brian's Brain": { state: { algo: 'generations', states: 3, w:200, h:200, initType: 'random', initVal: 40 }, code: `return {\n    dimensions: [200, 200],\n    neighborhood: 'moore',\n    init: () => Math.random() < 0.4 ? 1 : 0,\n    getColor: (v) => v === 1 ? [255,255,255,255] : (v===2 ? [100,100,100,255] : [0,0,0,255]),\n    update: (v, n) => {\n        if (v === 1) return 2; // Dying\n        if (v === 2) return 0; // Dead\n        let s = 0; for(let i=0; i<n.length; i++) if(n[i]===1) s++;\n        return s === 2 ? 1 : 0;\n    }\n};` },
+    "Cyclic Demon": { state: { algo: 'cyclic', states: 14, w:150, h:150, initType: 'random', initVal: 99 }, code: `return {\n    dimensions: [150, 150],\n    neighborhood: 'von_neumann',\n    init: () => Math.floor(Math.random() * 14),\n    getColor: (v) => { const i = v/14; return [i*255, (1-i)*200, 255, 255]; },\n    update: (v, n) => {\n        const next = (v + 1) % 14;\n        let count = 0;\n        for(let i=0; i<n.length; i++) if(n[i] === next) count++;\n        return count >= 1 ? next : v;\n    }\n};` },
+    "Reaction Diffusion": { state: { algo: 'average', smooth: 0.1, w:100, h:100, initType: 'circle', initVal: 10 }, code: `return {\n    dimensions: [100, 100],\n    type: 'float',\n    neighborhood: 'moore',\n    range: 1,\n    init: (x,y) => {\n        const cx = 50, cy = 50;\n        const d = Math.sqrt((x-cx)**2 + (y-cy)**2);\n        return d < 10 ? 1.0 : 0.0;\n    },\n    getColor: (v) => [v*255, v*50, 100, 255],\n    update: (v, n) => {\n        let avg = 0; for(let x of n) avg += x;\n        avg /= n.length;\n        return v * 0.9 + avg * 0.1 + (avg > 0.4 ? 0.01 : -0.01);\n    }\n};` }
 };
 
 class SimulationEngine {
@@ -538,8 +643,11 @@ class SimulationEngine {
         this.history = [];
         this.currentFlux = 0;
         this.neighborhoodBuffer = null;
-        this.heatmapBuffer = null;
         this.isAnalysisMode = false;
+        this.heatmapBuffer = null;    
+        this.volatilityBuffer = null; 
+        this.sensitivityBuffer = null;
+        this.lastSweepGrid = null;    
     }
 
     load(code) {
@@ -547,6 +655,7 @@ class SimulationEngine {
             const func = new Function(code);
             const cfg = func();
             if (!cfg || !Array.isArray(cfg.dimensions)) throw new Error("Config must return object with 'dimensions'");
+            if (typeof cfg.update !== 'function') throw new Error("Config must implement 'update' function");
             
             const [w, h] = cfg.dimensions;
             const size = w * h;
@@ -556,6 +665,9 @@ class SimulationEngine {
                 this.gridA = isFloat ? new Float32Array(size) : new Uint8Array(size);
                 this.gridB = isFloat ? new Float32Array(size) : new Uint8Array(size);
                 this.heatmapBuffer = new Float32Array(size);
+                this.volatilityBuffer = new Float32Array(size);
+                this.sensitivityBuffer = new Float32Array(size);
+                this.lastSweepGrid = new Float32Array(size);
             }
 
             this.w = w; this.h = h; this.size = size;
@@ -586,14 +698,13 @@ class SimulationEngine {
             for (let i = 0; i < this.size; i++) arr[i] = init(i % this.w, Math.floor(i / this.w));
         } else arr.fill(0);
         
-        if (this.heatmapBuffer) this.heatmapBuffer.fill(0);
+        if (!this.isAnalysisMode && this.heatmapBuffer) this.heatmapBuffer.fill(0);
         this.gen = 0;
         this.history = [];
     }
 
     step() {
         if (!this.config) return false;
-        
         const src = this.isBufferA ? this.gridA : this.gridB;
         const dst = this.isBufferA ? this.gridB : this.gridA;
         const { update, neighborhood, range: cfgRange } = this.config;
@@ -603,8 +714,6 @@ class SimulationEngine {
         const nb = this.neighborhoodBuffer;
         
         let changedCount = 0;
-        
-        // Massive Optimization: Remove % operator from loop by handling logic
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < w; x++) {
                 let ni = 0;
@@ -612,30 +721,26 @@ class SimulationEngine {
                     for (let dx = -range; dx <= range; dx++) {
                         if (dx === 0 && dy === 0) continue;
                         if (isVonNeumann && (Math.abs(dx) + Math.abs(dy) > range)) continue;
-                        
                         let ny = y + dy;
                         if (ny < 0) ny += h; else if (ny >= h) ny -= h;
-                        
                         let nx = x + dx;
                         if (nx < 0) nx += w; else if (nx >= w) nx -= w;
-                        
                         nb[ni++] = src[ny * w + nx];
                     }
                 }
-                
                 const neighborInput = (ni === nb.length) ? nb : nb.subarray(0, ni);
                 const newVal = update(src[y*w+x], neighborInput);
-                
-                if (newVal !== src[y*w+x]) changedCount++;
+                if (newVal !== src[y*w+x]) {
+                    changedCount++;
+                    if (this.isAnalysisMode) this.volatilityBuffer[y*w+x] += 1;
+                }
                 dst[y*w+x] = newVal;
             }
         }
-
         this.currentFlux = changedCount / this.size;
         this.isBufferA = !this.isBufferA;
         this.gen++;
         if (this.gen % 5 === 0) this.recordStats();
-        
         return changedCount > 0;
     }
     
@@ -651,7 +756,6 @@ class SimulationEngine {
         if (!this.gridA) return 0;
         const grid = this.getCurrentGrid();
         let h = 0x811c9dc5;
-        // Simple FNV-1a like hashing for grid state
         for(let i = 0; i < this.size; i++) {
             h ^= grid[i];
             h = Math.imul(h, 0x01000193);
@@ -681,14 +785,7 @@ class SimulationEngine {
         const grid = this.getCurrentGrid();
         let active = 0;
         for(let i=0; i<grid.length; i++) if(grid[i] > 0) active++;
-        
-        this.history.push({ 
-            gen: this.gen, 
-            density: active / this.size,
-            entropy: this.calculateEntropy(),
-            flux: this.currentFlux
-        });
-        
+        this.history.push({ gen: this.gen, density: active / this.size, entropy: this.calculateEntropy(), flux: this.currentFlux });
         if (this.history.length > 50000) this.history.shift();
     }
 
@@ -705,16 +802,33 @@ class SimulationEngine {
             }
         }
     }
+
+    pastePattern(targetX, targetY, pattern) {
+        if (!this.gridA || !pattern || !pattern.data) return;
+        const target = this.getCurrentGrid();
+        for (let y = 0; y < pattern.h; y++) {
+            for (let x = 0; x < pattern.w; x++) {
+                const val = pattern.data[y * pattern.w + x];
+                if (val !== undefined && val !== 0) {
+                    const py = (targetY + y) % this.h; 
+                    const px = (targetX + x) % this.w;
+                    const finalY = py < 0 ? py + this.h : py;
+                    const finalX = px < 0 ? px + this.w : px;
+                    target[finalY * this.w + finalX] = val;
+                }
+            }
+        }
+    }
 }
 
 class Renderer {
-    constructor(canvas, overlayCanvas, engine) {
+    constructor(canvas, overlayCanvas, engine, app) {
         this.canvas = canvas;
         this.overlayCanvas = overlayCanvas;
         this.ctx = canvas.getContext('2d', { alpha: false });
         this.overlayCtx = overlayCanvas.getContext('2d');
         this.engine = engine;
-        this.heatmapEngine = engine; // Separate reference for heatmap accumulation
+        this.app = app;
         this.offCanvas = document.createElement('canvas');
         this.offCtx = this.offCanvas.getContext('2d', { alpha: false });
         this.imageData = null;
@@ -722,6 +836,27 @@ class Renderer {
         this.heatmapMode = false;
         this.resize();
         this.trailBuffer = null;
+        this.ageBuffer = null;
+        this.lastGrid = null;
+        this.colormaps = {
+            grayscale: (t) => [t*255, t*255, t*255],
+            viridis: (t) => this.interpolatePalette(t, [[68,1,84],[72,35,116],[64,67,135],[53,95,140],[42,120,142],[33,144,141],[34,168,132],[68,191,112],[122,209,81],[194,223,35],[253,231,37]]),
+            inferno: (t) => this.interpolatePalette(t, [[0,0,4],[27,12,65],[74,11,106],[120,28,109],[165,44,96],[207,68,70],[237,105,37],[251,155,6],[247,209,61],[252,255,164]]),
+            magma: (t) => this.interpolatePalette(t, [[0,0,4],[28,16,68],[79,18,123],[129,37,129],[181,54,122],[229,80,100],[251,135,97],[254,194,135],[252,253,191]]),
+            plasma: (t) => this.interpolatePalette(t, [[13,8,135],[70,3,159],[114,1,168],[156,23,158],[189,55,134],[216,87,107],[237,121,83],[251,159,58],[253,202,38],[240,249,33]]),
+            turbo: (t) => this.interpolatePalette(t, [[48,18,59],[70,107,227],[40,188,235],[50,242,152],[164,252,60],[238,206,19],[251,126,33],[228,60,30],[169,22,1],[122,4,3]])
+        };
+    }
+    
+    interpolatePalette(t, stops) {
+        if (t <= 0) return stops[0];
+        if (t >= 1) return stops[stops.length-1];
+        const i = t * (stops.length - 1);
+        const idx = Math.floor(i);
+        const amt = i - idx;
+        const c1 = stops[idx];
+        const c2 = stops[idx+1];
+        return [c1[0] + (c2[0]-c1[0])*amt, c1[1] + (c2[1]-c1[1])*amt, c1[2] + (c2[2]-c1[2])*amt];
     }
 
     resize() {
@@ -729,56 +864,84 @@ class Renderer {
         const rect = this.canvas.parentElement.getBoundingClientRect();
         if (rect.width === 0) return;
         [this.canvas, this.overlayCanvas].forEach(c => {
-            c.width = rect.width * p;
-            c.height = rect.height * p;
-            c.style.width = rect.width + 'px';
-            c.style.height = rect.height + 'px';
+            c.width = rect.width * p; c.height = rect.height * p;
+            c.style.width = rect.width + 'px'; c.style.height = rect.height + 'px';
         });
         this.ctx.scale(p, p);
         this.overlayCtx.scale(p, p);
         this.ctx.imageSmoothingEnabled = false;
         this.overlayCtx.imageSmoothingEnabled = false;
     }
+    
+    fitToScreen(gridW, gridH) {
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        if (rect.width === 0) return; 
+        const padding = 40;
+        const availW = rect.width - padding;
+        const availH = rect.height - padding;
+        let zoom = Math.min(availW / gridW, availH / gridH);
+        zoom = Math.max(0.1, zoom); 
+        this.cam = { x: (rect.width - gridW * zoom) / 2, y: (rect.height - gridH * zoom) / 2, zoom };
+        this.draw(); 
+    }
+    
+    resetBuffers() {
+        this.trailBuffer = null;
+        this.ageBuffer = null;
+        this.lastGrid = null;
+    }
 
     updateOffscreen() {
         const { w, h, config } = this.engine;
         if (!w || !h) return;
-
         if (this.offCanvas.width !== w || this.offCanvas.height !== h) {
             this.offCanvas.width = w; this.offCanvas.height = h;
             this.imageData = this.offCtx.createImageData(w, h);
-            this.trailBuffer = new Uint8Array(w * h * 4);
+            this.resetBuffers();
         }
+        if (!this.trailBuffer) this.trailBuffer = new Uint8Array(w*h*4);
+        if (!this.ageBuffer) this.ageBuffer = new Uint32Array(w*h);
+        if (!this.lastGrid) this.lastGrid = new Uint8Array(w*h);
 
         const grid = this.engine.getCurrentGrid();
         const data = this.imageData.data;
         const getColor = config.getColor || ((v) => [v?255:0, v?255:0, v?255:0, 255]);
-        const mode = config.renderMode || 'standard';
+        const viz = this.app.vizSettings || {};
+        const mode = viz.mode || 'standard';
 
         for (let i = 0; i < grid.length; i++) {
             const idx = i * 4;
             const val = grid[i];
-            const col = getColor(val);
             
             if (mode === 'trails') {
-                const r = col[0], g = col[1], b = col[2];
-                this.trailBuffer[idx] = Math.max(0, this.trailBuffer[idx] - 5);
-                this.trailBuffer[idx+1] = Math.max(0, this.trailBuffer[idx+1] - 5);
-                this.trailBuffer[idx+2] = Math.max(0, this.trailBuffer[idx+2] - 5);
+                const col = getColor(val);
+                const decay = viz.decay !== undefined ? viz.decay : 0.9;
+                this.trailBuffer[idx] = Math.floor(this.trailBuffer[idx] * decay);
+                this.trailBuffer[idx+1] = Math.floor(this.trailBuffer[idx+1] * decay);
+                this.trailBuffer[idx+2] = Math.floor(this.trailBuffer[idx+2] * decay);
                 if (val > 0) {
-                    this.trailBuffer[idx] = r;
-                    this.trailBuffer[idx+1] = g;
-                    this.trailBuffer[idx+2] = b;
+                    this.trailBuffer[idx] = col[0]; this.trailBuffer[idx+1] = col[1]; this.trailBuffer[idx+2] = col[2];
                 }
-                data[idx] = this.trailBuffer[idx];
-                data[idx+1] = this.trailBuffer[idx+1];
-                data[idx+2] = this.trailBuffer[idx+2];
-                data[idx+3] = 255;
-            } else {
-                data[idx] = col[0];
-                data[idx+1] = col[1];
-                data[idx+2] = col[2];
-                data[idx+3] = 255;
+                data[idx] = this.trailBuffer[idx]; data[idx+1] = this.trailBuffer[idx+1]; data[idx+2] = this.trailBuffer[idx+2]; data[idx+3] = 255;
+            } else if (mode === 'age') {
+                if (val > 0) this.ageBuffer[i]++; else this.ageBuffer[i] = 0;
+                if (this.ageBuffer[i] === 0) {
+                    data[idx] = 0; data[idx+1] = 0; data[idx+2] = 0; data[idx+3] = 255;
+                } else {
+                    const norm = Math.min(1, this.ageBuffer[i] / (viz.ageCap || 100));
+                    data[idx] = Math.floor(norm * 255); data[idx+1] = Math.floor(norm * 255); data[idx+2] = 255; data[idx+3] = 255;
+                }
+            } else if (mode === 'velocity') {
+                const last = this.lastGrid[i];
+                let r=0, g=0, b=0;
+                if (val > 0 && last === 0) { r=50; g=255; b=50; } 
+                else if (val === 0 && last > 0) { r=255; g=50; b=50; } 
+                else if (val > 0 && last > 0 && !viz.hideStable) { r=50; g=100; b=255; } 
+                this.lastGrid[i] = val;
+                data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = 255;
+            } else { 
+                const col = getColor(val);
+                data[idx] = col[0]; data[idx+1] = col[1]; data[idx+2] = col[2]; data[idx+3] = 255;
             }
         }
         this.offCtx.putImageData(this.imageData, 0, 0);
@@ -787,15 +950,36 @@ class Renderer {
     draw() {
         this.ctx.fillStyle = '#09090b';
         this.ctx.fillRect(0, 0, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
-        
-        if (this.heatmapMode) return; // In heatmap mode, main canvas is blank background
-
+        if (this.heatmapMode) return; 
         if (!this.engine.w) return;
         this.ctx.save();
         this.ctx.translate(this.cam.x, this.cam.y);
         this.ctx.scale(this.cam.zoom, this.cam.zoom);
         this.ctx.drawImage(this.offCanvas, 0, 0);
-        if (this.cam.zoom > 10) {
+        
+        if (this.app.interactionMode === 'stamp' && this.app.patterns.activePattern && this.app.mouseGridPos) {
+            const p = this.app.patterns.activePattern;
+            const mx = this.app.mouseGridPos.x;
+            const my = this.app.mouseGridPos.y;
+            this.ctx.globalAlpha = 0.5;
+            const getColor = this.engine.config.getColor || (() => [255,255,255,255]);
+            for(let y=0; y<p.h; y++) {
+                for(let x=0; x<p.w; x++) {
+                    const v = p.data[y*p.w+x];
+                    if(v > 0) {
+                        const col = getColor(v);
+                        this.ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+                        this.ctx.fillRect(mx+x, my+y, 1, 1);
+                    }
+                }
+            }
+            this.ctx.strokeStyle = '#3b82f6';
+            this.ctx.lineWidth = 1/this.cam.zoom;
+            this.ctx.strokeRect(mx, my, p.w, p.h);
+            this.ctx.globalAlpha = 1.0;
+        }
+
+        if (this.cam.zoom > 4 || (this.app.vizSettings && this.app.vizSettings.showGrid)) {
             this.ctx.beginPath();
             this.ctx.lineWidth = 0.5 / this.cam.zoom;
             this.ctx.strokeStyle = '#333';
@@ -810,64 +994,44 @@ class Renderer {
     drawHeatmapOverlay() {
         this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
         if (document.getElementById('overlay-canvas').style.display === 'none') return;
-        // Always draw from heatmapEngine (Main App Sim) regardless of current live engine
-        const { w, h, heatmapBuffer } = this.heatmapEngine;
+        const { w, h } = this.engine;
         if (!w) return;
         
+        const mode = document.getElementById('sweep-overlay-mode').value;
+        let buffer;
+        if (mode === 'volatility') buffer = this.engine.volatilityBuffer;
+        else if (mode === 'sensitivity') buffer = this.engine.sensitivityBuffer;
+        else buffer = this.engine.heatmapBuffer;
+
+        if (!buffer) return;
+        const mapName = document.getElementById('sweep-colormap').value || 'viridis';
+        const colorFn = this.colormaps[mapName] || this.colormaps.viridis;
         const iData = this.overlayCtx.createImageData(w, h);
         const data = iData.data;
-        let minHeat = Infinity;
-        let maxHeat = -Infinity;
+        let minHeat = Infinity, maxHeat = -Infinity;
         
-        for(let i=0; i<heatmapBuffer.length; i++) {
-            const v = heatmapBuffer[i];
-            if(v > 0) {
-                if (v < minHeat) minHeat = v;
-                if (v > maxHeat) maxHeat = v;
-            }
+        for(let i=0; i<buffer.length; i++) {
+            const v = buffer[i];
+            if(v > 0) { if (v < minHeat) minHeat = v; if (v > maxHeat) maxHeat = v; }
         }
-        
-        if (maxHeat === -Infinity) maxHeat = 1;
-        if (minHeat === Infinity) minHeat = 0;
-        let range = maxHeat - minHeat;
-        if (range === 0) range = 1;
+        if (maxHeat === -Infinity) maxHeat = 1; if (minHeat === Infinity) minHeat = 0;
+        let range = maxHeat - minHeat; if (range === 0) range = 1;
         
         for(let i=0; i<w*h; i++) {
-            const val = heatmapBuffer[i];
+            const val = buffer[i];
             if (val > 0) {
                 const norm = (val - minHeat) / range;
+                const rgb = colorFn(norm);
                 const idx = i*4;
-                // Heatmap Gradient: Blue -> Green -> Red -> White
-                // Simple implementation:
-                let r=0, g=0, b=0;
-                if (norm < 0.25) { // Dark Blue to Blue
-                    b = 128 + norm * 4 * 127;
-                } else if (norm < 0.5) { // Blue to Green
-                    b = 255 * (1 - (norm-0.25)*4);
-                    g = 255 * ((norm-0.25)*4);
-                } else if (norm < 0.75) { // Green to Red
-                    g = 255 * (1 - (norm-0.5)*4);
-                    r = 255 * ((norm-0.5)*4);
-                } else { // Red to White
-                    r = 255;
-                    g = 255 * ((norm-0.75)*4);
-                    b = 255 * ((norm-0.75)*4);
-                }
-                
-                data[idx] = r;
-                data[idx+1] = g;
-                data[idx+2] = b;
-                data[idx+3] = 255; 
+                data[idx] = rgb[0]; data[idx+1] = rgb[1]; data[idx+2] = rgb[2]; data[idx+3] = 255; 
             }
         }
         const tempC = document.createElement('canvas');
         tempC.width = w; tempC.height = h;
         tempC.getContext('2d').putImageData(iData, 0, 0);
-        
         this.overlayCtx.save();
         this.overlayCtx.translate(this.cam.x, this.cam.y);
         this.overlayCtx.scale(this.cam.zoom, this.cam.zoom);
-        // If heatmap mode, we want opaque normal blend on black. If overlay, screen blend.
         this.overlayCtx.globalCompositeOperation = this.heatmapMode ? 'source-over' : 'screen';
         this.overlayCtx.drawImage(tempC, 0, 0);
         this.overlayCtx.restore();
@@ -875,9 +1039,290 @@ class Renderer {
 
     screenToWorld(sx, sy) {
         const rect = this.canvas.getBoundingClientRect();
+        // sx, sy are expected to be clientX, clientY
         const x = (sx - rect.left - this.cam.x) / this.cam.zoom;
         const y = (sy - rect.top - this.cam.y) / this.cam.zoom;
         return { x: Math.floor(x), y: Math.floor(y) };
+    }
+}
+
+class PatternManager {
+    constructor(app) {
+        this.app = app;
+        this.patterns = [];
+        this.activePattern = null;
+        this.editCanvas = document.getElementById('editor-canvas');
+        this.init();
+    }
+    
+    init() {
+        const saved = localStorage.getItem('ca_patterns');
+        if (saved) {
+            try { this.patterns = JSON.parse(saved); } catch(e) { this.patterns = []; }
+        }
+        this.renderList();
+        
+        // --- Buttons for List / Stamp / Selection ---
+        document.getElementById('btn-patt-capture').onclick = () => {
+             this.app.interactionMode = 'select';
+             document.getElementById('btn-patt-capture').classList.add('active');
+             document.getElementById('btn-patt-stamp').classList.remove('active');
+        };
+        document.getElementById('btn-patt-delete').onclick = () => this.deleteActive();
+        
+        // --- Transformations for Editor ---
+        document.getElementById('btn-patt-rot').onclick = () => this.transformEditing(p => {
+            const newData = new Array(p.w*p.h);
+            for(let y=0; y<p.h; y++) for(let x=0; x<p.w; x++) newData[x*p.h + (p.h-1-y)] = p.data[y*p.w+x];
+            return { w: p.h, h: p.w, data: newData, name: p.name };
+        });
+        document.getElementById('btn-patt-flip-h').onclick = () => this.transformEditing(p => {
+             const newData = [...p.data];
+             for(let y=0; y<p.h; y++) for(let x=0; x<p.w/2; x++) {
+                 const i1 = y*p.w+x, i2 = y*p.w+(p.w-1-x);
+                 [newData[i1], newData[i2]] = [newData[i2], newData[i1]];
+             }
+             return { ...p, data: newData };
+        });
+        document.getElementById('btn-patt-flip-v').onclick = () => this.transformEditing(p => {
+             const newData = [...p.data];
+             for(let y=0; y<p.h/2; y++) for(let x=0; x<p.w; x++) {
+                 const i1 = y*p.w+x, i2 = (p.h-1-y)*p.w+x;
+                 [newData[i1], newData[i2]] = [newData[i2], newData[i1]];
+             }
+             return { ...p, data: newData };
+        });
+        document.getElementById('btn-patt-stamp').onclick = (e) => {
+            if (this.activePattern) {
+                this.app.interactionMode = 'stamp';
+                e.target.classList.add('active');
+                document.getElementById('btn-patt-capture').classList.remove('active');
+            }
+        };
+
+        // --- Editor Controls ---
+        this.editingPattern = { name: "New Pattern", w: 10, h: 10, data: new Array(100).fill(0) };
+        this.drawEditor();
+
+        document.getElementById('btn-patt-resize').onclick = () => {
+            const w = parseInt(document.getElementById('patt-edit-w').value);
+            const h = parseInt(document.getElementById('patt-edit-h').value);
+            if(w>0 && h>0) {
+                const newData = new Array(w*h).fill(0);
+                // Preserve data
+                const oldW = this.editingPattern.w;
+                const oldH = this.editingPattern.h;
+                for(let y=0; y<Math.min(h, oldH); y++) {
+                    for(let x=0; x<Math.min(w, oldW); x++) {
+                        newData[y*w+x] = this.editingPattern.data[y*oldW+x];
+                    }
+                }
+                this.editingPattern.w = w; this.editingPattern.h = h;
+                this.editingPattern.data = newData;
+                this.drawEditor();
+            }
+        };
+
+        document.getElementById('btn-patt-save').onclick = () => {
+            const name = document.getElementById('patt-edit-name').value || "Pattern " + (this.patterns.length+1);
+            const newP = { ...this.editingPattern, name: name, data: [...this.editingPattern.data] };
+            this.patterns.push(newP);
+            this.persist();
+            this.renderList();
+            this.activePattern = newP;
+        };
+        
+        document.getElementById('btn-patt-clear').onclick = () => {
+            this.editingPattern.data.fill(0);
+            this.drawEditor();
+        };
+
+        // --- Editor Interactions ---
+        let isEditing = false;
+        const getCell = (e) => {
+            const rect = this.editCanvas.getBoundingClientRect();
+            const scaleX = this.editCanvas.width / rect.width;
+            const scaleY = this.editCanvas.height / rect.height;
+            const rx = (e.clientX - rect.left) * scaleX;
+            const ry = (e.clientY - rect.top) * scaleY;
+            // Calculate grid size based on drawing
+            const minDim = Math.min(this.editCanvas.width, this.editCanvas.height);
+            const p = this.editingPattern;
+            const maxDim = Math.max(p.w, p.h);
+            const cellSize = (minDim / maxDim) * 0.9;
+            const ox = (this.editCanvas.width - p.w*cellSize)/2;
+            const oy = (this.editCanvas.height - p.h*cellSize)/2;
+            
+            const gx = Math.floor((rx - ox) / cellSize);
+            const gy = Math.floor((ry - oy) / cellSize);
+            return {x: gx, y: gy};
+        };
+
+        this.editCanvas.onmousedown = (e) => {
+            isEditing = true;
+            const c = getCell(e);
+            this.toggleCell(c.x, c.y);
+        };
+        window.addEventListener('mousemove', (e) => {
+            if(isEditing && e.target === this.editCanvas) {
+                const c = getCell(e);
+                // For drag, we force on (1)
+                if (c.x >=0 && c.x < this.editingPattern.w && c.y >= 0 && c.y < this.editingPattern.h) {
+                     this.editingPattern.data[c.y*this.editingPattern.w + c.x] = 1;
+                     this.drawEditor();
+                }
+            }
+        });
+        window.addEventListener('mouseup', () => isEditing = false);
+    }
+
+    toggleCell(x, y) {
+        if (x >= 0 && x < this.editingPattern.w && y >= 0 && y < this.editingPattern.h) {
+            const idx = y * this.editingPattern.w + x;
+            this.editingPattern.data[idx] = this.editingPattern.data[idx] ? 0 : 1;
+            this.drawEditor();
+        }
+    }
+
+    transformEditing(fn) {
+        this.editingPattern = fn(this.editingPattern);
+        document.getElementById('patt-edit-w').value = this.editingPattern.w;
+        document.getElementById('patt-edit-h').value = this.editingPattern.h;
+        this.drawEditor();
+    }
+    
+    drawEditor() {
+        const cvs = this.editCanvas;
+        const ctx = cvs.getContext('2d');
+        const rect = cvs.getBoundingClientRect();
+        // Set actual resolution
+        cvs.width = rect.width; cvs.height = rect.height;
+        
+        ctx.fillStyle = '#000'; ctx.fillRect(0,0,cvs.width, cvs.height);
+        
+        const p = this.editingPattern;
+        const minDim = Math.min(cvs.width, cvs.height);
+        const maxDim = Math.max(p.w, p.h);
+        const cellSize = (minDim / maxDim) * 0.9;
+        
+        const ox = (cvs.width - p.w*cellSize)/2;
+        const oy = (cvs.height - p.h*cellSize)/2;
+        
+        // Draw grid background
+        ctx.fillStyle = '#111';
+        ctx.fillRect(ox, oy, p.w*cellSize, p.h*cellSize);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for(let i=0; i<=p.w; i++) { ctx.moveTo(ox + i*cellSize, oy); ctx.lineTo(ox + i*cellSize, oy + p.h*cellSize); }
+        for(let i=0; i<=p.h; i++) { ctx.moveTo(ox, oy + i*cellSize); ctx.lineTo(ox + p.w*cellSize, oy + i*cellSize); }
+        ctx.stroke();
+        
+        // Draw cells
+        ctx.fillStyle = '#3b82f6';
+        for(let y=0; y<p.h; y++) {
+            for(let x=0; x<p.w; x++) {
+                if(p.data[y*p.w + x]) {
+                    ctx.fillRect(ox + x*cellSize + 1, oy + y*cellSize + 1, cellSize - 2, cellSize - 2);
+                }
+            }
+        }
+        
+        // Border
+        ctx.strokeStyle = '#555';
+        ctx.strokeRect(ox, oy, p.w*cellSize, p.h*cellSize);
+    }
+
+    saveSelection(x1, y1, x2, y2) {
+        // Sort coordinates
+        const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+        const w = (maxX - minX) + 1;
+        const h = (maxY - minY) + 1;
+        
+        const grid = this.app.sim.getCurrentGrid();
+        const simW = this.app.sim.w;
+        const simH = this.app.sim.h;
+        const data = [];
+        
+        for(let dy=0; dy<h; dy++) {
+            for(let dx=0; dx<w; dx++) {
+                // Correct toroidal wrapping for selection
+                let sx = (minX + dx) % simW;
+                let sy = (minY + dy) % simH;
+                if(sx < 0) sx += simW;
+                if(sy < 0) sy += simH;
+                
+                data.push(grid[sy*simW + sx]);
+            }
+        }
+        
+        // Load into editor instead of prompt
+        this.editingPattern = { name: "Captured", w, h, data };
+        document.getElementById('patt-edit-w').value = w;
+        document.getElementById('patt-edit-h').value = h;
+        document.getElementById('patt-edit-name').value = "Captured Pattern";
+        this.drawEditor();
+        
+        // Switch to patterns tab to see capture
+        document.querySelector('.tab[data-target="patterns"]').click();
+
+        this.app.interactionMode = 'draw';
+        document.getElementById('btn-patt-capture').classList.remove('active');
+    }
+    
+    deleteActive() {
+        if(!this.activePattern) return;
+        this.patterns = this.patterns.filter(p => p !== this.activePattern);
+        this.activePattern = null;
+        this.persist();
+        this.renderList();
+        document.getElementById('btn-patt-delete').disabled = true;
+    }
+
+    persist() { localStorage.setItem('ca_patterns', JSON.stringify(this.patterns)); }
+
+    renderList() {
+        const el = document.getElementById('pattern-list');
+        el.innerHTML = '';
+        this.patterns.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'pattern-card';
+            if (p === this.activePattern) card.classList.add('active');
+            const thumb = document.createElement('canvas');
+            thumb.className = 'pattern-thumb';
+            thumb.width = p.w; thumb.height = p.h;
+            this.renderToCanvas(p, thumb);
+            const lbl = document.createElement('div');
+            lbl.className = 'pattern-name';
+            lbl.innerText = p.name;
+            card.append(thumb, lbl);
+            card.onclick = () => {
+                this.activePattern = p;
+                this.renderList(); // Refresh active class
+                document.getElementById('btn-patt-delete').disabled = false;
+                
+                // Load into editor
+                this.editingPattern = { ...p, data: [...p.data] };
+                document.getElementById('patt-edit-name').value = p.name;
+                document.getElementById('patt-edit-w').value = p.w;
+                document.getElementById('patt-edit-h').value = p.h;
+                this.drawEditor();
+            };
+            el.appendChild(card);
+        });
+    }
+
+    renderToCanvas(p, cvs) {
+        const ctx = cvs.getContext('2d');
+        ctx.fillStyle = '#000'; ctx.fillRect(0,0,cvs.width,cvs.height);
+        const img = ctx.createImageData(p.w, p.h);
+        for(let i=0; i<p.data.length; i++) {
+            const v = p.data[i];
+            const ii = i*4;
+            img.data[ii] = v?59:0; img.data[ii+1] = v?130:0; img.data[ii+2] = v?246:0; img.data[ii+3] = 255;
+        }
+        ctx.putImageData(img, 0, 0);
     }
 }
 
@@ -890,18 +1335,17 @@ class AnalysisEngine {
         this.canvas.addEventListener('mousedown', (e) => this.handleClick(e));
         this.currentResults = [];
         this.previousResults = [];
-        // Reused instance to prevent memory churn
         this.sim = new SimulationEngine();
     }
 
     async runSweep(paramKey, start, end, steps, maxGens, retain) {
         if (this.running) return;
+        if (this.app.ui.isCodeDirty) {
+            if (!confirm("Running sweep requires the Visual Designer. Custom code edits will be overwritten by the designer settings. Continue?")) return;
+        }
+
         this.running = true;
         this.cancel = false;
-        
-        if (retain) this.previousResults = [...this.currentResults];
-        else this.previousResults = [];
-        this.currentResults = [];
         
         const btnStart = document.getElementById('btn-sweep-start');
         const btnStop = document.getElementById('btn-sweep-stop');
@@ -913,9 +1357,15 @@ class AnalysisEngine {
         btnStop.disabled = false;
         legend.style.display = 'none';
         
-        // Clear heatmap if not retaining (fresh perspective)
+        if (retain) this.previousResults = [...this.currentResults];
+        else this.previousResults = [];
+        this.currentResults = [];
+
         if (!retain) {
-            this.app.sim.heatmapBuffer.fill(0);
+            if(this.app.sim.heatmapBuffer) this.app.sim.heatmapBuffer.fill(0);
+            if(this.app.sim.volatilityBuffer) this.app.sim.volatilityBuffer.fill(0);
+            if(this.app.sim.sensitivityBuffer) this.app.sim.sensitivityBuffer.fill(0);
+            if(this.app.sim.lastSweepGrid) this.app.sim.lastSweepGrid.fill(0);
             this.app.renderer.drawHeatmapOverlay();
         }
         
@@ -923,63 +1373,52 @@ class AnalysisEngine {
         const designerState = this.app.ui.getDesignerState();
 
         try {
-            // Enable Analysis Mode to skip history recording in Sim
             this.sim.isAnalysisMode = true;
-
             for (let i = 0; i <= steps; i++) {
                 if (this.cancel) break;
-                
                 const val = start + i * delta;
-                
                 const testState = JSON.parse(JSON.stringify(designerState));
                 if (paramKey === 'initV') testState.initVal = val;
                 else if (paramKey === 'range') testState.range = Math.round(val);
                 else if (paramKey === 'states') testState.states = Math.round(val);
                 
                 const code = this.app.ui.generateCode(testState);
+                const res = this.sim.load(code);
+                if (!res.success) continue; 
+                this.sim.isAnalysisMode = true; 
                 
-                // Reuse Simulation Instance, update logic
-                this.sim.load(code);
-                this.sim.isAnalysisMode = true; // Ensure flag is set after load/reset
-                
-                // Cycle Detection Set
                 const historyHashes = new Set();
-                
-                // Fast Forward with Visual Updates & Optimization
                 let stableGen = 0;
                 for(let g=0; g<maxGens; g++) {
                     const changed = this.sim.step();
                     stableGen = g;
-                    
-                    // Optimization 1: Check flux (Stasis)
                     if (!changed) break; 
-                    
-                    // Optimization 2: Check Oscillation (Hash)
-                    // Checking every frame for large grids can be slow, checking every 2 frames is a good trade-off
                     if (g % 2 === 0) {
                         const h = this.sim.getHash();
-                        if (historyHashes.has(h)) break; // Oscillation detected
+                        if (historyHashes.has(h)) break; 
                         historyHashes.add(h);
-                        // Safe bound for hash history to prevent memory leaks in extreme cases
                         if (historyHashes.size > 100) historyHashes.clear();
                     }
-
-                    // Optional: Visual Update frequency
                     if (g % 5 === 0) {
-                        this.app.renderer.engine = this.sim; // Temporary swap engine for renderer
+                        this.app.renderer.engine = this.sim; 
                         this.app.renderer.updateOffscreen();
                         this.app.renderer.draw();
-                        // Explicitly redraw overlay from main engine buffer
                         this.app.renderer.drawHeatmapOverlay();
                     }
                 }
                 
-                // Accumulate Heatmap using FINAL state of this parameter step
-                if (this.sim.gridA) {
+                if (this.sim.gridA && this.app.sim.heatmapBuffer) {
                     const grid = this.sim.getCurrentGrid();
+                    const appSim = this.app.sim;
                     for(let k=0; k<this.sim.size; k++) {
-                        if (grid[k] > 0) this.app.sim.heatmapBuffer[k] += 1;
+                        if (grid[k] > 0) appSim.heatmapBuffer[k] += 1;
+                        appSim.volatilityBuffer[k] += this.sim.volatilityBuffer[k];
+                        if (i > 0 && appSim.lastSweepGrid) {
+                            const diff = Math.abs(grid[k] - appSim.lastSweepGrid[k]);
+                            if (diff > 0) appSim.sensitivityBuffer[k] += 1;
+                        }
                     }
+                    if(appSim.lastSweepGrid) appSim.lastSweepGrid.set(grid);
                     this.app.renderer.drawHeatmapOverlay();
                 }
 
@@ -1002,98 +1441,47 @@ class AnalysisEngine {
                 this.currentResults.push({ x: val, y: measure });
                 progress.style.width = ((i / steps) * 100) + '%';
                 this.drawResults(start, end, metricKey);
-                
                 await new Promise(r => setTimeout(r, 0));
             }
         } catch(e) {
             console.error("Sweep Error:", e);
+        } finally {
+            this.app.renderer.engine = this.app.sim;
+            this.app.renderer.updateOffscreen();
+            this.app.renderer.draw();
+            this.running = false;
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+            legend.style.display = 'block';
         }
-        
-        // Restore renderer to main engine
-        this.app.renderer.engine = this.app.sim;
-        this.app.renderer.updateOffscreen();
-        this.app.renderer.draw();
-
-        this.running = false;
-        btnStart.disabled = false;
-        btnStop.disabled = true;
-        legend.style.display = 'block';
     }
     
     drawResults(minX, maxX, metricKey) {
         const ctx = this.canvas.getContext('2d');
         const w = this.canvas.width = this.canvas.offsetWidth;
         const h = this.canvas.height = this.canvas.offsetHeight;
-        
-        ctx.fillStyle = "#0c0c0e";
-        ctx.fillRect(0,0,w,h);
-        
-        // Grid
-        ctx.strokeStyle = "#27272a";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, h*0.25); ctx.lineTo(w, h*0.25);
-        ctx.moveTo(0, h*0.50); ctx.lineTo(w, h*0.50);
-        ctx.moveTo(0, h*0.75); ctx.lineTo(w, h*0.75);
-        ctx.stroke();
-
+        ctx.fillStyle = "#0c0c0e"; ctx.fillRect(0,0,w,h);
+        ctx.strokeStyle = "#27272a"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, h*0.25); ctx.lineTo(w, h*0.25); ctx.moveTo(0, h*0.50); ctx.lineTo(w, h*0.50); ctx.moveTo(0, h*0.75); ctx.lineTo(w, h*0.75); ctx.stroke();
         const allPts = [...this.currentResults, ...this.previousResults];
         if (allPts.length === 0) return;
-        
         let minY = Infinity, maxY = -Infinity;
-        for(let p of allPts) {
-            minY = Math.min(minY, p.y);
-            maxY = Math.max(maxY, p.y);
-        }
-        
-        if (metricKey === 'density') { 
-            minY = 0; maxY = 1; 
-        } else {
-            if (minY === maxY) {
-                minY -= 0.1; maxY += 0.1;
-            } else {
-                const pad = (maxY - minY) * 0.1;
-                minY -= pad; maxY += pad;
-            }
-        }
-        
-        if (maxX === minX) maxX += 0.001;
-        if (maxY === minY) maxY += 0.001;
-
+        for(let p of allPts) { minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
+        if (metricKey === 'density') { minY = 0; maxY = 1; } else { if (minY === maxY) { minY -= 0.1; maxY += 0.1; } else { const pad = (maxY - minY) * 0.1; minY -= pad; maxY += pad; } }
+        if (maxX === minX) maxX += 0.001; if (maxY === minY) maxY += 0.001;
         const mapX = (v) => ((v - minX) / (maxX - minX)) * w;
         const mapY = (v) => h - ((v - minY) / (maxY - minY)) * h;
         
         if (this.previousResults.length > 0) {
-            ctx.strokeStyle = "#52525b";
-            ctx.setLineDash([4, 4]);
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            for(let i=0; i<this.previousResults.length; i++) {
-                const p = this.previousResults[i];
-                if(i===0) ctx.moveTo(mapX(p.x), mapY(p.y));
-                else ctx.lineTo(mapX(p.x), mapY(p.y));
-            }
-            ctx.stroke();
-            ctx.setLineDash([]);
+            ctx.strokeStyle = "#52525b"; ctx.setLineDash([4, 4]); ctx.lineWidth = 2; ctx.beginPath();
+            for(let i=0; i<this.previousResults.length; i++) { const p = this.previousResults[i]; if(i===0) ctx.moveTo(mapX(p.x), mapY(p.y)); else ctx.lineTo(mapX(p.x), mapY(p.y)); }
+            ctx.stroke(); ctx.setLineDash([]);
         }
-
         if (this.currentResults.length > 0) {
-            ctx.strokeStyle = "#3b82f6";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            for(let i=0; i<this.currentResults.length; i++) {
-                const p = this.currentResults[i];
-                if(i===0) ctx.moveTo(mapX(p.x), mapY(p.y));
-                else ctx.lineTo(mapX(p.x), mapY(p.y));
-            }
+            ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 2; ctx.beginPath();
+            for(let i=0; i<this.currentResults.length; i++) { const p = this.currentResults[i]; if(i===0) ctx.moveTo(mapX(p.x), mapY(p.y)); else ctx.lineTo(mapX(p.x), mapY(p.y)); }
             ctx.stroke();
-            
-            ctx.fillStyle = "#3b82f6";
-            for(let p of this.currentResults) {
-                ctx.beginPath();
-                ctx.arc(mapX(p.x), mapY(p.y), 3, 0, Math.PI*2);
-                ctx.fill();
-            }
+            ctx.fillStyle = "#3b82f6"; for(let p of this.currentResults) { ctx.beginPath(); ctx.arc(mapX(p.x), mapY(p.y), 3, 0, Math.PI*2); ctx.fill(); }
         }
         this.lastBounds = { minX, maxX, w };
     }
@@ -1105,10 +1493,7 @@ class AnalysisEngine {
         const ratio = x / this.lastBounds.w;
         const val = this.lastBounds.minX + ratio * (this.lastBounds.maxX - this.lastBounds.minX);
         const param = document.getElementById('sweep-param').value;
-        if (param === 'initV') {
-            document.getElementById('des-init-val').value = Math.round(val);
-            document.getElementById('lbl-init-val').innerText = Math.round(val) + "%";
-        }
+        if (param === 'initV') { document.getElementById('des-init-val').value = Math.round(val); document.getElementById('lbl-init-val').innerText = Math.round(val) + "%"; }
         this.app.updateFromDesigner();
     }
     stop() { this.cancel = true; }
@@ -1122,7 +1507,72 @@ class UIManager {
         this.setupEventListeners();
         this.setupDesigner();
         this.renderPresets();
-        this.updateSweepInputs('steps'); // Init default
+        this.updateSweepInputs('steps'); 
+        this.app.vizSettings = { mode: 'standard', decay: 0.9, ageCap: 100, hideStable: false, showGrid: false };
+    }
+
+    setDesignerState(state) {
+        if (state.w) document.getElementById('des-w').value = state.w;
+        if (state.h) document.getElementById('des-h').value = state.h;
+        if (state.initType) document.getElementById('des-init-type').value = state.initType;
+        if (state.initVal) { document.getElementById('des-init-val').value = state.initVal; document.getElementById('lbl-init-val').innerText = state.initVal + '%'; }
+        if (state.algo) {
+            document.getElementById('des-algo').value = state.algo;
+            document.querySelectorAll('.algo-panel').forEach(p => p.style.display = 'none');
+            const map = { 'life': 'panel-life', 'generations': 'panel-generations', 'cyclic': 'panel-cyclic', 'average': 'panel-average' };
+            const active = document.getElementById(map[state.algo]);
+            if(active) active.style.display = 'block';
+        }
+        document.querySelectorAll('.rule-check').forEach(el => el.classList.remove('active'));
+        if (state.births) state.births.forEach(i => document.getElementById('b'+i)?.classList.add('active'));
+        if (state.survives) state.survives.forEach(i => document.getElementById('s'+i)?.classList.add('active'));
+        if (state.states) document.getElementById('des-states').value = state.states;
+        if (state.cycStates) document.getElementById('des-cyc-states').value = state.cycStates;
+        if (state.cycThresh) document.getElementById('des-cyc-thresh').value = state.cycThresh;
+        if (state.smooth) document.getElementById('des-smooth').value = state.smooth;
+        if (state.c1) document.getElementById('des-col1').value = state.c1;
+        if (state.c0) document.getElementById('des-col0').value = state.c0;
+        this.isCodeDirty = false;
+        document.getElementById('warning-banner').style.display = 'none';
+    }
+
+    updateDesignerFromCode(code) {
+        try {
+            const cfgFunc = new Function(code);
+            const cfg = cfgFunc();
+            if (cfg.dimensions) { document.getElementById('des-w').value = cfg.dimensions[0]; document.getElementById('des-h').value = cfg.dimensions[1]; }
+            const initStr = cfg.init ? cfg.init.toString() : '';
+            const updateStr = cfg.update ? cfg.update.toString() : '';
+            if (initStr.includes('Math.random()')) {
+                document.getElementById('des-init-type').value = 'random';
+                const match = initStr.match(/< ([\d\.]+)/);
+                if (match) { const val = parseFloat(match[1]) * 100; document.getElementById('des-init-val').value = Math.round(val); document.getElementById('lbl-init-val').innerText = Math.round(val) + "%"; }
+            } else if (initStr.includes('Math.floor') && initStr.includes('x ===') && initStr.includes('y ===')) { document.getElementById('des-init-type').value = 'center'; } 
+            else if (initStr.includes('Math.hypot')) {
+                if (initStr.includes('Math.abs')) document.getElementById('des-init-type').value = 'circle'; else document.getElementById('des-init-type').value = 'filled_circle';
+                const match = initStr.match(/< ([\d\.]+) \*/); 
+                if(match) { const val = parseFloat(match[1]) * 100; document.getElementById('des-init-val').value = Math.round(val); document.getElementById('lbl-init-val').innerText = Math.round(val) + "%"; }
+            } else { document.getElementById('des-init-type').value = 'empty'; }
+            
+            if (updateStr.includes('b.includes')) {
+                document.getElementById('des-algo').value = 'life';
+                const bMatch = updateStr.match(/const b = \[([\d,]+)\]/); const sMatch = updateStr.match(/const s_ = \[([\d,]+)\]/);
+                document.querySelectorAll('.rule-check').forEach(el => el.classList.remove('active'));
+                if (bMatch) bMatch[1].split(',').forEach(n => document.getElementById('b'+n)?.classList.add('active'));
+                if (sMatch) sMatch[1].split(',').forEach(n => document.getElementById('s'+n)?.classList.add('active'));
+            } else if (updateStr.includes('(v + 1) %') && updateStr.includes('return 2')) {
+                document.getElementById('des-algo').value = 'generations';
+                const stMatch = updateStr.match(/\(v \+ 1\) % (\d+)/); if(stMatch) document.getElementById('des-states').value = stMatch[1];
+            } else if (updateStr.includes('(v + 1) %') && updateStr.includes('count >=')) {
+                document.getElementById('des-algo').value = 'cyclic';
+                const stMatch = updateStr.match(/\(v \+ 1\) % (\d+)/); const thMatch = updateStr.match(/count >= (\d+)/);
+                if(stMatch) document.getElementById('des-cyc-states').value = stMatch[1]; if(thMatch) document.getElementById('des-cyc-thresh').value = thMatch[1];
+            } else if (updateStr.includes('v *') && updateStr.includes('smooth')) {
+                document.getElementById('des-algo').value = 'average';
+                const smMatch = updateStr.match(/v \* ([\d\.]+)/); if(smMatch) { const oneMinus = parseFloat(smMatch[1]); document.getElementById('des-smooth').value = (1 - oneMinus).toFixed(1); }
+            }
+            const algoEvent = new Event('change'); document.getElementById('des-algo').dispatchEvent(algoEvent);
+        } catch(e) { }
     }
 
     setupEventListeners() {
@@ -1132,39 +1582,84 @@ class UIManager {
                 document.querySelectorAll('.view-layer').forEach(x => x.classList.remove('active'));
                 t.classList.add('active');
                 document.getElementById('view-' + t.dataset.target).classList.add('active');
-                if (t.dataset.target === 'designer' && this.isCodeDirty) {
-                    document.getElementById('warning-banner').style.display = 'block';
-                } else {
-                    document.getElementById('warning-banner').style.display = 'none';
-                }
+                if (t.dataset.target === 'designer' && this.isCodeDirty) { document.getElementById('warning-banner').style.display = 'block'; } else { document.getElementById('warning-banner').style.display = 'none'; }
+                if (t.dataset.target === 'patterns') this.app.patterns.renderList();
             };
         });
         document.getElementById('btn-compile').onclick = () => this.app.compile();
-        document.getElementById('btn-reset').onclick = () => this.app.reset();
-        document.getElementById('code-area').oninput = () => { this.isCodeDirty = true; };
-        document.getElementById('btn-overwrite-confirm').onclick = () => {
-            this.isCodeDirty = false;
-            document.getElementById('warning-banner').style.display = 'none';
-            this.app.updateFromDesigner();
+        document.getElementById('btn-reset').onclick = () => { this.isCodeDirty = false; document.getElementById('warning-banner').style.display = 'none'; this.app.updateFromDesigner(); };
+        const editor = document.getElementById('code-area');
+        let debounceTimer;
+        editor.oninput = () => { 
+            this.isCodeDirty = true; 
+            clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { this.updateDesignerFromCode(editor.value); }, 1000);
         };
+        editor.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') { e.preventDefault(); const start = editor.selectionStart; const end = editor.selectionEnd; editor.value = editor.value.substring(0, start) + "    " + editor.value.substring(end); editor.selectionStart = editor.selectionEnd = start + 4; editor.dispatchEvent(new Event('input')); }
+        });
+        document.getElementById('btn-overwrite-confirm').onclick = () => { this.isCodeDirty = false; document.getElementById('warning-banner').style.display = 'none'; this.app.updateFromDesigner(); };
         document.getElementById('file-import').onchange = (e) => this.handleImport(e);
         document.getElementById('btn-export').onclick = () => this.handleExport();
         const canvas = document.getElementById('main-canvas');
         let isDragging = false, lastX = 0, lastY = 0, isDrawing = false;
+        
         canvas.onmousedown = (e) => {
             if (e.button === 2 || e.shiftKey) { isDragging = true; lastX = e.clientX; lastY = e.clientY; } 
+            else if (this.app.interactionMode === 'select') {
+                this.app.selectionStart = { x: e.clientX, y: e.clientY };
+                this.app.isSelecting = true;
+                const box = document.getElementById('selection-box');
+                const vRect = document.getElementById('viewport').getBoundingClientRect();
+                box.style.display = 'block'; 
+                box.style.left = (e.clientX - vRect.left) + 'px'; 
+                box.style.top = (e.clientY - vRect.top) + 'px'; 
+                box.style.width = '0px'; 
+                box.style.height = '0px';
+            }
             else { isDrawing = true; this.handleDraw(e); }
         };
         window.onmousemove = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const wCoord = this.app.renderer.screenToWorld(e.clientX, e.clientY);
+            this.app.mouseGridPos = wCoord;
+
             if (isDragging) {
-                this.app.renderer.cam.x += e.clientX - lastX;
-                this.app.renderer.cam.y += e.clientY - lastY;
+                this.app.renderer.cam.x += e.clientX - lastX; this.app.renderer.cam.y += e.clientY - lastY;
                 lastX = e.clientX; lastY = e.clientY;
-                this.app.renderer.draw();
-                this.app.renderer.drawHeatmapOverlay();
-            } else if (isDrawing) this.handleDraw(e);
+                this.app.renderer.draw(); this.app.renderer.drawHeatmapOverlay();
+            } else if (this.app.isSelecting) {
+                const box = document.getElementById('selection-box');
+                const vRect = document.getElementById('viewport').getBoundingClientRect();
+                // We calculate box relative to Viewport, not Client
+                const startX = this.app.selectionStart.x - vRect.left;
+                const startY = this.app.selectionStart.y - vRect.top;
+                const curX = e.clientX - vRect.left;
+                const curY = e.clientY - vRect.top;
+                
+                const x = Math.min(startX, curX);
+                const y = Math.min(startY, curY);
+                const w = Math.abs(curX - startX);
+                const h = Math.abs(curY - startY);
+                
+                box.style.left = x + 'px'; 
+                box.style.top = y + 'px'; 
+                box.style.width = w + 'px'; 
+                box.style.height = h + 'px';
+            } else if (isDrawing) { this.handleDraw(e); }
+            else if (this.app.interactionMode === 'stamp') {
+                this.app.renderer.draw(); // Redraw for hover effect
+            }
         };
-        window.onmouseup = () => { isDragging = false; isDrawing = false; };
+        window.onmouseup = (e) => { 
+            isDragging = false; isDrawing = false; 
+            if(this.app.isSelecting) {
+                this.app.isSelecting = false;
+                document.getElementById('selection-box').style.display = 'none';
+                const s = this.app.renderer.screenToWorld(this.app.selectionStart.x, this.app.selectionStart.y);
+                const end = this.app.renderer.screenToWorld(e.clientX, e.clientY);
+                this.app.patterns.saveSelection(s.x, s.y, end.x, end.y);
+            }
+        };
         canvas.onwheel = (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -1176,45 +1671,22 @@ class UIManager {
                 r.cam.x = mx - (mx - r.cam.x) * delta;
                 r.cam.y = my - (my - r.cam.y) * delta;
                 r.cam.zoom = newZoom;
-                r.draw();
-                r.drawHeatmapOverlay();
+                r.draw(); r.drawHeatmapOverlay();
             }
         };
         document.getElementById('hud-play').onclick = () => this.app.togglePlay();
         document.getElementById('hud-step').onclick = () => this.app.step();
         document.getElementById('hud-reset').onclick = () => this.app.reset();
-        document.getElementById('sim-speed').oninput = (e) => {
-            this.app.stepsPerFrame = parseInt(e.target.value);
-            document.getElementById('lbl-speed').innerText = e.target.value + 'x';
-        };
-        const bindToggle = (id, key) => {
-            document.getElementById(id).onclick = (e) => {
-                this.vizOptions[key] = !this.vizOptions[key];
-                e.target.classList.toggle('active');
-            };
-        };
-        bindToggle('btn-viz-density', 'density');
-        bindToggle('btn-viz-entropy', 'entropy');
-        bindToggle('btn-viz-flux', 'flux');
-        document.getElementById('viz-history-mode').onchange = (e) => {
-            this.vizOptions.rolling = e.target.value === 'rolling';
-        };
-        document.getElementById('btn-viz-clear').onclick = () => {
-            this.app.sim.history = [];
-            this.app.sim.heatmapBuffer.fill(0);
-            this.app.renderer.drawHeatmapOverlay();
-        };
+        document.getElementById('hud-fit').onclick = () => this.app.renderer.fitToScreen(this.app.sim.w, this.app.sim.h);
+        document.getElementById('sim-speed').oninput = (e) => { this.app.stepsPerFrame = parseInt(e.target.value); document.getElementById('lbl-speed').innerText = e.target.value + 'x'; };
+        const bindToggle = (id, key) => { document.getElementById(id).onclick = (e) => { this.vizOptions[key] = !this.vizOptions[key]; e.target.classList.toggle('active'); }; };
+        bindToggle('btn-viz-density', 'density'); bindToggle('btn-viz-entropy', 'entropy'); bindToggle('btn-viz-flux', 'flux');
+        document.getElementById('viz-history-mode').onchange = (e) => { this.vizOptions.rolling = e.target.value === 'rolling'; };
+        document.getElementById('btn-viz-clear').onclick = () => { this.app.sim.history = []; this.app.sim.heatmapBuffer.fill(0); this.app.renderer.drawHeatmapOverlay(); };
         document.getElementById('btn-show-overlay').onclick = (e) => {
-            const el = document.getElementById('overlay-canvas');
-            const isActive = el.style.display !== 'none';
-            // Toggle Logic: If turning ON, switch renderer mode. If turning OFF, switch back.
-            // Wait, we want heatmap ONLY.
-            this.app.renderer.heatmapMode = !isActive;
-            el.style.display = isActive ? 'none' : 'block';
-            e.target.classList.toggle('active');
-            // Force redraw to clear/show raw cells
-            this.app.renderer.draw();
-            if(!isActive) this.app.renderer.drawHeatmapOverlay();
+            const el = document.getElementById('overlay-canvas'); const isActive = el.style.display !== 'none';
+            this.app.renderer.heatmapMode = !isActive; el.style.display = isActive ? 'none' : 'block';
+            e.target.classList.toggle('active'); this.app.renderer.draw(); if(!isActive) this.app.renderer.drawHeatmapOverlay();
         };
         document.getElementById('btn-sweep-start').onclick = () => {
             const param = document.getElementById('sweep-param').value;
@@ -1226,23 +1698,18 @@ class UIManager {
             this.app.analysis.runSweep(param, s, e, steps, maxGens, retain);
         };
         document.getElementById('btn-sweep-stop').onclick = () => this.app.analysis.stop();
-        
-        // Sweep Inputs Linking
         document.getElementById('sweep-increment').oninput = () => this.updateSweepInputs('inc');
         document.getElementById('sweep-steps').oninput = () => this.updateSweepInputs('steps');
         document.getElementById('sweep-start').oninput = () => this.updateSweepInputs('range');
         document.getElementById('sweep-end').oninput = () => this.updateSweepInputs('range');
-
+        document.getElementById('sweep-overlay-mode').onchange = () => this.app.renderer.drawHeatmapOverlay();
+        document.getElementById('sweep-colormap').onchange = () => this.app.renderer.drawHeatmapOverlay();
         const resizer = document.getElementById('resizer');
         const sidebar = document.getElementById('sidebar');
         resizer.onmousedown = (e) => {
-            e.preventDefault();
-            resizer.classList.add('active');
+            e.preventDefault(); resizer.classList.add('active');
             const startX = e.clientX, startW = sidebar.offsetWidth;
-            const doDrag = (ev) => {
-                sidebar.style.width = Math.max(200, startW + (ev.clientX - startX)) + 'px';
-                this.app.renderer.resize(); this.app.renderer.draw();
-            };
+            const doDrag = (ev) => { sidebar.style.width = Math.max(200, startW + (ev.clientX - startX)) + 'px'; this.app.renderer.resize(); this.app.renderer.draw(); };
             const stopDrag = () => { window.removeEventListener('mousemove', doDrag); window.removeEventListener('mouseup', stopDrag); resizer.classList.remove('active'); };
             window.addEventListener('mousemove', doDrag); window.addEventListener('mouseup', stopDrag);
         };
@@ -1252,35 +1719,55 @@ class UIManager {
             if (e.code === 'ArrowRight') this.app.step();
             if (e.code === 'KeyR' && e.ctrlKey) { e.preventDefault(); this.app.compile(); }
             else if (e.code === 'KeyR') this.app.reset();
+            if (e.code === 'Escape') { 
+                this.app.interactionMode = 'draw'; 
+                this.app.isSelecting = false; 
+                document.getElementById('selection-box').style.display = 'none';
+                document.getElementById('btn-patt-capture').classList.remove('active');
+                document.getElementById('btn-patt-stamp').classList.remove('active');
+                this.app.renderer.draw();
+            }
         }
         window.onresize = () => { this.app.renderer.resize(); this.app.renderer.draw(); };
+        const vizModeSel = document.getElementById('viz-render-mode');
+        const vizPanel = document.getElementById('viz-settings-panel');
+        const vizGroups = { 'trails': document.getElementById('viz-ctrl-trails'), 'age': document.getElementById('viz-ctrl-age'), 'velocity': document.getElementById('viz-ctrl-velocity'), 'neighborhood': document.getElementById('viz-ctrl-neighborhood') };
+        const updateVizUI = () => {
+            const mode = vizModeSel.value;
+            this.app.vizSettings.mode = mode;
+            let hasControls = false;
+            for(let key in vizGroups) { if(key === mode) { vizGroups[key].style.display = 'block'; hasControls = true; } else { vizGroups[key].style.display = 'none'; } }
+            vizPanel.style.display = hasControls ? 'block' : 'none';
+            this.app.renderer.updateOffscreen(); this.app.renderer.draw();
+        };
+        vizModeSel.onchange = updateVizUI;
+        document.getElementById('viz-trail-decay').oninput = (e) => { const val = parseInt(e.target.value) / 100; document.getElementById('lbl-trail-decay').innerText = val.toFixed(2); this.app.vizSettings.decay = val; };
+        document.getElementById('viz-age-cap').oninput = (e) => { const val = parseInt(e.target.value); document.getElementById('lbl-age-cap').innerText = val; this.app.vizSettings.ageCap = val; this.app.renderer.updateOffscreen(); this.app.renderer.draw(); };
+        document.getElementById('viz-vel-hide-stable').onchange = (e) => { this.app.vizSettings.hideStable = e.target.checked; this.app.renderer.updateOffscreen(); this.app.renderer.draw(); };
+        document.getElementById('viz-show-grid').onchange = (e) => { this.app.vizSettings.showGrid = e.target.checked; this.app.renderer.draw(); };
     }
     
     updateSweepInputs(source) {
         const start = parseFloat(document.getElementById('sweep-start').value);
         const end = parseFloat(document.getElementById('sweep-end').value);
         const range = end - start;
-        
-        if (source === 'range' || source === 'steps') {
-            const steps = parseInt(document.getElementById('sweep-steps').value) || 1;
-            const inc = range / steps;
-            document.getElementById('sweep-increment').value = parseFloat(inc.toFixed(2));
-        } else if (source === 'inc') {
-            const inc = parseFloat(document.getElementById('sweep-increment').value) || 1;
-            if (inc !== 0) {
-                const steps = Math.floor(range / inc);
-                document.getElementById('sweep-steps').value = steps;
-            }
-        }
+        if (source === 'range' || source === 'steps') { const steps = parseInt(document.getElementById('sweep-steps').value) || 1; const inc = range / steps; document.getElementById('sweep-increment').value = parseFloat(inc.toFixed(2)); } 
+        else if (source === 'inc') { const inc = parseFloat(document.getElementById('sweep-increment').value) || 1; if (inc !== 0) { const steps = Math.floor(range / inc); document.getElementById('sweep-steps').value = steps; } }
     }
 
     handleDraw(e) {
         const coords = this.app.renderer.screenToWorld(e.clientX, e.clientY);
-        const size = parseInt(document.getElementById('hud-brush').value);
-        if (coords.x >= 0 && coords.x < this.app.sim.w && coords.y >= 0 && coords.y < this.app.sim.h) {
-            this.app.sim.setCell(coords.x, coords.y, 1, size);
-            this.app.renderer.updateOffscreen();
-            this.app.renderer.draw();
+        if (this.app.interactionMode === 'stamp') {
+            if (this.app.patterns.activePattern) {
+                this.app.sim.pastePattern(coords.x, coords.y, this.app.patterns.activePattern);
+                this.app.renderer.updateOffscreen(); this.app.renderer.draw();
+            }
+        } else {
+            const size = parseInt(document.getElementById('hud-brush').value);
+            if (coords.x >= 0 && coords.x < this.app.sim.w && coords.y >= 0 && coords.y < this.app.sim.h) {
+                this.app.sim.setCell(coords.x, coords.y, 1, size);
+                this.app.renderer.updateOffscreen(); this.app.renderer.draw();
+            }
         }
     }
 
@@ -1288,22 +1775,12 @@ class UIManager {
         const makeGrid = (id, prefix) => {
             const el = document.getElementById(id);
             for(let i=0; i<=8; i++) {
-                const d = document.createElement('div');
-                d.className = 'rule-check';
-                d.innerHTML = `<span>${i}</span>`;
-                d.onclick = () => { d.classList.toggle('active'); this.triggerDesignerUpdate(); };
-                d.id = `${prefix}${i}`;
-                el.appendChild(d);
+                const d = document.createElement('div'); d.className = 'rule-check'; d.innerHTML = `<span>${i}</span>`; d.onclick = () => { d.classList.toggle('active'); this.triggerDesignerUpdate(); }; d.id = `${prefix}${i}`; el.appendChild(d);
             }
         };
-        makeGrid('grid-birth', 'b');
-        makeGrid('grid-survive', 's');
-        document.getElementById('b3').classList.add('active');
-        document.getElementById('s2').classList.add('active');
-        document.getElementById('s3').classList.add('active');
-        document.querySelectorAll('#view-designer input, #view-designer select').forEach(el => {
-            el.oninput = () => this.triggerDesignerUpdate();
-        });
+        makeGrid('grid-birth', 'b'); makeGrid('grid-survive', 's');
+        document.getElementById('b3').classList.add('active'); document.getElementById('s2').classList.add('active'); document.getElementById('s3').classList.add('active');
+        document.querySelectorAll('#view-designer input, #view-designer select').forEach(el => { el.onchange = () => this.triggerDesignerUpdate(); el.oninput = () => this.triggerDesignerUpdate(); });
         document.getElementById('des-algo').onchange = (e) => {
             document.querySelectorAll('.algo-panel').forEach(p => p.style.display = 'none');
             const map = { 'life': 'panel-life', 'generations': 'panel-generations', 'cyclic': 'panel-cyclic', 'average': 'panel-average' };
@@ -1316,129 +1793,70 @@ class UIManager {
 
     getDesignerState() {
         const b = [], s = [];
-        for(let i=0; i<=8; i++) {
-            if(document.getElementById('b'+i).classList.contains('active')) b.push(i);
-            if(document.getElementById('s'+i).classList.contains('active')) s.push(i);
-        }
+        for(let i=0; i<=8; i++) { if(document.getElementById('b'+i).classList.contains('active')) b.push(i); if(document.getElementById('s'+i).classList.contains('active')) s.push(i); }
         return {
-            w: parseInt(document.getElementById('des-w').value),
-            h: parseInt(document.getElementById('des-h').value),
-            initType: document.getElementById('des-init-type').value,
-            initVal: parseInt(document.getElementById('des-init-val').value),
-            algo: document.getElementById('des-algo').value,
-            births: b, survives: s,
-            states: parseInt(document.getElementById('des-states').value) || 8,
-            cycStates: parseInt(document.getElementById('des-cyc-states').value) || 14,
-            cycThresh: parseInt(document.getElementById('des-cyc-thresh').value) || 1,
-            smooth: parseFloat(document.getElementById('des-smooth').value),
-            c1: document.getElementById('des-col1').value,
-            c0: document.getElementById('des-col0').value,
-            renderMode: document.getElementById('des-render-mode').value
+            w: parseInt(document.getElementById('des-w').value), h: parseInt(document.getElementById('des-h').value),
+            initType: document.getElementById('des-init-type').value, initVal: parseInt(document.getElementById('des-init-val').value),
+            algo: document.getElementById('des-algo').value, births: b, survives: s,
+            states: parseInt(document.getElementById('des-states').value) || 8, cycStates: parseInt(document.getElementById('des-cyc-states').value) || 14,
+            cycThresh: parseInt(document.getElementById('des-cyc-thresh').value) || 1, smooth: parseFloat(document.getElementById('des-smooth').value),
+            c1: document.getElementById('des-col1').value, c0: document.getElementById('des-col0').value, renderMode: 'standard' 
         };
     }
 
     generateCode(state) {
         let initCode = `init: () => 0`;
-        const val = state.initVal / 100; // Normalize 0-1
-        
-        if (state.initType === 'random') {
-            initCode = `init: () => Math.random() < ${val} ? 1 : 0`;
-        } else if (state.initType === 'center') {
-            // Exact center point
-            initCode = `init: (x,y) => (x === Math.floor(${state.w}/2) && y === Math.floor(${state.h}/2)) ? 1 : 0`;
-        } else if (state.initType === 'filled_circle') {
-            // Filled Circle based on radius (mapped from val 0-100% of half width)
-            initCode = `init: (x,y) => Math.hypot(x-${state.w/2}, y-${state.h/2}) < ${val * state.w/2} ? 1 : 0`;
-        } else if (state.initType === 'circle') {
-            // Hollow Ring
-            const r = val * state.w/2;
-            initCode = `init: (x,y) => { const d = Math.hypot(x-${state.w/2}, y-${state.h/2}); return (d > ${r} - 1 && d < ${r} + 1) ? 1 : 0; }`;
-        } else if (state.initType === 'empty') {
-            initCode = `init: () => 0`;
-        }
-        
-        let updateCode = "";
-        let type = "";
-        
-        if (state.algo === 'life') {
-            updateCode = `update: (v, n) => {
-        let s = 0; for(let i=0; i<n.length; i++) s += n[i];
-        const b = [${state.births.join(',')}];
-        const s_ = [${state.survives.join(',')}];
-        if(v === 0) return b.includes(s) ? 1 : 0;
-        return s_.includes(s) ? 1 : 0;
-    }`;
-        } else if (state.algo === 'generations') {
-            updateCode = `update: (v, n) => {
-        let s = 0; for(let i=0; i<n.length; i++) s += (n[i]===1 ? 1 : 0);
-        if(v === 0) return s === 3 ? 1 : 0; 
-        if(v === 1) return (s === 2 || s === 3) ? 1 : 2; 
-        return (v + 1) % ${state.states}; 
-    }`;
-        } else if (state.algo === 'average') {
-            type = "type: 'float',";
-            updateCode = `update: (v, n) => {
-        let s = 0; for(let x of n) s += x;
-        return v * ${1 - state.smooth} + (s/n.length) * ${state.smooth};
-    }`;
-        }
-        const rgb1 = this.hexToRgb(state.c1);
-        const rgb0 = this.hexToRgb(state.c0);
-        return `return { dimensions: [${state.w}, ${state.h}], ${type} ${initCode}, neighborhood: 'moore', renderMode: '${state.renderMode}', getColor: (v) => v > 0 ? [${rgb1.r}, ${rgb1.g}, ${rgb1.b}, 255] : [${rgb0.r}, ${rgb0.g}, ${rgb0.b}, 255], ${updateCode} };`;
+        const val = state.initVal / 100; 
+        if (state.initType === 'random') { initCode = `init: () => Math.random() < ${val} ? 1 : 0`; } 
+        else if (state.initType === 'center') { initCode = `init: (x,y) => (x === Math.floor(${state.w}/2) && y === Math.floor(${state.h}/2)) ? 1 : 0`; } 
+        else if (state.initType === 'filled_circle') { initCode = `init: (x,y) => Math.hypot(x-${state.w/2}, y-${state.h/2}) < ${val * state.w/2} ? 1 : 0`; } 
+        else if (state.initType === 'circle') { const r = val * state.w/2; initCode = `init: (x,y) => { const d = Math.hypot(x-${state.w/2}, y-${state.h/2}); return (Math.abs(d - ${r}) < 1.5) ? 1 : 0; }`; } 
+        else if (state.initType === 'empty') { initCode = `init: () => 0`; }
+        let updateCode = "", type = "";
+        if (state.algo === 'life') { updateCode = `update: (v, n) => {\n        let s = 0; for(let i=0; i<n.length; i++) s += n[i];\n        const b = [${state.births.join(',')}];\n        const s_ = [${state.survives.join(',')}];\n        if(v === 0) return b.includes(s) ? 1 : 0;\n        return s_.includes(s) ? 1 : 0;\n    }`; } 
+        else if (state.algo === 'generations') { updateCode = `update: (v, n) => {\n        let s = 0; for(let i=0; i<n.length; i++) s += (n[i]===1 ? 1 : 0);\n        if(v === 0) return s === 3 ? 1 : 0; \n        if(v === 1) return (s === 2 || s === 3) ? 1 : 2; \n        return (v + 1) % ${state.states}; \n    }`; } 
+        else if (state.algo === 'average') { type = "type: 'float',"; updateCode = `update: (v, n) => {\n        let s = 0; for(let x of n) s += x;\n        return v * ${1 - state.smooth} + (s/n.length) * ${state.smooth};\n    }`; } 
+        else if (state.algo === 'cyclic') { updateCode = `update: (v, n) => {\n        const next = (v + 1) % ${state.cycStates};\n        let count = 0;\n        for(let i=0; i<n.length; i++) if(n[i] === next) count++;\n        return count >= ${state.cycThresh} ? next : v;\n    }`; }
+        const rgb1 = this.hexToRgb(state.c1); const rgb0 = this.hexToRgb(state.c0);
+        return `return { \n    dimensions: [${state.w}, ${state.h}], \n    ${type} ${initCode}, \n    neighborhood: 'moore', \n    renderMode: '${state.renderMode}', \n    getColor: (v) => v > 0 ? [${rgb1.r}, ${rgb1.g}, ${rgb1.b}, 255] : [${rgb0.r}, ${rgb0.g}, ${rgb0.b}, 255], \n    ${updateCode} \n};`;
     }
-    hexToRgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0};
-    }
+    hexToRgb(hex) { const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0}; }
     renderPresets() {
-        const list = document.getElementById('preset-list');
-        list.innerHTML = "";
-        Object.keys(PRESETS).forEach(k => {
-            const div = document.createElement('div');
-            div.className = 'preset-item';
-            div.innerText = k;
-            div.onclick = () => { this.app.loadCode(PRESETS[k]); this.isCodeDirty = true; };
-            list.appendChild(div);
-        });
+        const list = document.getElementById('preset-list'); list.innerHTML = "";
+        Object.keys(PRESETS).forEach(k => { const div = document.createElement('div'); div.className = 'preset-item'; div.innerText = k; div.onclick = () => { const preset = PRESETS[k]; this.setDesignerState(preset.state); this.app.loadCode(preset.code); }; list.appendChild(div); });
     }
-    handleImport(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => this.app.loadCode(ev.target.result);
-        reader.readAsText(file);
-    }
-    handleExport() {
-        const blob = new Blob([document.getElementById('code-area').value], {type: 'text/javascript'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'ca_logic.js'; a.click();
-    }
+    handleImport(e) { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (ev) => this.app.loadCode(ev.target.result); reader.readAsText(file); }
+    handleExport() { const blob = new Blob([document.getElementById('code-area').value], {type: 'text/javascript'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'ca_logic.js'; a.click(); }
 }
 
 class App {
     constructor() {
         this.sim = new SimulationEngine();
-        this.renderer = new Renderer(document.getElementById('main-canvas'), document.getElementById('overlay-canvas'), this.sim);
+        this.renderer = new Renderer(document.getElementById('main-canvas'), document.getElementById('overlay-canvas'), this.sim, this);
         this.analysis = new AnalysisEngine(this);
+        this.patterns = new PatternManager(this);
         this.ui = new UIManager(this);
         this.isRunning = false;
         this.stepsPerFrame = 1;
         this.lastTime = 0;
         this.frameCount = 0;
         this.fpsTimer = 0;
-        const saved = localStorage.getItem('ca_code');
-        if (saved) this.loadCode(saved);
-        else this.updateFromDesigner();
-        this.loop();
+        this.interactionMode = 'draw'; 
+        this.isSelecting = false;
+        this.selectionStart = {x:0, y:0};
+        this.mouseGridPos = {x:0, y:0};
+        
+        setTimeout(() => {
+            const saved = localStorage.getItem('ca_code');
+            if (saved) this.loadCode(saved);
+            else this.updateFromDesigner();
+            this.loop();
+        }, 10);
     }
+
     loadCode(code) { document.getElementById('code-area').value = code; this.compile(); }
-    updateFromDesigner() {
-        const state = this.ui.getDesignerState();
-        const code = this.ui.generateCode(state);
-        document.getElementById('code-area').value = code;
-        this.compile();
-    }
+    updateFromDesigner() { const state = this.ui.getDesignerState(); const code = this.ui.generateCode(state); document.getElementById('code-area').value = code; this.compile(); }
+
     compile() {
         this.isRunning = false;
         const code = document.getElementById('code-area').value;
@@ -1446,28 +1864,19 @@ class App {
         const dot = document.getElementById('status-indicator');
         const msg = document.getElementById('viewport-msg');
         if (res.success) {
-            dot.className = 'status-dot ok';
-            msg.innerText = "Compiled Successfully";
-            msg.style.opacity = 1;
-            setTimeout(() => msg.style.opacity = 0, 2000);
-            const container = document.getElementById('viewport');
-            const zoom = Math.min((container.offsetWidth - 40) / res.w, (container.offsetHeight - 40) / res.h);
-            this.renderer.cam = { x: (container.offsetWidth - res.w * zoom) / 2, y: (container.offsetHeight - res.h * zoom) / 2, zoom: zoom || 1 };
-            this.renderer.updateOffscreen();
-            this.renderer.draw();
+            dot.className = 'status-dot ok'; msg.innerText = "Compiled Successfully"; msg.style.opacity = 1; setTimeout(() => msg.style.opacity = 0, 2000);
+            this.renderer.updateOffscreen(); this.renderer.fitToScreen(res.w, res.h);
             localStorage.setItem('ca_code', code);
         } else {
-            dot.className = 'status-dot err';
-            msg.innerText = "Error: " + res.error.message;
-            msg.style.opacity = 1;
+            dot.className = 'status-dot err'; msg.innerText = "Error: " + res.error.message; msg.style.opacity = 1; console.error(res.error);
         }
         this.updateHUD();
     }
+
     togglePlay() {
         this.isRunning = !this.isRunning;
         document.getElementById('viewport-msg').innerText = this.isRunning ? "Running" : "Paused";
-        document.getElementById('viewport-msg').style.opacity = 1;
-        setTimeout(() => document.getElementById('viewport-msg').style.opacity = 0, 1000);
+        document.getElementById('viewport-msg').style.opacity = 1; setTimeout(() => document.getElementById('viewport-msg').style.opacity = 0, 1000);
         document.getElementById('hud-play').innerHTML = this.isRunning ? `<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>` : `<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
     }
     step() { this.sim.step(); this.renderer.updateOffscreen(); this.renderer.draw(); this.updateHUD(); }
@@ -1475,67 +1884,45 @@ class App {
     loop() {
         requestAnimationFrame(() => this.loop());
         if (this.isRunning) {
-            for (let i = 0; i < this.stepsPerFrame; i++) {
-                this.sim.step();
-                this.sim.addToHeatmap(); // Normal mode: Accumulate continuously
-            }
-            this.renderer.updateOffscreen();
-            this.renderer.draw();
-            this.updateHUD();
+            for (let i = 0; i < this.stepsPerFrame; i++) { this.sim.step(); this.sim.addToHeatmap(); }
+            this.renderer.updateOffscreen(); this.renderer.draw(); this.updateHUD();
         }
         const now = performance.now();
         this.frameCount++;
-        if (now - this.fpsTimer > 1000) {
-            document.getElementById('hud-fps').innerText = this.frameCount;
-            this.frameCount = 0;
-            this.fpsTimer = now;
-            this.drawLiveGraph();
-        }
-        // Update overlay less frequently for performance
+        if (now - this.fpsTimer > 1000) { document.getElementById('hud-fps').innerText = this.frameCount; this.frameCount = 0; this.fpsTimer = now; this.drawLiveGraph(); }
         if (this.frameCount % 5 === 0) this.renderer.drawHeatmapOverlay();
     }
     updateHUD() { document.getElementById('hud-gen').innerText = this.sim.gen; }
+    
     drawLiveGraph() {
         const cvs = document.getElementById('graph-live');
         if (cvs.offsetParent === null) return;
         const ctx = cvs.getContext('2d');
         const w = cvs.width = cvs.offsetWidth;
         const h = cvs.height = cvs.offsetHeight;
-        ctx.fillStyle = "#0c0c0e";
-        ctx.fillRect(0,0,w,h);
+        ctx.fillStyle = "#0c0c0e"; ctx.fillRect(0,0,w,h);
         ctx.strokeStyle = "#222"; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(0, h*0.25); ctx.lineTo(w, h*0.25); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, h*0.75); ctx.lineTo(w, h*0.75); ctx.stroke();
         let data = this.sim.history;
         if (data.length < 2) return;
         if (this.ui.vizOptions.rolling) { data = data.slice(-300); }
-        const minGen = data[0].gen;
-        const maxGen = data[data.length-1].gen;
-        const rangeX = Math.max(1, maxGen - minGen);
+        const minGen = data[0].gen; const maxGen = data[data.length-1].gen; const rangeX = Math.max(1, maxGen - minGen);
         const drawLine = (prop, color, scaleMax = 1) => {
             if (!this.ui.vizOptions[prop]) return;
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
+            ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
             for(let i=0; i<data.length; i++) {
-                const x = ((data[i].gen - minGen) / rangeX) * w;
-                const val = data[i][prop] || 0;
-                const y = h - ((val / scaleMax) * h);
+                const x = ((data[i].gen - minGen) / rangeX) * w; const val = data[i][prop] || 0; const y = h - ((val / scaleMax) * h);
                 if (i===0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
             }
             ctx.stroke();
         };
-        let maxEnt = 0;
-        let maxFlux = 0;
-        for(let d of data) {
-            maxEnt = Math.max(maxEnt, d.entropy);
-            maxFlux = Math.max(maxFlux, d.flux);
-        }
-        drawLine('density', '#3b82f6', 1);
-        drawLine('entropy', '#f59e0b', Math.max(0.1, maxEnt));
-        drawLine('flux', '#ec4899', Math.max(0.01, maxFlux));
+        let maxEnt = 0; let maxFlux = 0;
+        for(let d of data) { maxEnt = Math.max(maxEnt, d.entropy); maxFlux = Math.max(maxFlux, d.flux); }
+        drawLine('density', '#3b82f6', 1); drawLine('entropy', '#f59e0b', Math.max(0.1, maxEnt)); drawLine('flux', '#ec4899', Math.max(0.01, maxFlux));
     }
 }
+
 window.app = new App();
 </script>
 </body>
