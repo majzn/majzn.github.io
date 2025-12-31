@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal CA IDE v3.0</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --panel: #0d0d0d;
+            --border: #262626;
+            --text: #a3a3a3;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --secondary: #f59e0b;
+            --error: #ef4444;
+            --success: #22c55e;
+            --font-mono: 'Fira Code', 'Menlo', 'Consolas', monospace;
+        }
+        * { box-sizing: border-box; outline: none; border-radius: 0 !important; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; display: flex; }
+        #container { display: flex; width: 100%; height: 100%; }
+        #sidebar { width: 440px; min-width: 360px; display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--border); z-index: 10; }
+        #resizer { width: 3px; cursor: col-resize; background: var(--border); transition: background 0.2s; }
+        #resizer:hover, #resizer.resizing { background: var(--accent); }
+        #main-view { flex: 1; position: relative; background: #000; overflow: hidden; }
+        .header { padding: 12px; background: #141414; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        .tab-bar { display: flex; background: #080808; border-bottom: 1px solid var(--border); }
+        .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-size: 11px; color: #525252; text-transform: uppercase; border-bottom: 2px solid transparent; font-weight: 700; transition: all 0.2s; }
+        .tab:hover { color: #a3a3a3; background: #111; }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: #111; }
+        .section-label { padding: 8px 12px; background: #080808; border-bottom: 1px solid var(--border); font-size: 10px; color: #404040; text-transform: uppercase; font-weight: 800; }
+        .presets-container { max-height: 160px; overflow-y: auto; border-bottom: 1px solid var(--border); background: #0a0a0a; }
+        .preset-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #141414; cursor: pointer; font-size: 12px; transition: background 0.1s; }
+        .preset-item:hover { background: #141414; color: #fff; }
+        .tool-btn-small { background: transparent; border: none; color: #404040; cursor: pointer; padding: 2px; font-size: 14px; }
+        .tool-btn-small:hover { color: var(--error); }
+        .toolbar { display: flex; gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+        .tool-btn { flex: 1; background: #141414; border: none; color: #a3a3a3; padding: 10px; font-size: 11px; cursor: pointer; text-transform: uppercase; font-weight: 700; text-align: center; }
+        .tool-btn:hover { background: #1a1a1a; color: #fff; }
+        .tool-btn.active { color: var(--accent); background: #000; border: 1px solid var(--accent); }
+        #content-area { flex: 1; position: relative; display: flex; overflow: hidden; }
+        #code-editor { width: 100%; height: 100%; background: #050505; color: #e5e5e5; border: none; padding: 16px; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; resize: none; }
+        #visual-editor, #analysis-editor { width: 100%; height: 100%; background: #0d0d0d; overflow-y: auto; padding: 0; display: none; }
+        .v-section { padding: 20px; border-bottom: 1px solid var(--border); }
+        .v-head { font-size: 10px; text-transform: uppercase; color: var(--accent); font-weight: 800; margin-bottom: 12px; letter-spacing: 1px; }
+        .v-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: center; }
+        .v-col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .v-label { font-size: 10px; color: #737373; text-transform: uppercase; font-weight: 600; }
+        .v-input, .v-select { background: #171717; border: 1px solid var(--border); color: #fff; padding: 8px; width: 100%; font-size: 12px; font-family: var(--font-mono); }
+        .v-input:focus, .v-select:focus { border-color: var(--accent); outline: none; }
+        .v-color { width: 100%; height: 32px; border: 1px solid var(--border); background: none; cursor: pointer; padding: 0; }
+        .check-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+        .check-box-wrapper { display: flex; flex-direction: column; align-items: center; background: #141414; padding: 6px 0; cursor: pointer; }
+        .check-box-wrapper:hover { background: #1a1a1a; }
+        .check-box-wrapper span { font-size: 9px; color: #404040; margin-top: 2px; }
+        .graph-container { background: #000; border: 1px solid var(--border); height: 160px; position: relative; margin-top: 8px; cursor: crosshair; }
+        .graph-canvas { display: block; width: 100%; height: 100%; }
+        .graph-overlay { position: absolute; top: 6px; left: 8px; pointer-events: none; font-size: 9px; color: #404040; font-family: var(--font-mono); text-transform: uppercase; }
+        .progress-bar { height: 3px; width: 100%; background: #171717; margin: 12px 0; position: relative; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.1s linear; }
+        .run-btn { width: 100%; background: var(--accent); color: white; border: none; padding: 12px; text-transform: uppercase; font-weight: 800; font-size: 11px; cursor: pointer; letter-spacing: 1px; }
+        .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .run-btn.stop { background: var(--error); }
+        #hud { position: absolute; top: 0; left: 0; width: 100%; padding: 12px; pointer-events: none; display: flex; justify-content: space-between; }
+        .hud-panel { background: rgba(10, 10, 10, 0.9); border: 1px solid var(--border); padding: 8px 16px; pointer-events: auto; display: flex; gap: 20px; align-items: center; backdrop-filter: blur(8px); }
+        .hud-group { display: flex; flex-direction: column; gap: 2px; }
+        .hud-label { font-size: 8px; color: #525252; text-transform: uppercase; font-family: var(--font-mono); font-weight: 800; }
+        .hud-value { font-size: 12px; font-family: var(--font-mono); color: #e5e5e5; }
+        .btn-icon { background: transparent; border: 1px solid #262626; color: #737373; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn-icon:hover { border-color: #525252; color: #fff; background: #171717; }
+        .btn-icon.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #262626; }
+        #tooltip { position: fixed; display: none; pointer-events: none; z-index: 1000; background: #000; border: 1px solid var(--accent); color: #fff; padding: 6px 10px; font-family: var(--font-mono); font-size: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border-radius: 4px; }
+        .status-bar { padding: 0 12px; background: #0a0a0a; border-top: 1px solid var(--border); font-size: 10px; font-family: var(--font-mono); display: flex; justify-content: space-between; align-items: center; height: 28px; color: #404040; }
+        #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; display: none; justify-content: center; align-items: center; }
+        .modal { background: var(--panel); border: 1px solid var(--border); padding: 24px; width: 340px; display: flex; flex-direction: column; gap: 16px; border-radius: 4px; }
+        .modal h3 { margin: 0; font-size: 12px; text-transform: uppercase; color: #fff; letter-spacing: 1px; }
+        .modal input { background: #141414; border: 1px solid var(--border); color: #fff; padding: 12px; font-family: var(--font-mono); font-size: 13px; }
+        .no-select { user-select: none; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="sidebar">
+        <div class="header">
+            <span>Universal CA IDE v3.0</span>
+            <span id="status-ind" style="color:var(--success)">Ready</span>
+        </div>
+        
+        <div class="tab-bar no-select">
+            <div class="tab active" id="tab-code" onclick="switchTab('code')">Script</div>
+            <div class="tab" id="tab-visual" onclick="switchTab('visual')">Designer</div>
+            <div class="tab" id="tab-analysis" onclick="switchTab('analysis')">Analysis</div>
+        </div>
+
+        <div class="section-label no-select">Logic Presets</div>
+        <div class="presets-container custom-scroll" id="preset-list"></div>
+        
+        <div class="toolbar">
+            <button class="tool-btn" onclick="openSaveModal()">Save</button>
+            <button class="tool-btn" onclick="document.getElementById('file-input').click()">Import</button>
+            <button class="tool-btn" onclick="exportPreset()">Export</button>
+            <button class="tool-btn" onclick="resetCamToFit()">Auto-Fit</button>
+        </div>
+
+        <div id="content-area">
+            <textarea id="code-editor" spellcheck="false" placeholder="Simulation logic..."></textarea>
+            
+            <div id="visual-editor" class="custom-scroll">
+                <div class="v-section">
+                    <div class="v-head">Space Dimensions</div>
+                    <div class="v-row">
+                        <div class="v-col"><span class="v-label">Width</span><input type="number" id="v-dim-w" class="v-input" value="200"></div>
+                        <div class="v-col"><span class="v-label">Height</span><input type="number" id="v-dim-h" class="v-input" value="200"></div>
+                    </div>
+                </div>
+
+                <div class="v-section">
+                    <div class="v-head">Seed Configuration</div>
+                    <div class="v-row">
+                        <select id="v-init-type" class="v-select">
+                            <option value="random">Random Noise</option>
+                            <option value="center">Center Singularity</option>
+                            <option value="circle">Circular Wave</option>
+                            <option value="empty">Null Field</option>
+                        </select>
+                    </div>
+                    <div class="v-row">
+                        <div class="v-col"><span class="v-label">Seeding Factor</span><input type="range" id="v-init-val" min="0" max="100" value="15"></div>
+                        <span id="v-init-disp" style="font-size:10px; font-family:var(--font-mono); width:30px">0.15</span>
+                    </div>
+                </div>
+
+                <div id="designer-panels">
+                    <div class="v-section">
+                        <div class="v-head">Cellular Logic</div>
+                        <div class="v-row">
+                            <select id="v-algo-type" class="v-select">
+                                <option value="life">Classical Life (B/S)</option>
+                                <option value="generations">Generations (Aged)</option>
+                                <option value="cyclic">Cyclic Demon</option>
+                                <option value="average">Float Diffusion</option>
+                            </select>
+                        </div>
+                        <div class="v-row">
+                            <div class="v-col"><span class="v-label">Neighborhood</span><select id="v-neigh-type" class="v-select"><option value="moore">Moore</option><option value="von_neumann">V. Neumann</option></select></div>
+                            <div class="v-col"><span class="v-label">Radius</span><input type="number" id="v-range" class="v-input" value="1" min="1" max="10"></div>
+                        </div>
+                        <div id="v-panel-life">
+                            <span class="v-label">Birth Thresholds</span><div class="check-grid" id="v-grid-b"></div><br>
+                            <span class="v-label">Survival Thresholds</span><div class="check-grid" id="v-grid-s"></div>
+                        </div>
+                        <div id="v-panel-gen" style="display:none; margin-top:12px;">
+                            <div class="v-col"><span class="v-label">State Limit</span><input type="number" id="v-states-gen" class="v-input" value="8"></div>
+                        </div>
+                        <div id="v-panel-cyclic" style="display:none; margin-top:12px;">
+                            <div class="v-row">
+                                <div class="v-col"><span class="v-label">Total States</span><input type="number" id="v-states-cyc" class="v-input" value="14"></div>
+                                <div class="v-col"><span class="v-label">Activation Thresh</span><input type="number" id="v-thresh-cyc" class="v-input" value="1"></div>
+                            </div>
+                        </div>
+                        <div id="v-panel-avg" style="display:none; margin-top:12px;">
+                            <div class="v-col"><span class="v-label">Viscosity</span><input type="number" id="v-smooth" class="v-input" value="0.2" step="0.05"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="v-section">
+                    <div class="v-head">Renderer Optics</div>
+                    <div class="v-row">
+                        <div class="v-col"><span class="v-label">Color A</span><input type="color" id="v-col-0" class="v-color" value="#050505"></div>
+                        <div class="v-col"><span class="v-label">Color B</span><input type="color" id="v-col-1" class="v-color" value="#3b82f6"></div>
+                    </div>
+                    <div class="v-row">
+                        <select id="v-render-mode" class="v-select">
+                            <option value="standard">Direct State</option>
+                            <option value="trails">Persistence Trails</option>
+                            <option value="topo">Laplacian Surface</option>
+                            <option value="velocity">Velocity Vectors</option>
+                            <option value="heatmap_roll">Rolling Activity</option>
+                            <option value="age">Cell Chronology</option>
+                        </select>
+                    </div>
+                    <div class="v-row">
+                        <div class="v-col"><span class="v-label">Effect Intensity</span><input type="range" id="v-decay" min="0" max="99" value="15"></div>
+                    </div>
+                    <button class="tool-btn" style="width:100%; border:1px solid var(--border)" onclick="resetStats()">Clear Statistical Cache</button>
+                </div>
+            </div>
+
+            <div id="analysis-editor" class="custom-scroll">
+                <div class="v-section">
+                    <div class="v-head">Simulation Control</div>
+                    <div class="v-row">
+                        <div class="v-col"><span class="v-label">Updates per Frame</span><input type="range" id="a-speed" min="1" max="100" value="1"></div>
+                        <span id="a-speed-disp" style="font-size:12px; font-weight:bold; width:40px; text-align:right">1x</span>
+                    </div>
+                </div>
+
+                <div class="v-section">
+                    <div class="v-head">Realtime Telemetry</div>
+                    <div class="graph-container">
+                        <canvas id="live-graph" class="graph-canvas"></canvas>
+                        <div class="graph-overlay">Blue: Density | Orange: Flux</div>
+                    </div>
+                    <div class="v-row tight" style="margin-top:8px; justify-content: space-between;">
+                        <span class="v-label">Density: <span id="lbl-pop" style="color:var(--accent)">0%</span></span>
+                        <span class="v-label">Stability Index: <span id="lbl-ent" style="color:var(--secondary)">0.000</span></span>
+                    </div>
+                </div>
+
+                <div class="v-section">
+                    <div class="v-head">Automated Sweep Engine</div>
+                    <div class="v-row">
+                        <div class="v-col">
+                            <span class="v-label">Focus Parameter</span>
+                            <select id="s-param" class="v-select">
+                                <option value="initV">Initial Density</option>
+                                <option value="smooth">Diffusion Factor</option>
+                                <option value="vThreshCyc">Activation Threshold</option>
+                                <option value="range">Local Range</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="v-row">
+                         <div class="v-col"><span class="v-label">Start</span><input type="number" id="s-start" class="v-input" value="5"></div>
+                         <div class="v-col"><span class="v-label">End</span><input type="number" id="s-end" class="v-input" value="50"></div>
+                         <div class="v-col"><span class="v-label">Samples</span><input type="number" id="s-steps" class="v-input" value="25"></div>
+                    </div>
+                    <div class="v-row">
+                        <div class="v-col"><span class="v-label">Horizon (Gens)</span><input type="number" id="s-gens" class="v-input" value="150"></div>
+                        <div class="v-col">
+                            <span class="v-label">Analysis Objective</span>
+                            <select id="s-metric" class="v-select">
+                                <option value="density">Steady Density</option>
+                                <option value="stability">Settlement Delta</option>
+                                <option value="entropy">Shannon Entropy</option>
+                                <option value="chaos">Lyapunov (Chaos)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="v-row" style="gap:6px">
+                        <button id="btn-run-sweep" class="run-btn">Initiate Sweep</button>
+                        <button id="btn-pause-sweep" class="tool-btn" style="flex:0.3; display:none">Pause</button>
+                        <button id="btn-stop-sweep" class="tool-btn stop" style="flex:0.3; display:none">Halt</button>
+                    </div>
+                    <div class="progress-bar"><div id="sweep-progress" class="progress-fill"></div></div>
+                    <div class="graph-container" style="height: 180px;">
+                        <canvas id="sweep-graph" class="graph-canvas"></canvas>
+                        <div class="graph-overlay" id="sweep-overlay-label">Topology Distribution (Click to Jump)</div>
+                    </div>
+                    <button id="btn-view-overlay" class="tool-btn" style="margin-top:12px; width:100%; border:1px solid var(--border)">Toggle Probability Overlay</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span id="status-msg">ENGINE IDLE</span>
+            <span id="dims-display">0x0</span>
+        </div>
+    </div>
+
+    <div id="resizer"></div>
+
+    <div id="main-view">
+        <canvas id="sim-canvas"></canvas>
+        <div id="hud">
+            <div class="hud-panel">
+                <button class="btn-icon" id="btn-play"><svg viewBox="0 0 24 24" fill="currentColor" id="icon-play"><path d="M8 5v14l11-7z"/></svg><svg viewBox="0 0 24 24" fill="currentColor" id="icon-pause" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></button>
+                <button class="btn-icon" id="btn-step"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/></svg></button>
+                <button class="btn-icon" id="btn-restart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+                <div class="hud-group"><span class="hud-label">Gen</span><span class="hud-value" id="val-gen">0</span></div>
+                <div class="hud-group"><span class="hud-label">FPS</span><span class="hud-value" id="val-fps">0</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="tooltip"></div>
+</div>
+
+<div id="modal-overlay">
+    <div class="modal">
+        <h3>Save Component Configuration</h3>
+        <input type="text" id="save-name" placeholder="Preset name...">
+        <div style="display:flex; gap:8px">
+            <button class="tool-btn" style="flex:1" onclick="closeSaveModal()">Discard</button>
+            <button class="tool-btn" style="flex:1; background:var(--accent); color:white" onclick="saveCurrentPreset()">Commit</button>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="file-input" accept=".json" style="display:none">
+
+<script>
+const SYSTEM_PRESETS = {
+    life: { name: "Conway's Life", code: `/* @VISUAL_CONFIG:{"dimW":200,"dimH":200,"initT":"random","initV":15,"algo":"life","b":[3],"s":[2,3],"neigh":"moore","range":1,"c0":"#050505","c1":"#3b82f6","renderMode":"standard","decay":0.1} */\nreturn {\n    dimensions: [200, 200],\n    init: () => Math.random() < 0.15 ? 1 : 0,\n    neighborhood: 'moore',\n    getColor: (v) => v ? [59, 130, 246, 255] : [10, 10, 10, 255],\n    update: (v, n) => {\n        let s = 0; for(let i=0; i<n.length; i++) s += n[i];\n        return v ? (s === 2 || s === 3 ? 1 : 0) : (s === 3 ? 1 : 0);\n    }\n};` },
+    brain: { name: "Brian's Brain", code: `/* @VISUAL_CONFIG:{"dimW":180,"dimH":180,"initT":"random","initV":50,"algo":"generations","b":[2],"s":[],"genStates":3,"neigh":"moore","range":1,"c0":"#000000","c1":"#ffffff","renderMode":"standard","decay":0.1} */\nreturn {\n    dimensions: [180, 180],\n    init: () => Math.random() < 0.5 ? 1 : 0,\n    neighborhood: 'moore',\n    getColor: (v) => v === 0 ? [0,0,0,255] : (v === 1 ? [255,255,255,255] : [0,128,255,255]),\n    update: (v, n) => {\n        let s = 0; for(let x of n) if(x===1) s++;\n        if(v === 0) return s === 2 ? 1 : 0;\n        if(v === 1) return 2;\n        return 0;\n    }\n};` },
+    cyclic: { name: "Cyclic Chaos", code: `/* @VISUAL_CONFIG:{"dimW":150,"dimH":150,"initT":"random","initV":100,"algo":"cyclic","cycStates":14,"cycThresh":1,"neigh":"von_neumann","range":1,"c0":"#ff0000","c1":"#0000ff","renderMode":"standard","decay":0.1} */\nreturn {\n    dimensions: [150, 150],\n    init: () => Math.floor(Math.random() * 14),\n    neighborhood: 'von_neumann',\n    getColor: (v) => {\n        const t = v / 14;\n        return [Math.sin(t*6.28)*127+128, Math.sin(t*6.28+2)*127+128, Math.sin(t*6.28+4)*127+128, 255];\n    },\n    update: (v, n) => {\n        const next = (v + 1) % 14; let c = 0;\n        for(let x of n) if(x === next) c++;\n        return c >= 1 ? next : v;\n    }\n};` },
+    fluid: { name: "Diffusion Field", code: `/* @VISUAL_CONFIG:{"dimW":160,"dimH":160,"initT":"random","initV":10,"algo":"average","smooth":0.2,"neigh":"moore","range":1,"c0":"#000000","c1":"#3b82f6","renderMode":"topo","decay":0.5} */\nreturn {\n    dimensions: [160, 160],\n    type: 'float',\n    init: () => Math.random() < 0.1 ? 1.0 : 0,\n    neighborhood: 'moore',\n    getColor: (v) => [v*100, v*200, v*255, 255],\n    update: (v, n) => {\n        let s = 0; for(let x of n) s += x;\n        return v * 0.8 + (s / n.length) * 0.2 + (Math.random()-0.5)*0.01;\n    }\n};` }
+};
+
+const dom = {
+    canvas: document.getElementById('sim-canvas'), codeEditor: document.getElementById('code-editor'), visualEditor: document.getElementById('visual-editor'), analysisEditor: document.getElementById('analysis-editor'), statusInd: document.getElementById('status-ind'), presetList: document.getElementById('preset-list'), playBtn: document.getElementById('btn-play'), stepBtn: document.getElementById('btn-step'), restartBtn: document.getElementById('btn-restart'), genVal: document.getElementById('val-gen'), fpsVal: document.getElementById('val-fps'), dimsVal: document.getElementById('dims-display'), sidebar: document.getElementById('sidebar'), resizer: document.getElementById('resizer'), mainView: document.getElementById('main-view'), tabCode: document.getElementById('tab-code'), tabVisual: document.getElementById('tab-visual'), tabAnalysis: document.getElementById('tab-analysis'),
+    vDimW: document.getElementById('v-dim-w'), vDimH: document.getElementById('v-dim-h'), vInitType: document.getElementById('v-init-type'), vInitVal: document.getElementById('v-init-val'), vInitDisp: document.getElementById('v-init-disp'), vAlgo: document.getElementById('v-algo-type'), vNeigh: document.getElementById('v-neigh-type'), vRange: document.getElementById('v-range'), vPanelLife: document.getElementById('v-panel-life'), vPanelGen: document.getElementById('v-panel-gen'), vPanelCyc: document.getElementById('v-panel-cyclic'), vPanelAvg: document.getElementById('v-panel-avg'), vCol0: document.getElementById('v-col-0'), vCol1: document.getElementById('v-col-1'), vStatesGen: document.getElementById('v-states-gen'), vStatesCyc: document.getElementById('v-states-cyc'), vThreshCyc: document.getElementById('v-thresh-cyc'), vSmooth: document.getElementById('v-smooth'), vRenderMode: document.getElementById('v-render-mode'), vRenderDecay: document.getElementById('v-decay'),
+    aSpeed: document.getElementById('a-speed'), aSpeedDisp: document.getElementById('a-speed-disp'), liveGraph: document.getElementById('live-graph'), lblPop: document.getElementById('lbl-pop'), lblEnt: document.getElementById('lbl-ent'), sParam: document.getElementById('s-param'), sStart: document.getElementById('s-start'), sEnd: document.getElementById('s-end'), sSteps: document.getElementById('s-steps'), sGens: document.getElementById('s-gens'), sMetric: document.getElementById('s-metric'), btnRunSweep: document.getElementById('btn-run-sweep'), btnPauseSweep: document.getElementById('btn-pause-sweep'), btnStopSweep: document.getElementById('btn-stop-sweep'), btnViewOverlay: document.getElementById('btn-view-overlay'), sweepProgress: document.getElementById('sweep-progress'), sweepGraph: document.getElementById('sweep-graph'), tooltip: document.getElementById('tooltip'), modal: document.getElementById('modal-overlay'), saveName: document.getElementById('save-name'), fileInput: document.getElementById('file-input')
+};
+
+const ctx = dom.canvas.getContext('2d', { alpha: false });
+
+let state = {
+    gridA: null, gridB: null, auxGrid: null, dims: [0,0], strides: [], totalSize: 0, offsets: [], config: null,
+    isBufferA: true, gen: 0, running: false, compileTimer: null, visualTimer: null, lastTime: 0, fpsGenStart: 0,
+    offCanvas: document.createElement('canvas'), offCtx: null, imgData: null,
+    cam: { x: 0, y: 0, zoom: 1, drag: false, lastX: 0, lastY: 0 },
+    activeTab: 'code', stepsPerFrame: 1, history: [],
+    sweep: { running: false, paused: false, data: [], buffer: null, showingOverlay: false, maxPixelHit: 0 },
+    userPresets: {}
+};
+
+const graphMetadata = { maps: {} };
+
+function compile(preserve = false) {
+    state.running = false; updateUI();
+    try {
+        const script = dom.codeEditor.value;
+        const config = new Function(script)();
+        const total = config.dimensions.reduce((a,b)=>a*b, 1);
+        const isF = config.type === 'float';
+        if(!preserve || state.totalSize !== total || state.gridA?.constructor !== (isF?Float32Array:Uint8Array)) {
+            state.gridA = isF ? new Float32Array(total) : new Uint8Array(total);
+            state.gridB = isF ? new Float32Array(total) : new Uint8Array(total);
+            state.auxGrid = new Float32Array(total);
+        }
+        state.config = config; state.dims = config.dimensions; state.totalSize = total;
+        state.strides = []; let s=1; for(let d of state.dims) { state.strides.push(s); s*=d; }
+        state.isBufferA = true; state.gen = 0; state.history = [];
+        if(config.init) {
+            for(let i=0; i<total; i++) {
+                let coords = []; for(let k=0; k<state.dims.length; k++) coords.push(Math.floor(i/state.strides[k])%state.dims[k]);
+                state.gridA[i] = config.init(...coords);
+            }
+        }
+        const vw = state.dims[0], vh = state.dims[1] || 400;
+        if(state.offCanvas.width !== vw || state.offCanvas.height !== vh) {
+            state.offCanvas.width = vw; state.offCanvas.height = vh;
+            state.offCtx = state.offCanvas.getContext('2d');
+            state.imgData = state.offCtx.createImageData(vw, vh);
+        }
+        dom.dimsVal.innerText = state.dims.join('x');
+        setStatus("Ready", "var(--success)"); 
+        if(!preserve) resetCamToFit();
+        draw();
+    } catch(e) { setStatus("Error", "var(--error)"); console.error(e); }
+}
+
+function step(silent = false) {
+    if(!state.gridA) return false;
+    const src = state.isBufferA ? state.gridA : state.gridB;
+    const dst = state.isBufferA ? state.gridB : state.gridA;
+    const aux = state.auxGrid, mode = (state.config.renderMode || 'standard').toString();
+    const decay = 1 - (state.config.decay || 0.1);
+    const upd = state.config.update;
+    const isF = state.config.type === 'float';
+    const w = state.dims[0], h = state.dims[1];
+    const range = state.config.range || (parseInt(dom.vRange.value) || 1);
+    const neighType = state.config.neighborhood || dom.vNeigh.value;
+    const maxN = (2*range+1)**2 - 1;
+    const n = isF ? new Float32Array(maxN) : new Uint8Array(maxN);
+    let diff = 0;
+    for(let y=0; y<h; y++) {
+        for(let x=0; x<w; x++) {
+            const i = y*w + x;
+            let ni = 0;
+            for(let dy=-range; dy<=range; dy++) {
+                for(let dx=-range; dx<=range; dx++) {
+                    if(dx===0 && dy===0) continue;
+                    if(neighType === 'von_neumann' && Math.abs(dx)+Math.abs(dy) > range) continue;
+                    const ny = (y + dy + h) % h;
+                    const nx = (x + dx + w) % w;
+                    n[ni++] = src[ny*w + nx];
+                }
+            }
+            const validN = n.subarray(0, ni);
+            const v = upd(src[i], validN);
+            dst[i] = v;
+            diff += Math.abs(v - src[i]);
+            if(mode === 'heatmap_roll') aux[i] = aux[i]*decay + (v>0?1:0);
+            else if(mode === 'age') aux[i] = (v>0 ? aux[i]+1 : 0);
+        }
+    }
+    state.isBufferA = !state.isBufferA; state.gen++;
+    updateLiveStats(); 
+    if(!silent) { draw(); }
+    return diff > 0.0001;
+}
+
+function getTurbo(t) {
+    t = Math.max(0, Math.min(1, t));
+    return [Math.max(0, Math.sin((t-0.1)*3.5)+0.1)*255, Math.max(0, Math.sin((t-0.4)*3.5)+0.1)*255, Math.max(0, Math.sin((t-0.7)*3.5)+0.1)*255];
+}
+
+function draw() {
+    if(state.sweep.showingOverlay) { if(drawOverlayMap()) return; }
+    if(!state.gridA) return;
+    const src = state.isBufferA ? state.gridA : state.gridB;
+    const d = state.imgData.data, cf = state.config, w = state.dims[0], h = state.dims[1];
+    const mode = (cf.renderMode || 'standard').toString(), aux = state.auxGrid;
+    for(let i=0; i<w*h; i++) {
+        const p = i * 4; let color = cf.getColor(src[i]);
+        if(mode === 'topo') {
+            const g = Math.abs(src[i] - (src[i+1]||src[i])) + Math.abs(src[i] - (src[i+w]||src[i]));
+            const v = Math.min(1, g * 5); color = [v*255, v*128, 255-v*255, 255];
+        } else if(mode === 'velocity') {
+            color = [128+(src[i]-(src[i-1]||src[i]))*255, 128+(src[i]-(src[i-w]||src[i]))*255, 255, 255];
+        } else if(mode === 'heatmap_roll' || mode === 'age') {
+            const val = mode === 'age' ? Math.min(1, aux[i]/100) : Math.min(1, aux[i]/5);
+            const rgb = getTurbo(val); color = [rgb[0], rgb[1], rgb[2], 255];
+        } else if(mode === 'trails') {
+            const a = 1 - (cf.decay || 0.1);
+            d[p]=color[0]*(1-a)+d[p]*a; d[p+1]=color[1]*(1-a)+d[p+1]*a; d[p+2]=color[2]*(1-a)+d[p+2]*a; d[p+3]=255; continue;
+        }
+        d[p]=color[0]; d[p+1]=color[1]; d[p+2]=color[2]; d[p+3]=255;
+    }
+    state.offCtx.putImageData(state.imgData, 0, 0);
+    renderMain();
+}
+
+function renderMain() {
+    ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, dom.canvas.width, dom.canvas.height);
+    ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(state.cam.x, state.cam.y); ctx.scale(state.cam.zoom, state.cam.zoom);
+    ctx.drawImage(state.offCanvas, 0, 0); ctx.restore();
+}
+
+async function runSweepExperiment() {
+    if(state.sweep.running) return;
+    const vs = getVisualState(), pKey = dom.sParam.value, start = parseFloat(dom.sStart.value), end = parseFloat(dom.sEnd.value), steps = parseInt(dom.sSteps.value), gens = parseInt(dom.sGens.value);
+    const overlayIntent = state.sweep.showingOverlay;
+    state.sweep = { running: true, paused: false, data: [], buffer: new Float32Array(state.totalSize).fill(0), maxPixelHit: 0, showingOverlay: overlayIntent };
+    dom.btnRunSweep.disabled = true; dom.btnPauseSweep.style.display = 'block'; dom.btnStopSweep.style.display = 'block';
+    const delta = (end - start) / Math.max(1, steps - 1);
+    for(let i=0; i<steps; i++) {
+        while(state.sweep.paused) await new Promise(r => setTimeout(r, 100));
+        if(!state.sweep.running) break;
+        const val = start + i * delta; vs[pKey] = val; dom.codeEditor.value = generateCode(vs); compile(true);
+        let hashHistory = [], settlementGen = gens, lyapunovSum = 0, actualGens = 0;
+        let pertGrid = new (state.gridA.constructor)(state.gridA);
+        pertGrid[Math.floor(state.totalSize/2)] = state.config.type === 'float' ? (pertGrid[Math.floor(state.totalSize/2)] > 0.5 ? 0 : 1.0) : 1;
+        for(let g=0; g<gens; g++) {
+            const activeDiff = step(true);
+            actualGens++;
+            const currentGrid = state.isBufferA ? state.gridA : state.gridB;
+            for(let k=0; k<state.totalSize; k++) { if(currentGrid[k] > 0) { state.sweep.buffer[k]++; if(state.sweep.buffer[k] > state.sweep.maxPixelHit) state.sweep.maxPixelHit = state.sweep.buffer[k]; } }
+            let h = 0; for(let k=0; k<state.totalSize; k+=20) h = ((h << 5) - h) + currentGrid[k];
+            if(hashHistory.includes(h) || !activeDiff) { settlementGen = Math.min(settlementGen, g); break; }
+            hashHistory.push(h); if(hashHistory.length > 16) hashHistory.shift();
+            const w = state.dims[0], h_dim = state.dims[1], r_val = vs.range || 1, maxN = (2*r_val+1)**2 - 1;
+            const nBuff = state.config.type === 'float' ? new Float32Array(maxN) : new Uint8Array(maxN);
+            const upd = state.config.update;
+            let nextPert = new (pertGrid.constructor)(pertGrid.length);
+            for(let y=0; y<h_dim; y++) {
+                for(let x=0; x<w; x++) {
+                    let ni = 0;
+                    for(let dy=-r_val; dy<=r_val; dy++) {
+                        for(let dx=-r_val; dx<=r_val; dx++) {
+                            if(dx===0 && dy===0) continue;
+                            const ny = (y + dy + h_dim) % h_dim;
+                            const nx = (x + dx + w) % w;
+                            nBuff[ni++] = pertGrid[ny*w + nx];
+                        }
+                    }
+                    nextPert[y*w+x] = upd(pertGrid[y*w+x], nBuff.subarray(0, ni));
+                }
+            }
+            pertGrid = nextPert;
+            let dist = 0; for(let k=0; k<state.totalSize; k++) dist += Math.abs(currentGrid[k] - pertGrid[k]);
+            lyapunovSum += Math.log(Math.max(0.000001, dist));
+        }
+        const finalArr = state.isBufferA ? state.gridA : state.gridB; let count = 0;
+        for(let k=0; k<finalArr.length; k++) { if(finalArr[k]>0) count++; }
+        state.sweep.data.push({ x: val, density: count/state.totalSize, stability: settlementGen, entropy: calcEntropy(finalArr), chaos: lyapunovSum / Math.max(1, actualGens) });
+        dom.sweepProgress.style.width = ((i+1)/steps)*100 + "%";
+        drawGraph(dom.sweepGraph, state.sweep.data, "Param", dom.sMetric.value);
+        if(state.sweep.showingOverlay) draw();
+        await new Promise(r => setTimeout(r, 10));
+    }
+    stopSweep();
+}
+
+function calcEntropy(arr) {
+    let counts = new Map(), total = arr.length;
+    for(let v of arr) { const b = Math.round(v*20)/20; counts.set(b, (counts.get(b)||0)+1); }
+    let ent = 0; for(let c of counts.values()) { let p = c/total; ent -= p * Math.log2(p); }
+    return ent;
+}
+
+function drawOverlayMap() {
+    const d = state.imgData.data, buf = state.sweep.buffer, max = state.sweep.maxPixelHit;
+    if(!buf || max === 0) return false;
+    for(let i=0; i<state.totalSize; i++) {
+        const rgb = getTurbo(buf[i]/max); const p = i*4;
+        d[p]=rgb[0]; d[p+1]=rgb[1]; d[p+2]=rgb[2]; d[p+3]=255;
+    }
+    state.offCtx.putImageData(state.imgData, 0, 0); renderMain();
+    return true;
+}
+
+function resetCamToFit() {
+    const vw = state.dims[0], vh = state.dims[1] || 400;
+    const cw = dom.mainView.offsetWidth, ch = dom.mainView.offsetHeight;
+    if(cw === 0) return;
+    const zoom = Math.min((cw - 60) / vw, (ch - 60) / vh) || 1;
+    state.cam = { x: (cw-vw*zoom)/2, y: (ch-vh*zoom)/2, zoom: Math.max(0.01, zoom) };
+    draw();
+}
+
+function updateLiveStats() {
+    const arr = state.isBufferA ? state.gridA : state.gridB;
+    let act = 0; for(let v of arr) if(v > 0) act++;
+    const den = act / arr.length; 
+    const prev = (state.isBufferA ? state.gridB : state.gridA);
+    let flux = 0; if(prev) for(let k=0; k<state.totalSize; k++) flux += Math.abs(arr[k] - prev[k]);
+    const normalizedFlux = flux / state.totalSize;
+    state.history.push({ x: state.gen, y: den, flux: normalizedFlux }); 
+    if(state.history.length > 200) state.history.shift();
+    dom.lblPop.innerText = (den*100).toFixed(1) + "%"; dom.lblEnt.innerText = normalizedFlux.toFixed(4);
+    dom.genVal.innerText = state.gen;
+    if (state.activeTab === 'analysis') drawGraph(dom.liveGraph, state.history, "Gen", "y", true);
+}
+
+function drawGraph(can, data, xl, yk, isLive = false) {
+    const c = can.getContext('2d'), w = can.width = can.offsetWidth, h = can.height = can.offsetHeight;
+    if (w === 0) return;
+    c.fillStyle = "#0a0a0a"; c.fillRect(0,0,w,h); if(data.length < 2) return;
+    let minX = data[0].x, maxX = data[0].x, minY = 0, maxY = 1; 
+    if(!isLive) {
+        minY = data[0][yk]; maxY = data[0][yk];
+        data.forEach(p => { minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p[yk]); maxY=Math.max(maxY,p[yk]); });
+    } else { minX = data[0].x; maxX = data[data.length-1].x; }
+    if(Math.abs(maxY - minY) < 0.0001) { maxY += 0.05; minY -= 0.05; }
+    graphMetadata.maps[can.id] = { minX, maxX, minY, maxY };
+    const mx = v => ((v-minX)/Math.max(0.0001, maxX-minX))*(w-45)+35;
+    const my = v => h - (((v-minY)/Math.max(0.0001, maxY-minY))*(h-35)+25);
+    c.strokeStyle = "#1a1a1a"; c.lineWidth = 1; c.beginPath();
+    for(let i=0; i<=4; i++) { 
+        let ty = h - (i/4)*(h-35) - 25; c.moveTo(35, ty); c.lineTo(w, ty); 
+        c.fillStyle = "#444"; c.font = "8px Menlo"; c.fillText((minY + (i/4)*(maxY-minY)).toFixed(2), 2, ty + 3);
+    }
+    if(!isLive) for(let i=0; i<=4; i++) { let tx = 35 + (i/4)*(w-45); c.moveTo(tx, 10); c.lineTo(tx, h-25); c.fillText((minX + (i/4)*(maxX-minX)).toFixed(1), tx - 5, h-10); }
+    c.stroke();
+    c.strokeStyle = "rgba(59, 130, 246, 0.9)"; c.lineWidth = 2; c.beginPath();
+    c.moveTo(mx(data[0].x), my(data[0][yk])); for(let i=1; i<data.length; i++) c.lineTo(mx(data[i].x), my(data[i][yk]));
+    c.stroke();
+    if(isLive && data[0].flux !== undefined) {
+        const myFlux = v => h - ((v/0.3)*(h-35)+25);
+        c.strokeStyle = "rgba(245, 158, 11, 0.8)"; c.beginPath();
+        c.moveTo(mx(data[0].x), myFlux(data[0].flux)); for(let i=1; i<data.length; i++) c.lineTo(mx(data[i].x), myFlux(data[i].flux));
+        c.stroke();
+    }
+    if(!isLive) { c.fillStyle = "#fff"; data.forEach(p => { c.beginPath(); c.arc(mx(p.x), my(p[yk]), 2.5, 0, Math.PI*2); c.fill(); }); }
+}
+
+function setupEvents() {
+    dom.codeEditor.oninput = () => { clearTimeout(state.compileTimer); state.compileTimer = setTimeout(compile, 800); };
+    dom.playBtn.onclick = togglePlay; dom.stepBtn.onclick = () => step(); dom.restartBtn.onclick = () => compile();
+    dom.canvas.onwheel = e => { e.preventDefault(); const d=e.deltaY<0?1.15:0.85; state.cam.zoom*=d; state.cam.x=e.offsetX-(e.offsetX-state.cam.x)*d; state.cam.y=e.offsetY-(e.offsetY-state.cam.y)*d; draw(); };
+    dom.canvas.onmousedown = e => { state.cam.drag=true; state.cam.lastX=e.clientX; state.cam.lastY=e.clientY; interact(e); };
+    window.onmousemove = e => { if(state.cam.drag){ if(e.button===2||e.shiftKey){state.cam.x+=e.clientX-state.cam.lastX; state.cam.y+=e.clientY-state.cam.lastY; draw();} else interact(e); state.cam.lastX=e.clientX; state.cam.lastY=e.clientY; } };
+    window.onmouseup = () => state.cam.drag=false;
+    window.onkeydown = e => { if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT') return; if(e.code==='Space'){e.preventDefault(); togglePlay();} else if(e.code==='ArrowRight') step(); else if(e.code==='KeyR') compile(); };
+    dom.resizer.onmousedown = e => { e.preventDefault(); const sx=e.clientX, sw=dom.sidebar.offsetWidth; const mm=ev=>{dom.sidebar.style.width=(sw+ev.clientX-sx)+'px'; resizeCanvas();}; const mu=()=>{window.removeEventListener('mousemove',mm); window.removeEventListener('mouseup',mu);}; window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu); };
+    window.onresize = resizeCanvas;
+    dom.btnRunSweep.onclick = runSweepExperiment; dom.btnPauseSweep.onclick = () => { state.sweep.paused=!state.sweep.paused; dom.btnPauseSweep.innerText=state.sweep.paused?"Resume":"Pause"; };
+    dom.btnStopSweep.onclick = () => state.sweep.running=false;
+    dom.btnViewOverlay.onclick = () => { state.sweep.showingOverlay=!state.sweep.showingOverlay; dom.btnViewOverlay.classList.toggle('active', state.sweep.showingOverlay); draw(); };
+    dom.vAlgo.onchange = updateVisualPanels;
+    dom.visualEditor.querySelectorAll('input, select').forEach(el => el.oninput = () => { if(el.id==='v-init-val') dom.vInitDisp.innerText=(el.value/100).toFixed(2); scheduleVisualUpdate(); });
+    dom.aSpeed.oninput = e => { state.stepsPerFrame=parseInt(e.target.value); dom.aSpeedDisp.innerText=state.stepsPerFrame+'x'; };
+    dom.sweepGraph.onmousedown = (e) => {
+        const meta = graphMetadata.maps['sweep-graph']; if(!meta || state.sweep.data.length < 1) return;
+        const rect = dom.sweepGraph.getBoundingClientRect();
+        const rawX = ((e.clientX - rect.left - 35) / (rect.width - 45)) * (meta.maxX - meta.minX) + meta.minX;
+        let nearest = state.sweep.data.reduce((prev, curr) => Math.abs(curr.x - rawX) < Math.abs(prev.x - rawX) ? curr : prev);
+        const paramElMap = { initV: dom.vInitVal, smooth: dom.vSmooth, vThreshCyc: dom.vThreshCyc, range: dom.vRange };
+        const el = paramElMap[dom.sParam.value];
+        if(el) { el.value = nearest.x; el.dispatchEvent(new Event('input')); setStatus(`Loaded Param: ${nearest.x.toFixed(3)}`, '#fff'); }
+    };
+}
+
+function buildDesigner() {
+    ['vb','vs'].forEach((p, k) => {
+        const par = k===0?dom.vPanelLife.querySelector('#v-grid-b'):dom.vPanelLife.querySelector('#v-grid-s');
+        for(let i=0; i<=8; i++) {
+            const w=document.createElement('div'); w.className='check-box-wrapper'; w.innerHTML=`<input type="checkbox" id="${p}${i}"><span>${i}</span>`; par.appendChild(w);
+            w.onclick=()=>{const cb=w.querySelector('input'); cb.checked=!cb.checked; scheduleVisualUpdate();};
+        }
+    });
+}
+
+function getVisualState() {
+    const b=[], s=[]; for(let i=0; i<=8; i++) { if(document.getElementById('vb'+i).checked) b.push(i); if(document.getElementById('vs'+i).checked) s.push(i); }
+    return { dimW: parseInt(dom.vDimW.value)||200, dimH: parseInt(dom.vDimH.value)||200, initT: dom.vInitType.value, initV: parseInt(dom.vInitVal.value), algo: dom.vAlgo.value, neigh: dom.vNeigh.value, range: parseInt(dom.vRange.value), b, s, genStates: parseInt(dom.vStatesGen.value), cycStates: parseInt(dom.vStatesCyc.value), cycThresh: parseInt(dom.vThreshCyc.value), smooth: parseFloat(dom.vSmooth.value), c0: dom.vCol0.value, c1: dom.vCol1.value, renderMode: dom.vRenderMode.value, decay: parseInt(dom.vRenderDecay.value)/100 };
+}
+
+function generateCode(vs) {
+    const rgb = h => `[${parseInt(h.substr(1,2),16)},${parseInt(h.substr(3,2),16)},${parseInt(h.substr(5,2),16)},255]`;
+    let c = `/* @VISUAL_CONFIG:${JSON.stringify(vs)} */\nreturn {\n    dimensions: [${vs.dimW}, ${vs.dimH}],\n    renderMode: '${vs.renderMode}',\n    range: ${vs.range},\n    decay: ${vs.decay},\n`;
+    if(vs.algo==='average') c+=`    type: 'float',\n`;
+    c += `    init: (x, y) => {\n        const cx=Math.floor(${vs.dimW}/2), cy=Math.floor(${vs.dimH}/2), high=${vs.algo==='cyclic'?vs.cycStates-1:1};\n`;
+    if(vs.initT==='center') c+=`        return (x===cx && y===cy) ? high : 0;\n`;
+    else if(vs.initT==='circle') c+=`        return Math.sqrt((x-cx)**2+(y-cy)**2) < ${vs.initV/2} ? high : 0;\n`;
+    else if(vs.initT==='empty') c+=`        return 0;\n`;
+    else c+=`        return Math.random() < ${vs.initV/100} ? (typeof high === 'number' ? high : 1.0) : 0;\n`;
+    c += `    },\n    neighborhood: '${vs.neigh}',\n    getColor: (v) => {\n`;
+    if(vs.algo==='cyclic') c+=`        const t=v/${vs.cycStates}; return [Math.sin(t*6.28)*127+128, Math.sin(t*6.28+2)*127+128, Math.sin(t*6.28+4)*127+128, 255];\n`;
+    else if(vs.algo==='average') c+=`        const c=Math.floor(v*255); return [c,c,c,255];\n`;
+    else c+=`        if(v===0) return ${rgb(vs.c0)};\n        if(v===1) return ${rgb(vs.c1)};\n        return [100,100,255,255];\n`;
+    c += `    },\n    update: (v, n) => {\n`;
+    if(vs.algo==='cyclic') c+=`        const next=(v+1)%${vs.cycStates}; let c=0; for(let x of n) if(x === next) c++; return c >= ${vs.cycThresh} ? next : v;\n`;
+    else if(vs.algo==='average') c+=`        let s=0; for(let x of n) s+=x; return v*(1-${vs.smooth})+(s/n.length)*${vs.smooth};\n`;
+    else {
+        c+=`        let s=0; for(let x of n) if(x===1) s++;\n        if(v===0) return [${vs.b}].includes(s)?1:0;\n        if(v===1) return [${vs.s}].includes(s)?1:${vs.algo==='generations'?2:0};\n`;
+        if(vs.algo==='generations') c+=`        if(v<${vs.genStates}) return v+1; return 0;\n`;
+        else c+=`        return v;\n`;
+    }
+    return c + `    }\n};`;
+}
+
+function syncDesigner() {
+    const m = dom.codeEditor.value.match(/\/\* @VISUAL_CONFIG:(.*?) \*\//);
+    if(m && m[1]) {
+        try {
+            const vs = JSON.parse(m[1]); dom.vDimW.value=vs.dimW; dom.vDimH.value=vs.dimH; dom.vInitType.value=vs.initT; dom.vInitVal.value=vs.initV; dom.vAlgo.value=vs.algo; dom.vNeigh.value=vs.neigh; dom.vRange.value=vs.range;
+            for(let i=0; i<=8; i++){ document.getElementById('vb'+i).checked=(vs.b||[]).includes(i); document.getElementById('vs'+i).checked=(vs.s||[]).includes(i); }
+            dom.vStatesGen.value=vs.genStates; dom.vStatesCyc.value=vs.cycStates; dom.vThreshCyc.value=vs.cycThresh; dom.vSmooth.value=vs.smooth; dom.vCol0.value=vs.c0; dom.vCol1.value=vs.c1; dom.vRenderMode.value=vs.renderMode; dom.vRenderDecay.value=vs.decay*100;
+            updateVisualPanels();
+        } catch(e){}
+    }
+}
+
+function renderPresets() {
+    dom.presetList.innerHTML = '';
+    const add = (k,n,c,u) => {
+        const d = document.createElement('div'); d.className='preset-item'; d.innerHTML=`<span>${n}</span>`;
+        if(u) { const b = document.createElement('button'); b.className='tool-btn-small'; b.innerHTML='&times;'; b.onclick=e=>{e.stopPropagation(); delete state.userPresets[k]; localStorage.setItem('ca_user_p', JSON.stringify(state.userPresets)); renderPresets();}; d.appendChild(b); }
+        d.onclick=() => { dom.codeEditor.value=c; compile(); }; dom.presetList.appendChild(d);
+    };
+    Object.keys(SYSTEM_PRESETS).forEach(k => add(k, SYSTEM_PRESETS[k].name, SYSTEM_PRESETS[k].code, false));
+    Object.keys(state.userPresets).forEach(k => add(k, state.userPresets[k].name, state.userPresets[k].code, true));
+}
+
+function togglePlay() { state.running = !state.running; updateUI(); }
+function updateUI() { dom.playBtn.querySelector('#icon-play').style.display=state.running?'none':'block'; dom.playBtn.querySelector('#icon-pause').style.display=state.running?'block':'none'; }
+function resizeCanvas() { dom.canvas.width=dom.mainView.offsetWidth; dom.canvas.height=dom.mainView.offsetHeight; draw(); }
+function setStatus(m,c) { dom.statusInd.innerText=m; dom.statusInd.style.color=c; }
+function switchTab(t) { 
+    state.activeTab=t; 
+    ['code','visual','analysis'].forEach(x=>{ 
+        const tabEl = dom['tab'+x.charAt(0).toUpperCase()+x.slice(1)];
+        const editorEl = dom[x+'Editor'];
+        if(tabEl) tabEl.classList.toggle('active',x===t); 
+        if(editorEl) editorEl.style.display=x===t?'block':'none'; 
+    }); 
+    if(t==='visual') syncDesigner(); 
+    if(t==='analysis' && state.history.length > 0) drawGraph(dom.liveGraph, state.history, "Gen", "y", true);
+}
+function openSaveModal() { dom.modal.style.display='flex'; dom.saveName.focus(); }
+function closeSaveModal() { dom.modal.style.display='none'; }
+function saveCurrentPreset() { const n=dom.saveName.value.trim(); if(n){state.userPresets['u_'+Date.now()]={name:n, code:dom.codeEditor.value}; localStorage.setItem('ca_user_p', JSON.stringify(state.userPresets)); renderPresets(); closeSaveModal();} }
+function exportPreset() { const b=new Blob([JSON.stringify({code:dom.codeEditor.value})],{type:"application/json"}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download="ca_export.json"; a.click(); }
+function interact(e) { 
+    const r=dom.canvas.getBoundingClientRect(); 
+    const x=Math.floor((e.clientX-r.left-state.cam.x)/state.cam.zoom), y=Math.floor((e.clientY-r.top-state.cam.y)/state.cam.zoom); 
+    if(x>=0&&y>=0&&x<state.dims[0]&&y<state.dims[1]){ 
+        const arr = state.isBufferA ? state.gridA : state.gridB;
+        arr[y*state.strides[1]+x] = state.config.type === 'float' ? 1.0 : 1; 
+        draw(); 
+    } 
+}
+function updateVisualPanels() {
+    const t = dom.vAlgo.value; dom.vPanelLife.style.display = (t==='life'||t==='generations')?'block':'none';
+    dom.vPanelGen.style.display = t==='generations'?'block':'none'; dom.vPanelCyc.style.display = t==='cyclic'?'block':'none'; dom.vPanelAvg.style.display = t==='average'?'block':'none';
+}
+function scheduleVisualUpdate() { clearTimeout(state.visualTimer); state.visualTimer = setTimeout(() => { dom.codeEditor.value = generateCode(getVisualState()); compile(); }, 600); }
+function resetStats() { if(state.auxGrid) state.auxGrid.fill(0); state.gen=0; state.history=[]; draw(); }
+function stopSweep() { state.sweep.running=false; dom.btnRunSweep.disabled=false; dom.btnPauseSweep.style.display='none'; dom.btnStopSweep.style.display='none'; }
+
+function loop() { 
+    requestAnimationFrame(loop); 
+    if(state.running){ 
+        for(let i=0; i<state.stepsPerFrame; i++) {
+            if(!step(i < state.stepsPerFrame - 1)) { state.running = false; updateUI(); break; }
+        }
+        const n = performance.now();
+        if(n - state.lastTime > 500){
+            dom.fpsVal.innerText = Math.round((state.gen - state.fpsGenStart) / ((n - state.lastTime) / 1000));
+            state.fpsGenStart = state.gen; state.lastTime = n;
+        }
+    } 
+}
+
+try { const s = localStorage.getItem('ca_user_p'); if(s) state.userPresets = JSON.parse(s); } catch(e){}
+buildDesigner(); setupEvents(); renderPresets();
+setTimeout(() => { resizeCanvas(); dom.codeEditor.value = SYSTEM_PRESETS.life.code; compile(); loop(); }, 150);
+</script>
+</body>
+</html>

@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Universal CA IDE v5.5 (Architect)</title>
+    <meta name="description" content="Advanced Cellular Automata Environment with Parameter Sweeping and Live Analysis">
+    <style>
+        :root {
+            --bg: #09090b;
+            --panel: #18181b;
+            --border: #27272a;
+            --input: #3f3f46;
+            --text: #a1a1aa;
+            --text-light: #e4e4e7;
+            --accent: #3b82f6;
+            --accent-dim: rgba(59, 130, 246, 0.1);
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * { box-sizing: border-box; outline: none; }
+        
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background: var(--bg); color: var(--text); 
+            font-family: var(--font-ui); overflow: hidden; 
+            font-size: 13px;
+        }
+
+        /* Layout */
+        #app-root { display: flex; width: 100%; height: 100%; }
+        
+        /* Sidebar */
+        #sidebar { 
+            width: 400px; min-width: 320px; max-width: 600px;
+            display: flex; flex-direction: column; 
+            background: var(--panel); border-right: 1px solid var(--border); 
+            z-index: 20; 
+        }
+
+        /* Resizer */
+        #resizer {
+            width: 4px; background: transparent; cursor: col-resize;
+            margin-left: -2px; z-index: 30; transition: background 0.2s;
+        }
+        #resizer:hover, #resizer.active { background: var(--accent); }
+
+        /* Main View */
+        #viewport { 
+            flex: 1; position: relative; background: #000; 
+            overflow: hidden; cursor: crosshair; touch-action: none;
+        }
+
+        /* Common UI Elements */
+        .panel-header {
+            padding: 12px 16px; background: #111; 
+            border-bottom: 1px solid var(--border);
+            font-weight: 600; color: var(--text-light);
+            display: flex; justify-content: space-between; align-items: center;
+            letter-spacing: 0.5px;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--text); display: inline-block;
+            box-shadow: 0 0 8px rgba(0,0,0,0.5);
+            transition: background 0.3s;
+        }
+        .status-dot.ok { background: var(--success); box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+        .status-dot.err { background: var(--error); box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+        .status-dot.busy { background: var(--warning); animation: pulse 1s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* Tabs */
+        .tabs { display: flex; background: #111; border-bottom: 1px solid var(--border); }
+        .tab {
+            flex: 1; padding: 12px; text-align: center; cursor: pointer;
+            color: #71717a; border-bottom: 2px solid transparent;
+            font-weight: 500; transition: all 0.2s;
+        }
+        .tab:hover { color: var(--text-light); background: #1c1c1c; }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: #1c1c1c; }
+
+        /* Content Areas */
+        .content-stack { flex: 1; position: relative; overflow: hidden; }
+        .view-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            display: none; flex-direction: column; overflow-y: auto;
+            background: var(--panel);
+        }
+        .view-layer.active { display: flex; }
+
+        /* Code Editor */
+        #editor-container { flex: 1; position: relative; }
+        textarea.code-input {
+            width: 100%; height: 100%; background: #0c0c0e;
+            color: #e4e4e7; border: none; padding: 16px;
+            font-family: var(--font-mono); font-size: 13px; line-height: 1.5;
+            resize: none; tab-size: 4;
+        }
+        textarea.code-input:focus { background: #09090b; }
+
+        /* Form Controls */
+        .control-group { padding: 16px; border-bottom: 1px solid var(--border); }
+        .group-title { 
+            font-size: 11px; text-transform: uppercase; color: var(--accent); 
+            font-weight: 700; margin-bottom: 12px; letter-spacing: 0.5px;
+        }
+        
+        .row { display: flex; gap: 12px; margin-bottom: 10px; align-items: center; }
+        .col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        
+        label { font-size: 11px; color: #71717a; font-weight: 500; }
+        
+        input[type="text"], input[type="number"], select {
+            background: #27272a; border: 1px solid #3f3f46;
+            color: white; padding: 8px; border-radius: 4px !important;
+            font-family: var(--font-mono); font-size: 12px;
+            transition: border 0.2s;
+        }
+        input:focus, select:focus { border-color: var(--accent); }
+        
+        input[type="range"] { flex: 1; accent-color: var(--accent); }
+        input[type="color"] { 
+            padding: 0; width: 100%; height: 34px; cursor: pointer; 
+            border: 1px solid var(--border); background: none;
+        }
+        input[type="checkbox"] { accent-color: var(--accent); }
+
+        /* Buttons */
+        .btn-toolbar { 
+            padding: 8px; border-bottom: 1px solid var(--border); 
+            display: flex; gap: 8px; background: #111; flex-wrap: wrap;
+        }
+        .btn {
+            flex: 1; padding: 8px 12px; border: 1px solid var(--border);
+            background: #27272a; color: #e4e4e7; border-radius: 4px !important;
+            cursor: pointer; font-size: 12px; font-weight: 500;
+            transition: all 0.2s; text-align: center; white-space: nowrap;
+        }
+        .btn:hover { background: #3f3f46; border-color: #52525b; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+        .btn.primary:hover { background: var(--accent-hover); }
+        .btn.danger { background: rgba(239, 68, 68, 0.1); border-color: var(--error); color: var(--error); }
+        .btn.danger:hover { background: var(--error); color: white; }
+        .btn.toggle { border-color: transparent; background: transparent; color: #71717a; }
+        .btn.toggle:hover { color: #e4e4e7; background: #27272a; }
+        .btn.toggle.active { background: #27272a; color: var(--accent); border: 1px solid var(--accent); }
+
+        .legend-dot { display: inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+
+        /* Visual Grid for Rules */
+        .rule-grid { 
+            display: grid; grid-template-columns: repeat(9, 1fr); 
+            gap: 2px; background: transparent; 
+        }
+        .rule-check {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #27272a; padding: 8px 0; cursor: pointer; border-radius: 4px !important;
+            border: 1px solid transparent; transition: all 0.1s;
+        }
+        .rule-check:hover { background: #3f3f46; }
+        .rule-check.active { 
+            background: var(--accent); color: white; border-color: var(--accent);
+        }
+        .rule-check span { font-size: 10px; font-weight: 700; }
+
+        /* Graphs */
+        .canvas-container {
+            background: #0c0c0e; border: 1px solid var(--border);
+            height: 180px; width: 100%; position: relative; border-radius: 4px !important;
+            overflow: hidden;
+        }
+        canvas.graph { width: 100%; height: 100%; display: block; }
+        
+        /* Preset List */
+        .preset-list { max-height: 150px; overflow-y: auto; background: #111; border-bottom: 1px solid var(--border); }
+        .preset-item {
+            padding: 10px 16px; border-bottom: 1px solid #27272a;
+            cursor: pointer; display: flex; justify-content: space-between;
+            font-size: 12px; transition: background 0.1s;
+        }
+        .preset-item:hover { background: #27272a; color: white; }
+
+        /* HUD Overlay */
+        #hud {
+            position: absolute; bottom: 20px; left: 50%; 
+            transform: translateX(-50%);
+            background: rgba(24, 24, 27, 0.9);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px; border-radius: 8px !important;
+            display: flex; gap: 16px; align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            pointer-events: auto;
+            z-index: 50;
+        }
+        
+        .hud-btn {
+            background: transparent; border: none; color: #a1a1aa;
+            width: 36px; height: 36px; border-radius: 6px !important;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .hud-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+        .hud-btn.active { background: var(--accent); color: white; }
+        .hud-sep { width: 1px; height: 24px; background: #3f3f46; }
+        
+        .hud-stat { display: flex; flex-direction: column; min-width: 60px; }
+        .stat-label { font-size: 9px; text-transform: uppercase; font-weight: 700; color: #52525b; }
+        .stat-val { font-family: var(--font-mono); font-size: 13px; color: #e4e4e7; }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+        /* Tooltip */
+        #tooltip {
+            position: fixed; pointer-events: none; z-index: 1000;
+            background: #18181b; border: 1px solid var(--accent);
+            padding: 6px 10px; border-radius: 4px !important;
+            font-size: 11px; color: white; display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        /* Overlay Messages */
+        #viewport-msg {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0,0,0,0.7); padding: 8px 12px;
+            border-radius: 4px !important; color: white; font-size: 12px;
+            pointer-events: none; opacity: 0; transition: opacity 0.5s;
+        }
+        
+        #warning-banner {
+            background: rgba(245, 158, 11, 0.15); border: 1px solid var(--warning);
+            color: #fbbf24; padding: 12px; margin: 16px; font-size: 12px;
+            border-radius: 4px !important; display: none;
+        }
+        
+        .graph-legend {
+            position: absolute; top: 8px; left: 8px; pointer-events: none;
+            font-size: 9px; color: #71717a; background: rgba(0,0,0,0.5);
+            padding: 4px; border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-root">
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="panel-header">
+            <span>CA Architect v5.5</span>
+            <div id="status-indicator" class="status-dot ok" title="System Ready"></div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-target="editor">Script</div>
+            <div class="tab" data-target="designer">Designer</div>
+            <div class="tab" data-target="analysis">Analysis</div>
+        </div>
+
+        <div class="content-stack">
+            
+            <!-- Code Editor View -->
+            <div id="view-editor" class="view-layer active">
+                <div class="btn-toolbar">
+                    <button class="btn primary" id="btn-compile">Compile & Run (Ctrl+R)</button>
+                    <button class="btn" id="btn-reset">Reset</button>
+                    <button class="btn" id="btn-export">Export</button>
+                    <label class="btn" style="position:relative; overflow:hidden;">
+                        Import <input type="file" id="file-import" accept=".js,.json,.txt" style="position:absolute; opacity:0; top:0; left:0; width:100%; height:100%; cursor:pointer;">
+                    </label>
+                </div>
+                <div class="group-title" style="padding: 12px 16px 0;">Library</div>
+                <div class="preset-list" id="preset-list"></div>
+                <div id="editor-container">
+                    <textarea id="code-area" class="code-input" spellcheck="false"></textarea>
+                </div>
+            </div>
+
+            <!-- Visual Designer View -->
+            <div id="view-designer" class="view-layer">
+                <div id="warning-banner">
+                    Warning: You have manually edited the script. Changing settings here will overwrite your custom code.
+                    <button class="btn danger" id="btn-overwrite-confirm" style="margin-top:8px; width:100%">Overwrite my changes</button>
+                </div>
+                
+                <div class="control-group">
+                    <div class="group-title">Grid Topology</div>
+                    <div class="row">
+                        <div class="col">
+                            <label>Width</label>
+                            <input type="number" id="des-w" value="200" min="10" max="1000">
+                        </div>
+                        <div class="col">
+                            <label>Height</label>
+                            <input type="number" id="des-h" value="200" min="10" max="1000">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">Initialization</div>
+                    <div class="col">
+                        <label>Pattern Type</label>
+                        <select id="des-init-type">
+                            <option value="random">Random Noise</option>
+                            <option value="center">Central Singularity</option>
+                            <option value="filled_circle">Filled Circle</option>
+                            <option value="circle">Hollow Ring</option>
+                            <option value="empty">Empty Canvas</option>
+                        </select>
+                    </div>
+                    <div class="row" style="margin-top:10px">
+                        <div class="col">
+                            <label>Density / Radius</label>
+                            <div class="row" style="gap:8px; margin:0">
+                                <input type="range" id="des-init-val" min="0" max="100" value="15">
+                                <span id="lbl-init-val" style="width:30px; text-align:right">15%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">Rule Logic</div>
+                    <div class="row">
+                        <div class="col">
+                            <label>Algorithm</label>
+                            <select id="des-algo">
+                                <option value="life">Life-like (B/S)</option>
+                                <option value="generations">Generations</option>
+                                <option value="cyclic">Cyclic Demon</option>
+                                <option value="average">Float Averaging</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="panel-life" class="algo-panel">
+                        <div class="group-title" style="color:#71717a; margin-top:12px">Birth Conditions</div>
+                        <div class="rule-grid" id="grid-birth"></div>
+                        <div class="group-title" style="color:#71717a; margin-top:12px">Survival Conditions</div>
+                        <div class="rule-grid" id="grid-survive"></div>
+                    </div>
+
+                    <div id="panel-generations" class="algo-panel" style="display:none">
+                        <div class="col" style="margin-top:10px">
+                            <label>Decay States</label>
+                            <input type="number" id="des-states" value="8" min="2">
+                        </div>
+                    </div>
+
+                    <div id="panel-cyclic" class="algo-panel" style="display:none">
+                        <div class="row" style="margin-top:10px">
+                            <div class="col"><label>States</label><input type="number" id="des-cyc-states" value="14"></div>
+                            <div class="col"><label>Threshold</label><input type="number" id="des-cyc-thresh" value="1"></div>
+                        </div>
+                    </div>
+
+                    <div id="panel-average" class="algo-panel" style="display:none">
+                        <div class="col" style="margin-top:10px">
+                            <label>Smoothing Factor (0.0 - 1.0)</label>
+                            <input type="number" id="des-smooth" value="0.5" step="0.1" max="1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">Rendering</div>
+                    <div class="row">
+                        <div class="col"><label>Active Color</label><input type="color" id="des-col1" value="#3b82f6"></div>
+                        <div class="col"><label>Background</label><input type="color" id="des-col0" value="#000000"></div>
+                    </div>
+                    <div class="col" style="margin-top:8px">
+                        <label>Post-Processing</label>
+                        <select id="des-render-mode">
+                            <option value="standard">Standard (Crisp)</option>
+                            <option value="trails">Motion Trails</option>
+                            <option value="age">Age Heatmap</option>
+                            <option value="velocity">Velocity Map</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis View -->
+            <div id="view-analysis" class="view-layer">
+                <div class="control-group">
+                    <div class="group-title">Run Control</div>
+                    <div class="row">
+                        <div class="col">
+                            <label>Steps per Frame</label>
+                            <div class="row" style="gap:8px; margin:0">
+                                <input type="range" id="sim-speed" min="1" max="50" value="1">
+                                <span id="lbl-speed">1x</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">Real-Time Analysis</div>
+                    <div class="canvas-container">
+                        <canvas id="graph-live" class="graph"></canvas>
+                        <div class="graph-legend">
+                            <span style="color:#3b82f6">■ Density</span>
+                            <span style="color:#f59e0b">■ Entropy</span>
+                            <span style="color:#ec4899">■ Flux</span>
+                        </div>
+                    </div>
+                    
+                    <div class="group-title" style="margin-top:12px; font-size:10px; color:#52525b">Visualization Modes</div>
+                    <div class="btn-toolbar" style="border:none; padding:0; background:transparent; margin-bottom:12px">
+                        <button class="btn toggle active" id="btn-viz-density">Density</button>
+                        <button class="btn toggle active" id="btn-viz-entropy">Entropy</button>
+                        <button class="btn toggle" id="btn-viz-flux">Flux</button>
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <label>History Mode</label>
+                            <select id="viz-history-mode">
+                                <option value="rolling">Rolling Window (300)</option>
+                                <option value="infinite">Persistent (Infinite)</option>
+                            </select>
+                        </div>
+                        <div class="col">
+                             <label>&nbsp;</label>
+                             <button class="btn" id="btn-viz-clear">Clear Data</button>
+                        </div>
+                    </div>
+                    <button class="btn toggle" id="btn-show-overlay" style="width:100%; margin-top:8px; border:1px solid var(--border)">Toggle Spatial Heatmap Mode</button>
+                </div>
+
+                <div class="control-group">
+                    <div class="group-title">Parameter Sweep Engine</div>
+                    <div class="col" style="margin-bottom:8px">
+                        <label>Sweep Variable (X)</label>
+                        <select id="sweep-param">
+                            <option value="initV">Initial Density / Radius</option>
+                            <option value="range">Neighborhood Range</option>
+                            <option value="states">Total States</option>
+                        </select>
+                    </div>
+                    <div class="col" style="margin-bottom:8px">
+                        <label>Target Metric (Y)</label>
+                        <select id="sweep-metric">
+                            <option value="density">Active Density</option>
+                            <option value="entropy">Shannon Entropy</option>
+                            <option value="flux">System Flux (Stability)</option>
+                            <option value="iterations">Iterations to Stabilize</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                         <div class="col"><label>Start</label><input type="number" id="sweep-start" value="1"></div>
+                         <div class="col"><label>End</label><input type="number" id="sweep-end" value="99"></div>
+                    </div>
+                    <div class="row">
+                         <div class="col"><label>Step Size</label><input type="number" id="sweep-increment" value="4"></div>
+                         <div class="col"><label>Total Steps</label><input type="number" id="sweep-steps" value="25"></div>
+                    </div>
+                    <div class="row">
+                        <div class="col"><label>Max Gens per Step</label><input type="number" id="sweep-max-gens" value="200"></div>
+                    </div>
+                    
+                    <div class="btn-toolbar" style="background:transparent; padding:0; margin-top:12px; border:none">
+                        <button class="btn primary" id="btn-sweep-start">Run Sweep</button>
+                        <button class="btn danger" id="btn-sweep-stop" disabled>Stop</button>
+                        <div style="display:flex; align-items:center; gap:8px; margin-left:auto">
+                            <input type="checkbox" id="sweep-retain">
+                            <label for="sweep-retain" style="margin:0; cursor:pointer">Retain Previous</label>
+                        </div>
+                    </div>
+                    <div style="width:100%; height:4px; background:#27272a; margin-top:12px; overflow:hidden">
+                        <div id="sweep-progress" style="width:0%; height:100%; background:var(--accent); transition:width 0.2s"></div>
+                    </div>
+                    <div class="canvas-container" style="margin-top:12px; height:220px">
+                        <canvas id="graph-sweep" class="graph"></canvas>
+                        <div class="graph-legend" id="sweep-legend" style="display:none">Click to Load Params</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resizer Handle -->
+    <div id="resizer"></div>
+
+    <!-- Viewport -->
+    <div id="viewport">
+        <canvas id="main-canvas"></canvas>
+        <canvas id="overlay-canvas" style="position:absolute; top:0; left:0; pointer-events:none; mix-blend-mode:screen; opacity:0.8; display:none"></canvas>
+        <div id="viewport-msg">Simulation Paused</div>
+        
+        <!-- HUD -->
+        <div id="hud">
+            <button class="hud-btn" id="hud-play" title="Play/Pause (Space)"><svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+            <button class="hud-btn" id="hud-step" title="Step Frame (Right Arrow)"><svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/></svg></button>
+            <button class="hud-btn" id="hud-reset" title="Restart (R)"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+            <div class="hud-sep"></div>
+            <div class="hud-stat"><span class="stat-label">Gen</span><span class="stat-val" id="hud-gen">0</span></div>
+            <div class="hud-stat"><span class="stat-label">FPS</span><span class="stat-val" id="hud-fps">0</span></div>
+            <div class="hud-sep"></div>
+            <div class="col" style="width:100px">
+                <label style="font-size:9px; margin-bottom:2px">Brush Size</label>
+                <input type="range" id="hud-brush" min="1" max="10" value="1" style="height:4px">
+            </div>
+        </div>
+    </div>
+    
+    <div id="tooltip"></div>
+</div>
+
+<script>
+const PRESETS = {
+    "Conway's Life": `return { dimensions: [200, 200], neighborhood: 'moore', init: (x, y) => Math.random() < 0.2 ? 1 : 0, getColor: (v) => v ? [59, 130, 246, 255] : [10, 10, 12, 255], update: (v, n) => { let s = 0; for(let i=0; i<n.length; i++) s += n[i]; if (v === 1) return (s === 2 || s === 3) ? 1 : 0; return s === 3 ? 1 : 0; } };`,
+    "Brian's Brain": `return { dimensions: [200, 200], neighborhood: 'moore', init: () => Math.random() < 0.4 ? 1 : 0, getColor: (v) => v === 1 ? [255,255,255,255] : (v===2 ? [100,100,100,255] : [0,0,0,255]), update: (v, n) => { if (v === 1) return 2; if (v === 2) return 0; let s = 0; for(let i=0; i<n.length; i++) if(n[i]===1) s++; return s === 2 ? 1 : 0; } };`,
+    "Cyclic Demon": `return { dimensions: [150, 150], neighborhood: 'von_neumann', init: () => Math.floor(Math.random() * 14), getColor: (v) => { const i = v/14; return [i*255, (1-i)*200, 255, 255]; }, update: (v, n) => { const next = (v + 1) % 14; let count = 0; for(let i=0; i<n.length; i++) if(n[i] === next) count++; return count >= 1 ? next : v; } };`,
+    "Reaction Diffusion": `return { dimensions: [100, 100], type: 'float', neighborhood: 'moore', range: 1, init: (x,y) => { const cx = 50, cy = 50; const d = Math.sqrt((x-cx)**2 + (y-cy)**2); return d < 10 ? 1.0 : 0.0; }, getColor: (v) => [v*255, v*50, 100, 255], update: (v, n) => { let avg = 0; for(let x of n) avg += x; avg /= n.length; return v * 0.9 + avg * 0.1 + (avg > 0.4 ? 0.01 : -0.01); } };`
+};
+
+class SimulationEngine {
+    constructor() {
+        this.config = null;
+        this.gridA = null; this.gridB = null;
+        this.w = 0; this.h = 0; this.size = 0;
+        this.isBufferA = true;
+        this.gen = 0;
+        this.history = [];
+        this.currentFlux = 0;
+        this.neighborhoodBuffer = null;
+        this.heatmapBuffer = null;
+    }
+
+    load(code) {
+        try {
+            const func = new Function(code);
+            const cfg = func();
+            if (!cfg || !Array.isArray(cfg.dimensions)) throw new Error("Config must return object with 'dimensions'");
+            
+            const [w, h] = cfg.dimensions;
+            const size = w * h;
+            const isFloat = cfg.type === 'float';
+            
+            if (this.size !== size || (this.gridA && (isFloat !== (this.gridA instanceof Float32Array)))) {
+                this.gridA = isFloat ? new Float32Array(size) : new Uint8Array(size);
+                this.gridB = isFloat ? new Float32Array(size) : new Uint8Array(size);
+                this.heatmapBuffer = new Float32Array(size);
+            }
+
+            this.w = w; this.h = h; this.size = size;
+            this.config = cfg;
+            this.isBufferA = true;
+            this.gen = 0;
+            this.history = [];
+            
+            const range = Math.max(1, cfg.range || 1);
+            const maxNeighbors = (2*range+1)**2 - 1;
+            if (!this.neighborhoodBuffer || this.neighborhoodBuffer.length !== maxNeighbors || (isFloat !== (this.neighborhoodBuffer instanceof Float32Array))) {
+                this.neighborhoodBuffer = isFloat ? new Float32Array(maxNeighbors) : new Uint8Array(maxNeighbors);
+            }
+
+            this.reset();
+            return { success: true, w, h };
+        } catch (e) {
+            return { success: false, error: e };
+        }
+    }
+
+    reset() {
+        if (!this.config || !this.gridA) return;
+        const init = this.config.init;
+        const arr = this.gridA;
+        if (typeof init === 'function') {
+            for (let i = 0; i < this.size; i++) arr[i] = init(i % this.w, Math.floor(i / this.w));
+        } else arr.fill(0);
+        
+        if (this.heatmapBuffer) this.heatmapBuffer.fill(0);
+        this.gen = 0;
+        this.history = [];
+    }
+
+    step() {
+        if (!this.config) return false;
+        
+        const src = this.isBufferA ? this.gridA : this.gridB;
+        const dst = this.isBufferA ? this.gridB : this.gridA;
+        const { update, neighborhood, range: cfgRange } = this.config;
+        const w = this.w, h = this.h;
+        const range = Math.max(1, cfgRange || 1);
+        const isVonNeumann = neighborhood === 'von_neumann';
+        const nb = this.neighborhoodBuffer;
+        
+        let changedCount = 0;
+        
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                let ni = 0;
+                for (let dy = -range; dy <= range; dy++) {
+                    for (let dx = -range; dx <= range; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        if (isVonNeumann && (Math.abs(dx) + Math.abs(dy) > range)) continue;
+                        
+                        const ny = (y + dy + h) % h;
+                        const nx = (x + dx + w) % w;
+                        nb[ni++] = src[ny * w + nx];
+                    }
+                }
+                
+                const neighborInput = (ni === nb.length) ? nb : nb.subarray(0, ni);
+                const newVal = update(src[y*w+x], neighborInput);
+                
+                if (newVal !== src[y*w+x]) changedCount++;
+                dst[y*w+x] = newVal;
+            }
+        }
+
+        this.currentFlux = changedCount / this.size;
+        this.isBufferA = !this.isBufferA;
+        this.gen++;
+        if (this.gen % 5 === 0) this.recordStats();
+        
+        return changedCount > 0;
+    }
+    
+    addToHeatmap() {
+        if (!this.heatmapBuffer || !this.gridA) return;
+        const grid = this.getCurrentGrid();
+        for(let i = 0; i < this.size; i++) {
+            if (grid[i] > 0) this.heatmapBuffer[i] += 1;
+        }
+    }
+    
+    getHash() {
+        if (!this.gridA) return 0;
+        const grid = this.getCurrentGrid();
+        let h = 0x811c9dc5;
+        // Simple FNV-1a like hashing for grid state
+        for(let i = 0; i < this.size; i++) {
+            h ^= grid[i];
+            h = Math.imul(h, 0x01000193);
+        }
+        return h >>> 0;
+    }
+
+    calculateEntropy() {
+        if (!this.gridA) return 0;
+        const grid = this.getCurrentGrid();
+        const counts = {};
+        const total = this.size;
+        for (let i = 0; i < total; i++) {
+            const v = grid[i];
+            counts[v] = (counts[v] || 0) + 1;
+        }
+        let entropy = 0;
+        for (let key in counts) {
+            const p = counts[key] / total;
+            if (p > 0) entropy -= p * Math.log2(p);
+        }
+        return entropy;
+    }
+
+    recordStats() {
+        if (!this.gridA) return;
+        const grid = this.getCurrentGrid();
+        let active = 0;
+        for(let i=0; i<grid.length; i++) if(grid[i] > 0) active++;
+        
+        this.history.push({ 
+            gen: this.gen, 
+            density: active / this.size,
+            entropy: this.calculateEntropy(),
+            flux: this.currentFlux
+        });
+        
+        if (this.history.length > 50000) this.history.shift();
+    }
+
+    getCurrentGrid() { return this.isBufferA ? this.gridA : this.gridB; }
+    
+    setCell(x, y, val, size = 1) {
+        if (!this.gridA) return;
+        const target = this.getCurrentGrid();
+        for(let dy = 0; dy < size; dy++) {
+            for(let dx = 0; dx < size; dx++) {
+                const px = (x + dx) % this.w;
+                const py = (y + dy) % this.h;
+                target[py * this.w + px] = val;
+            }
+        }
+    }
+}
+
+class Renderer {
+    constructor(canvas, overlayCanvas, engine) {
+        this.canvas = canvas;
+        this.overlayCanvas = overlayCanvas;
+        this.ctx = canvas.getContext('2d', { alpha: false });
+        this.overlayCtx = overlayCanvas.getContext('2d');
+        this.engine = engine;
+        this.heatmapEngine = engine; // Separate reference for heatmap accumulation
+        this.offCanvas = document.createElement('canvas');
+        this.offCtx = this.offCanvas.getContext('2d', { alpha: false });
+        this.imageData = null;
+        this.cam = { x: 0, y: 0, zoom: 1 };
+        this.heatmapMode = false;
+        this.resize();
+        this.trailBuffer = null;
+    }
+
+    resize() {
+        const p = window.devicePixelRatio || 1;
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        if (rect.width === 0) return;
+        [this.canvas, this.overlayCanvas].forEach(c => {
+            c.width = rect.width * p;
+            c.height = rect.height * p;
+            c.style.width = rect.width + 'px';
+            c.style.height = rect.height + 'px';
+        });
+        this.ctx.scale(p, p);
+        this.overlayCtx.scale(p, p);
+        this.ctx.imageSmoothingEnabled = false;
+        this.overlayCtx.imageSmoothingEnabled = false;
+    }
+
+    updateOffscreen() {
+        const { w, h, config } = this.engine;
+        if (!w || !h) return;
+
+        if (this.offCanvas.width !== w || this.offCanvas.height !== h) {
+            this.offCanvas.width = w; this.offCanvas.height = h;
+            this.imageData = this.offCtx.createImageData(w, h);
+            this.trailBuffer = new Uint8Array(w * h * 4);
+        }
+
+        const grid = this.engine.getCurrentGrid();
+        const data = this.imageData.data;
+        const getColor = config.getColor || ((v) => [v?255:0, v?255:0, v?255:0, 255]);
+        const mode = config.renderMode || 'standard';
+
+        for (let i = 0; i < grid.length; i++) {
+            const idx = i * 4;
+            const val = grid[i];
+            const col = getColor(val);
+            
+            if (mode === 'trails') {
+                const r = col[0], g = col[1], b = col[2];
+                this.trailBuffer[idx] = Math.max(0, this.trailBuffer[idx] - 5);
+                this.trailBuffer[idx+1] = Math.max(0, this.trailBuffer[idx+1] - 5);
+                this.trailBuffer[idx+2] = Math.max(0, this.trailBuffer[idx+2] - 5);
+                if (val > 0) {
+                    this.trailBuffer[idx] = r;
+                    this.trailBuffer[idx+1] = g;
+                    this.trailBuffer[idx+2] = b;
+                }
+                data[idx] = this.trailBuffer[idx];
+                data[idx+1] = this.trailBuffer[idx+1];
+                data[idx+2] = this.trailBuffer[idx+2];
+                data[idx+3] = 255;
+            } else {
+                data[idx] = col[0];
+                data[idx+1] = col[1];
+                data[idx+2] = col[2];
+                data[idx+3] = 255;
+            }
+        }
+        this.offCtx.putImageData(this.imageData, 0, 0);
+    }
+
+    draw() {
+        this.ctx.fillStyle = '#09090b';
+        this.ctx.fillRect(0, 0, this.canvas.width / window.devicePixelRatio, this.canvas.height / window.devicePixelRatio);
+        
+        if (this.heatmapMode) return; // In heatmap mode, main canvas is blank background
+
+        if (!this.engine.w) return;
+        this.ctx.save();
+        this.ctx.translate(this.cam.x, this.cam.y);
+        this.ctx.scale(this.cam.zoom, this.cam.zoom);
+        this.ctx.drawImage(this.offCanvas, 0, 0);
+        if (this.cam.zoom > 10) {
+            this.ctx.beginPath();
+            this.ctx.lineWidth = 0.5 / this.cam.zoom;
+            this.ctx.strokeStyle = '#333';
+            const w = this.engine.w, h = this.engine.h;
+            for (let x = 0; x <= w; x++) { this.ctx.moveTo(x, 0); this.ctx.lineTo(x, h); }
+            for (let y = 0; y <= h; y++) { this.ctx.moveTo(0, y); this.ctx.lineTo(w, y); }
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
+    }
+    
+    drawHeatmapOverlay() {
+        this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+        if (document.getElementById('overlay-canvas').style.display === 'none') return;
+        // Always draw from heatmapEngine (Main App Sim) regardless of current live engine
+        const { w, h, heatmapBuffer } = this.heatmapEngine;
+        if (!w) return;
+        
+        const iData = this.overlayCtx.createImageData(w, h);
+        const data = iData.data;
+        let minHeat = Infinity;
+        let maxHeat = -Infinity;
+        
+        for(let i=0; i<heatmapBuffer.length; i++) {
+            const v = heatmapBuffer[i];
+            if(v > 0) {
+                if (v < minHeat) minHeat = v;
+                if (v > maxHeat) maxHeat = v;
+            }
+        }
+        
+        if (maxHeat === -Infinity) maxHeat = 1;
+        if (minHeat === Infinity) minHeat = 0;
+        let range = maxHeat - minHeat;
+        if (range === 0) range = 1;
+        
+        for(let i=0; i<w*h; i++) {
+            const val = heatmapBuffer[i];
+            if (val > 0) {
+                const norm = (val - minHeat) / range;
+                const idx = i*4;
+                // Heatmap Gradient: Blue -> Green -> Red -> White
+                // Simple implementation:
+                let r=0, g=0, b=0;
+                if (norm < 0.25) { // Dark Blue to Blue
+                    b = 128 + norm * 4 * 127;
+                } else if (norm < 0.5) { // Blue to Green
+                    b = 255 * (1 - (norm-0.25)*4);
+                    g = 255 * ((norm-0.25)*4);
+                } else if (norm < 0.75) { // Green to Red
+                    g = 255 * (1 - (norm-0.5)*4);
+                    r = 255 * ((norm-0.5)*4);
+                } else { // Red to White
+                    r = 255;
+                    g = 255 * ((norm-0.75)*4);
+                    b = 255 * ((norm-0.75)*4);
+                }
+                
+                data[idx] = r;
+                data[idx+1] = g;
+                data[idx+2] = b;
+                data[idx+3] = 255; 
+            }
+        }
+        const tempC = document.createElement('canvas');
+        tempC.width = w; tempC.height = h;
+        tempC.getContext('2d').putImageData(iData, 0, 0);
+        
+        this.overlayCtx.save();
+        this.overlayCtx.translate(this.cam.x, this.cam.y);
+        this.overlayCtx.scale(this.cam.zoom, this.cam.zoom);
+        // If heatmap mode, we want opaque normal blend on black. If overlay, screen blend.
+        this.overlayCtx.globalCompositeOperation = this.heatmapMode ? 'source-over' : 'screen';
+        this.overlayCtx.drawImage(tempC, 0, 0);
+        this.overlayCtx.restore();
+    }
+
+    screenToWorld(sx, sy) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = (sx - rect.left - this.cam.x) / this.cam.zoom;
+        const y = (sy - rect.top - this.cam.y) / this.cam.zoom;
+        return { x: Math.floor(x), y: Math.floor(y) };
+    }
+}
+
+class AnalysisEngine {
+    constructor(app) {
+        this.app = app;
+        this.running = false;
+        this.cancel = false;
+        this.canvas = document.getElementById('graph-sweep');
+        this.canvas.addEventListener('mousedown', (e) => this.handleClick(e));
+        this.currentResults = [];
+        this.previousResults = [];
+        // Reused instance to prevent memory churn
+        this.sim = new SimulationEngine();
+    }
+
+    async runSweep(paramKey, start, end, steps, maxGens, retain) {
+        if (this.running) return;
+        this.running = true;
+        this.cancel = false;
+        
+        if (retain) this.previousResults = [...this.currentResults];
+        else this.previousResults = [];
+        this.currentResults = [];
+        
+        const btnStart = document.getElementById('btn-sweep-start');
+        const btnStop = document.getElementById('btn-sweep-stop');
+        const progress = document.getElementById('sweep-progress');
+        const metricKey = document.getElementById('sweep-metric').value;
+        const legend = document.getElementById('sweep-legend');
+        
+        btnStart.disabled = true;
+        btnStop.disabled = false;
+        legend.style.display = 'none';
+        
+        // Clear heatmap if not retaining (fresh perspective)
+        if (!retain) {
+            this.app.sim.heatmapBuffer.fill(0);
+            this.app.renderer.drawHeatmapOverlay();
+        }
+        
+        const delta = (end - start) / Math.max(1, steps);
+        const designerState = this.app.ui.getDesignerState();
+
+        try {
+            for (let i = 0; i <= steps; i++) {
+                if (this.cancel) break;
+                
+                const val = start + i * delta;
+                
+                const testState = JSON.parse(JSON.stringify(designerState));
+                if (paramKey === 'initV') testState.initVal = val;
+                else if (paramKey === 'range') testState.range = Math.round(val);
+                else if (paramKey === 'states') testState.states = Math.round(val);
+                
+                const code = this.app.ui.generateCode(testState);
+                
+                // Reuse Simulation Instance, update logic
+                this.sim.load(code);
+                
+                // Cycle Detection Set
+                const historyHashes = new Set();
+                
+                // Fast Forward with Visual Updates & Optimization
+                let stableGen = 0;
+                for(let g=0; g<maxGens; g++) {
+                    const changed = this.sim.step();
+                    stableGen = g;
+                    
+                    // Optimization: Check flux and hash
+                    if (!changed) break; // Static
+                    
+                    // Only check hash if flux is low enough to be interesting or periodically
+                    // Checking every frame for large grids can be slow, but essential for detecting oscillators.
+                    // We check every 2 frames to trade off.
+                    if (g % 2 === 0) {
+                        const h = this.sim.getHash();
+                        if (historyHashes.has(h)) break; // Oscillation detected
+                        historyHashes.add(h);
+                        // Limit hash history size to prevent memory explosion on long runs
+                        if (historyHashes.size > 50) { 
+                            // Naive limit: we just clear old ones implicitly by Set iter order? No, Set keeps insertion order.
+                            // To keep strict N, we'd need an array or linkedhashmap. 
+                            // For simplicity, we just keep adding. 50 ints is tiny. 
+                            // Actually maxGens is usually < 1000. It's fine.
+                        }
+                    }
+
+                    // Optional: Visual Update frequency
+                    if (g % 5 === 0) {
+                        this.app.renderer.engine = this.sim; // Temporary swap engine for renderer
+                        this.app.renderer.updateOffscreen();
+                        this.app.renderer.draw();
+                        // Explicitly redraw overlay from main engine buffer
+                        this.app.renderer.drawHeatmapOverlay();
+                    }
+                }
+                
+                // Accumulate Heatmap using FINAL state of this parameter step
+                if (this.sim.gridA) {
+                    const grid = this.sim.getCurrentGrid();
+                    for(let k=0; k<this.sim.size; k++) {
+                        if (grid[k] > 0) this.app.sim.heatmapBuffer[k] += 1;
+                    }
+                    this.app.renderer.drawHeatmapOverlay();
+                }
+
+                let measure = 0;
+                if (metricKey === 'density') {
+                    if (this.sim.gridA) {
+                        const grid = this.sim.getCurrentGrid();
+                        let active = 0;
+                        for(let k=0; k<grid.length; k++) if(grid[k]>0) active++;
+                        measure = active / this.sim.size;
+                    }
+                } else if (metricKey === 'entropy') {
+                    measure = this.sim.calculateEntropy();
+                } else if (metricKey === 'flux') {
+                    measure = this.sim.currentFlux;
+                } else if (metricKey === 'iterations') {
+                    measure = stableGen;
+                }
+                
+                this.currentResults.push({ x: val, y: measure });
+                progress.style.width = ((i / steps) * 100) + '%';
+                this.drawResults(start, end, metricKey);
+                
+                await new Promise(r => setTimeout(r, 0));
+            }
+        } catch(e) {
+            console.error("Sweep Error:", e);
+        }
+        
+        // Restore renderer to main engine
+        this.app.renderer.engine = this.app.sim;
+        this.app.renderer.updateOffscreen();
+        this.app.renderer.draw();
+
+        this.running = false;
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        legend.style.display = 'block';
+    }
+    
+    drawResults(minX, maxX, metricKey) {
+        const ctx = this.canvas.getContext('2d');
+        const w = this.canvas.width = this.canvas.offsetWidth;
+        const h = this.canvas.height = this.canvas.offsetHeight;
+        
+        ctx.fillStyle = "#0c0c0e";
+        ctx.fillRect(0,0,w,h);
+        
+        // Grid
+        ctx.strokeStyle = "#27272a";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, h*0.25); ctx.lineTo(w, h*0.25);
+        ctx.moveTo(0, h*0.50); ctx.lineTo(w, h*0.50);
+        ctx.moveTo(0, h*0.75); ctx.lineTo(w, h*0.75);
+        ctx.stroke();
+
+        const allPts = [...this.currentResults, ...this.previousResults];
+        if (allPts.length === 0) return;
+        
+        let minY = Infinity, maxY = -Infinity;
+        for(let p of allPts) {
+            minY = Math.min(minY, p.y);
+            maxY = Math.max(maxY, p.y);
+        }
+        
+        if (metricKey === 'density') { 
+            minY = 0; maxY = 1; 
+        } else {
+            if (minY === maxY) {
+                minY -= 0.1; maxY += 0.1;
+            } else {
+                const pad = (maxY - minY) * 0.1;
+                minY -= pad; maxY += pad;
+            }
+        }
+        
+        if (maxX === minX) maxX += 0.001;
+        if (maxY === minY) maxY += 0.001;
+
+        const mapX = (v) => ((v - minX) / (maxX - minX)) * w;
+        const mapY = (v) => h - ((v - minY) / (maxY - minY)) * h;
+        
+        if (this.previousResults.length > 0) {
+            ctx.strokeStyle = "#52525b";
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for(let i=0; i<this.previousResults.length; i++) {
+                const p = this.previousResults[i];
+                if(i===0) ctx.moveTo(mapX(p.x), mapY(p.y));
+                else ctx.lineTo(mapX(p.x), mapY(p.y));
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        if (this.currentResults.length > 0) {
+            ctx.strokeStyle = "#3b82f6";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for(let i=0; i<this.currentResults.length; i++) {
+                const p = this.currentResults[i];
+                if(i===0) ctx.moveTo(mapX(p.x), mapY(p.y));
+                else ctx.lineTo(mapX(p.x), mapY(p.y));
+            }
+            ctx.stroke();
+            
+            ctx.fillStyle = "#3b82f6";
+            for(let p of this.currentResults) {
+                ctx.beginPath();
+                ctx.arc(mapX(p.x), mapY(p.y), 3, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+        this.lastBounds = { minX, maxX, w };
+    }
+    
+    handleClick(e) {
+        if (!this.lastBounds || this.running) return;
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const ratio = x / this.lastBounds.w;
+        const val = this.lastBounds.minX + ratio * (this.lastBounds.maxX - this.lastBounds.minX);
+        const param = document.getElementById('sweep-param').value;
+        if (param === 'initV') {
+            document.getElementById('des-init-val').value = Math.round(val);
+            document.getElementById('lbl-init-val').innerText = Math.round(val) + "%";
+        }
+        this.app.updateFromDesigner();
+    }
+    stop() { this.cancel = true; }
+}
+
+class UIManager {
+    constructor(app) {
+        this.app = app;
+        this.isCodeDirty = false;
+        this.vizOptions = { density: true, entropy: true, flux: false, rolling: true };
+        this.setupEventListeners();
+        this.setupDesigner();
+        this.renderPresets();
+        this.updateSweepInputs('steps'); // Init default
+    }
+
+    setupEventListeners() {
+        document.querySelectorAll('.tab').forEach(t => {
+            t.onclick = () => {
+                document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+                document.querySelectorAll('.view-layer').forEach(x => x.classList.remove('active'));
+                t.classList.add('active');
+                document.getElementById('view-' + t.dataset.target).classList.add('active');
+                if (t.dataset.target === 'designer' && this.isCodeDirty) {
+                    document.getElementById('warning-banner').style.display = 'block';
+                } else {
+                    document.getElementById('warning-banner').style.display = 'none';
+                }
+            };
+        });
+        document.getElementById('btn-compile').onclick = () => this.app.compile();
+        document.getElementById('btn-reset').onclick = () => this.app.reset();
+        document.getElementById('code-area').oninput = () => { this.isCodeDirty = true; };
+        document.getElementById('btn-overwrite-confirm').onclick = () => {
+            this.isCodeDirty = false;
+            document.getElementById('warning-banner').style.display = 'none';
+            this.app.updateFromDesigner();
+        };
+        document.getElementById('file-import').onchange = (e) => this.handleImport(e);
+        document.getElementById('btn-export').onclick = () => this.handleExport();
+        const canvas = document.getElementById('main-canvas');
+        let isDragging = false, lastX = 0, lastY = 0, isDrawing = false;
+        canvas.onmousedown = (e) => {
+            if (e.button === 2 || e.shiftKey) { isDragging = true; lastX = e.clientX; lastY = e.clientY; } 
+            else { isDrawing = true; this.handleDraw(e); }
+        };
+        window.onmousemove = (e) => {
+            if (isDragging) {
+                this.app.renderer.cam.x += e.clientX - lastX;
+                this.app.renderer.cam.y += e.clientY - lastY;
+                lastX = e.clientX; lastY = e.clientY;
+                this.app.renderer.draw();
+                this.app.renderer.drawHeatmapOverlay();
+            } else if (isDrawing) this.handleDraw(e);
+        };
+        window.onmouseup = () => { isDragging = false; isDrawing = false; };
+        canvas.onwheel = (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const r = this.app.renderer;
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            const newZoom = r.cam.zoom * delta;
+            if (newZoom > 0.1 && newZoom < 50) {
+                r.cam.x = mx - (mx - r.cam.x) * delta;
+                r.cam.y = my - (my - r.cam.y) * delta;
+                r.cam.zoom = newZoom;
+                r.draw();
+                r.drawHeatmapOverlay();
+            }
+        };
+        document.getElementById('hud-play').onclick = () => this.app.togglePlay();
+        document.getElementById('hud-step').onclick = () => this.app.step();
+        document.getElementById('hud-reset').onclick = () => this.app.reset();
+        document.getElementById('sim-speed').oninput = (e) => {
+            this.app.stepsPerFrame = parseInt(e.target.value);
+            document.getElementById('lbl-speed').innerText = e.target.value + 'x';
+        };
+        const bindToggle = (id, key) => {
+            document.getElementById(id).onclick = (e) => {
+                this.vizOptions[key] = !this.vizOptions[key];
+                e.target.classList.toggle('active');
+            };
+        };
+        bindToggle('btn-viz-density', 'density');
+        bindToggle('btn-viz-entropy', 'entropy');
+        bindToggle('btn-viz-flux', 'flux');
+        document.getElementById('viz-history-mode').onchange = (e) => {
+            this.vizOptions.rolling = e.target.value === 'rolling';
+        };
+        document.getElementById('btn-viz-clear').onclick = () => {
+            this.app.sim.history = [];
+            this.app.sim.heatmapBuffer.fill(0);
+            this.app.renderer.drawHeatmapOverlay();
+        };
+        document.getElementById('btn-show-overlay').onclick = (e) => {
+            const el = document.getElementById('overlay-canvas');
+            const isActive = el.style.display !== 'none';
+            // Toggle Logic: If turning ON, switch renderer mode. If turning OFF, switch back.
+            // Wait, we want heatmap ONLY.
+            this.app.renderer.heatmapMode = !isActive;
+            el.style.display = isActive ? 'none' : 'block';
+            e.target.classList.toggle('active');
+            // Force redraw to clear/show raw cells
+            this.app.renderer.draw();
+            if(!isActive) this.app.renderer.drawHeatmapOverlay();
+        };
+        document.getElementById('btn-sweep-start').onclick = () => {
+            const param = document.getElementById('sweep-param').value;
+            const s = parseFloat(document.getElementById('sweep-start').value);
+            const e = parseFloat(document.getElementById('sweep-end').value);
+            const steps = parseInt(document.getElementById('sweep-steps').value);
+            const maxGens = parseInt(document.getElementById('sweep-max-gens').value);
+            const retain = document.getElementById('sweep-retain').checked;
+            this.app.analysis.runSweep(param, s, e, steps, maxGens, retain);
+        };
+        document.getElementById('btn-sweep-stop').onclick = () => this.app.analysis.stop();
+        
+        // Sweep Inputs Linking
+        document.getElementById('sweep-increment').oninput = () => this.updateSweepInputs('inc');
+        document.getElementById('sweep-steps').oninput = () => this.updateSweepInputs('steps');
+        document.getElementById('sweep-start').oninput = () => this.updateSweepInputs('range');
+        document.getElementById('sweep-end').oninput = () => this.updateSweepInputs('range');
+
+        const resizer = document.getElementById('resizer');
+        const sidebar = document.getElementById('sidebar');
+        resizer.onmousedown = (e) => {
+            e.preventDefault();
+            resizer.classList.add('active');
+            const startX = e.clientX, startW = sidebar.offsetWidth;
+            const doDrag = (ev) => {
+                sidebar.style.width = Math.max(200, startW + (ev.clientX - startX)) + 'px';
+                this.app.renderer.resize(); this.app.renderer.draw();
+            };
+            const stopDrag = () => { window.removeEventListener('mousemove', doDrag); window.removeEventListener('mouseup', stopDrag); resizer.classList.remove('active'); };
+            window.addEventListener('mousemove', doDrag); window.addEventListener('mouseup', stopDrag);
+        };
+        window.onkeydown = (e) => {
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+            if (e.code === 'Space') this.app.togglePlay();
+            if (e.code === 'ArrowRight') this.app.step();
+            if (e.code === 'KeyR' && e.ctrlKey) { e.preventDefault(); this.app.compile(); }
+            else if (e.code === 'KeyR') this.app.reset();
+        }
+        window.onresize = () => { this.app.renderer.resize(); this.app.renderer.draw(); };
+    }
+    
+    updateSweepInputs(source) {
+        const start = parseFloat(document.getElementById('sweep-start').value);
+        const end = parseFloat(document.getElementById('sweep-end').value);
+        const range = end - start;
+        
+        if (source === 'range' || source === 'steps') {
+            const steps = parseInt(document.getElementById('sweep-steps').value) || 1;
+            const inc = range / steps;
+            document.getElementById('sweep-increment').value = parseFloat(inc.toFixed(2));
+        } else if (source === 'inc') {
+            const inc = parseFloat(document.getElementById('sweep-increment').value) || 1;
+            if (inc !== 0) {
+                const steps = Math.floor(range / inc);
+                document.getElementById('sweep-steps').value = steps;
+            }
+        }
+    }
+
+    handleDraw(e) {
+        const coords = this.app.renderer.screenToWorld(e.clientX, e.clientY);
+        const size = parseInt(document.getElementById('hud-brush').value);
+        if (coords.x >= 0 && coords.x < this.app.sim.w && coords.y >= 0 && coords.y < this.app.sim.h) {
+            this.app.sim.setCell(coords.x, coords.y, 1, size);
+            this.app.renderer.updateOffscreen();
+            this.app.renderer.draw();
+        }
+    }
+
+    setupDesigner() {
+        const makeGrid = (id, prefix) => {
+            const el = document.getElementById(id);
+            for(let i=0; i<=8; i++) {
+                const d = document.createElement('div');
+                d.className = 'rule-check';
+                d.innerHTML = `<span>${i}</span>`;
+                d.onclick = () => { d.classList.toggle('active'); this.triggerDesignerUpdate(); };
+                d.id = `${prefix}${i}`;
+                el.appendChild(d);
+            }
+        };
+        makeGrid('grid-birth', 'b');
+        makeGrid('grid-survive', 's');
+        document.getElementById('b3').classList.add('active');
+        document.getElementById('s2').classList.add('active');
+        document.getElementById('s3').classList.add('active');
+        document.querySelectorAll('#view-designer input, #view-designer select').forEach(el => {
+            el.oninput = () => this.triggerDesignerUpdate();
+        });
+        document.getElementById('des-algo').onchange = (e) => {
+            document.querySelectorAll('.algo-panel').forEach(p => p.style.display = 'none');
+            const map = { 'life': 'panel-life', 'generations': 'panel-generations', 'cyclic': 'panel-cyclic', 'average': 'panel-average' };
+            document.getElementById(map[e.target.value]).style.display = 'block';
+            this.triggerDesignerUpdate();
+        };
+    }
+
+    triggerDesignerUpdate() { if (!this.isCodeDirty) this.app.updateFromDesigner(); }
+
+    getDesignerState() {
+        const b = [], s = [];
+        for(let i=0; i<=8; i++) {
+            if(document.getElementById('b'+i).classList.contains('active')) b.push(i);
+            if(document.getElementById('s'+i).classList.contains('active')) s.push(i);
+        }
+        return {
+            w: parseInt(document.getElementById('des-w').value),
+            h: parseInt(document.getElementById('des-h').value),
+            initType: document.getElementById('des-init-type').value,
+            initVal: parseInt(document.getElementById('des-init-val').value),
+            algo: document.getElementById('des-algo').value,
+            births: b, survives: s,
+            states: parseInt(document.getElementById('des-states').value) || 8,
+            cycStates: parseInt(document.getElementById('des-cyc-states').value) || 14,
+            cycThresh: parseInt(document.getElementById('des-cyc-thresh').value) || 1,
+            smooth: parseFloat(document.getElementById('des-smooth').value),
+            c1: document.getElementById('des-col1').value,
+            c0: document.getElementById('des-col0').value,
+            renderMode: document.getElementById('des-render-mode').value
+        };
+    }
+
+    generateCode(state) {
+        let initCode = `init: () => 0`;
+        const val = state.initVal / 100; // Normalize 0-1
+        
+        if (state.initType === 'random') {
+            initCode = `init: () => Math.random() < ${val} ? 1 : 0`;
+        } else if (state.initType === 'center') {
+            // Exact center point
+            initCode = `init: (x,y) => (x === Math.floor(${state.w}/2) && y === Math.floor(${state.h}/2)) ? 1 : 0`;
+        } else if (state.initType === 'filled_circle') {
+            // Filled Circle based on radius (mapped from val 0-100% of half width)
+            initCode = `init: (x,y) => Math.hypot(x-${state.w/2}, y-${state.h/2}) < ${val * state.w/2} ? 1 : 0`;
+        } else if (state.initType === 'circle') {
+            // Hollow Ring
+            const r = val * state.w/2;
+            initCode = `init: (x,y) => { const d = Math.hypot(x-${state.w/2}, y-${state.h/2}); return (d > ${r} - 1 && d < ${r} + 1) ? 1 : 0; }`;
+        } else if (state.initType === 'empty') {
+            initCode = `init: () => 0`;
+        }
+        
+        let updateCode = "";
+        let type = "";
+        
+        if (state.algo === 'life') {
+            updateCode = `update: (v, n) => {
+        let s = 0; for(let i=0; i<n.length; i++) s += n[i];
+        const b = [${state.births.join(',')}];
+        const s_ = [${state.survives.join(',')}];
+        if(v === 0) return b.includes(s) ? 1 : 0;
+        return s_.includes(s) ? 1 : 0;
+    }`;
+        } else if (state.algo === 'generations') {
+            updateCode = `update: (v, n) => {
+        let s = 0; for(let i=0; i<n.length; i++) s += (n[i]===1 ? 1 : 0);
+        if(v === 0) return s === 3 ? 1 : 0; 
+        if(v === 1) return (s === 2 || s === 3) ? 1 : 2; 
+        return (v + 1) % ${state.states}; 
+    }`;
+        } else if (state.algo === 'average') {
+            type = "type: 'float',";
+            updateCode = `update: (v, n) => {
+        let s = 0; for(let x of n) s += x;
+        return v * ${1 - state.smooth} + (s/n.length) * ${state.smooth};
+    }`;
+        }
+        const rgb1 = this.hexToRgb(state.c1);
+        const rgb0 = this.hexToRgb(state.c0);
+        return `return { dimensions: [${state.w}, ${state.h}], ${type} ${initCode}, neighborhood: 'moore', renderMode: '${state.renderMode}', getColor: (v) => v > 0 ? [${rgb1.r}, ${rgb1.g}, ${rgb1.b}, 255] : [${rgb0.r}, ${rgb0.g}, ${rgb0.b}, 255], ${updateCode} };`;
+    }
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0};
+    }
+    renderPresets() {
+        const list = document.getElementById('preset-list');
+        list.innerHTML = "";
+        Object.keys(PRESETS).forEach(k => {
+            const div = document.createElement('div');
+            div.className = 'preset-item';
+            div.innerText = k;
+            div.onclick = () => { this.app.loadCode(PRESETS[k]); this.isCodeDirty = true; };
+            list.appendChild(div);
+        });
+    }
+    handleImport(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => this.app.loadCode(ev.target.result);
+        reader.readAsText(file);
+    }
+    handleExport() {
+        const blob = new Blob([document.getElementById('code-area').value], {type: 'text/javascript'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'ca_logic.js'; a.click();
+    }
+}
+
+class App {
+    constructor() {
+        this.sim = new SimulationEngine();
+        this.renderer = new Renderer(document.getElementById('main-canvas'), document.getElementById('overlay-canvas'), this.sim);
+        this.analysis = new AnalysisEngine(this);
+        this.ui = new UIManager(this);
+        this.isRunning = false;
+        this.stepsPerFrame = 1;
+        this.lastTime = 0;
+        this.frameCount = 0;
+        this.fpsTimer = 0;
+        const saved = localStorage.getItem('ca_code');
+        if (saved) this.loadCode(saved);
+        else this.updateFromDesigner();
+        this.loop();
+    }
+    loadCode(code) { document.getElementById('code-area').value = code; this.compile(); }
+    updateFromDesigner() {
+        const state = this.ui.getDesignerState();
+        const code = this.ui.generateCode(state);
+        document.getElementById('code-area').value = code;
+        this.compile();
+    }
+    compile() {
+        this.isRunning = false;
+        const code = document.getElementById('code-area').value;
+        const res = this.sim.load(code);
+        const dot = document.getElementById('status-indicator');
+        const msg = document.getElementById('viewport-msg');
+        if (res.success) {
+            dot.className = 'status-dot ok';
+            msg.innerText = "Compiled Successfully";
+            msg.style.opacity = 1;
+            setTimeout(() => msg.style.opacity = 0, 2000);
+            const container = document.getElementById('viewport');
+            const zoom = Math.min((container.offsetWidth - 40) / res.w, (container.offsetHeight - 40) / res.h);
+            this.renderer.cam = { x: (container.offsetWidth - res.w * zoom) / 2, y: (container.offsetHeight - res.h * zoom) / 2, zoom: zoom || 1 };
+            this.renderer.updateOffscreen();
+            this.renderer.draw();
+            localStorage.setItem('ca_code', code);
+        } else {
+            dot.className = 'status-dot err';
+            msg.innerText = "Error: " + res.error.message;
+            msg.style.opacity = 1;
+        }
+        this.updateHUD();
+    }
+    togglePlay() {
+        this.isRunning = !this.isRunning;
+        document.getElementById('viewport-msg').innerText = this.isRunning ? "Running" : "Paused";
+        document.getElementById('viewport-msg').style.opacity = 1;
+        setTimeout(() => document.getElementById('viewport-msg').style.opacity = 0, 1000);
+        document.getElementById('hud-play').innerHTML = this.isRunning ? `<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>` : `<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+    }
+    step() { this.sim.step(); this.renderer.updateOffscreen(); this.renderer.draw(); this.updateHUD(); }
+    reset() { this.sim.reset(); this.renderer.updateOffscreen(); this.renderer.draw(); this.updateHUD(); }
+    loop() {
+        requestAnimationFrame(() => this.loop());
+        if (this.isRunning) {
+            for (let i = 0; i < this.stepsPerFrame; i++) {
+                this.sim.step();
+                this.sim.addToHeatmap(); // Normal mode: Accumulate continuously
+            }
+            this.renderer.updateOffscreen();
+            this.renderer.draw();
+            this.updateHUD();
+        }
+        const now = performance.now();
+        this.frameCount++;
+        if (now - this.fpsTimer > 1000) {
+            document.getElementById('hud-fps').innerText = this.frameCount;
+            this.frameCount = 0;
+            this.fpsTimer = now;
+            this.drawLiveGraph();
+        }
+        // Update overlay less frequently for performance
+        if (this.frameCount % 5 === 0) this.renderer.drawHeatmapOverlay();
+    }
+    updateHUD() { document.getElementById('hud-gen').innerText = this.sim.gen; }
+    drawLiveGraph() {
+        const cvs = document.getElementById('graph-live');
+        if (cvs.offsetParent === null) return;
+        const ctx = cvs.getContext('2d');
+        const w = cvs.width = cvs.offsetWidth;
+        const h = cvs.height = cvs.offsetHeight;
+        ctx.fillStyle = "#0c0c0e";
+        ctx.fillRect(0,0,w,h);
+        ctx.strokeStyle = "#222"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, h*0.25); ctx.lineTo(w, h*0.25); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, h*0.75); ctx.lineTo(w, h*0.75); ctx.stroke();
+        let data = this.sim.history;
+        if (data.length < 2) return;
+        if (this.ui.vizOptions.rolling) { data = data.slice(-300); }
+        const minGen = data[0].gen;
+        const maxGen = data[data.length-1].gen;
+        const rangeX = Math.max(1, maxGen - minGen);
+        const drawLine = (prop, color, scaleMax = 1) => {
+            if (!this.ui.vizOptions[prop]) return;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for(let i=0; i<data.length; i++) {
+                const x = ((data[i].gen - minGen) / rangeX) * w;
+                const val = data[i][prop] || 0;
+                const y = h - ((val / scaleMax) * h);
+                if (i===0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        };
+        let maxEnt = 0;
+        let maxFlux = 0;
+        for(let d of data) {
+            maxEnt = Math.max(maxEnt, d.entropy);
+            maxFlux = Math.max(maxFlux, d.flux);
+        }
+        drawLine('density', '#3b82f6', 1);
+        drawLine('entropy', '#f59e0b', Math.max(0.1, maxEnt));
+        drawLine('flux', '#ec4899', Math.max(0.01, maxFlux));
+    }
+}
+window.app = new App();
+</script>
+</body>
+</html>
