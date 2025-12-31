@@ -3,776 +3,992 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPGPU CA IDE</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Universal CA IDE</title>
     <style>
-        :root { --bg: #050505; --panel: #111; --border: #333; --accent: #0f0; --text: #ccc; --grid: #1a1a1a; }
-        body { background: var(--bg); color: var(--text); font-family: monospace; overflow: hidden; margin: 0; }
-        .node { position: absolute; background: var(--panel); border: 1px solid var(--border); min-width: 140px; user-select: none; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.5); border-radius: 0; }
-        .node.selected { border-color: var(--accent); z-index: 20; }
-        .node-header { background: #161616; padding: 4px 8px; font-weight: 700; cursor: grab; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .node-header:active { cursor: grabbing; }
-        .node-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-        .socket { height: 18px; display: flex; align-items: center; position: relative; font-size: 10px; color: #888; }
-        .socket:hover { color: #fff; }
-        .socket.in { justify-content: flex-start; }
-        .socket.out { justify-content: flex-end; }
-        .port { width: 10px; height: 10px; background: #333; border: 1px solid #555; cursor: crosshair; transition: all 0.1s; }
-        .port:hover { border-color: #fff; transform: scale(1.2); }
-        .socket.in .port { margin-right: 8px; }
-        .socket.out .port { margin-left: 8px; }
-        .port[data-type="float"] { background: #888; }
-        .port[data-type="vec"] { background: #0f0; }
-        .port[data-type="bool"] { background: #f0f; }
-        .port[data-type="color"] { background: #f80; }
-        #editor-area { background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 20px 20px; cursor: default; }
-        #connections-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
-        path { fill: none; stroke: #555; stroke-width: 2px; }
-        path.active { stroke: var(--accent); stroke-dasharray: 5; animation: dash 1s linear infinite; }
-        @keyframes dash { to { stroke-dashoffset: -10; } }
-        #context-menu { display: none; position: absolute; background: #111; border: 1px solid #444; z-index: 100; min-width: 150px; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
-        .menu-item { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid #222; font-size: 11px; }
-        .menu-item:hover { background: var(--accent); color: #000; }
-        input[type="number"], input[type="text"] { background: #000; border: 1px solid #333; color: var(--accent); width: 100%; padding: 2px 6px; font-family: monospace; outline: none; }
-        input:focus { border-color: var(--accent); }
-        button:active { transform: translateY(1px); }
-        input[type="range"] { -webkit-appearance: none; background: #222; height: 4px; border-radius: 2px; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #0f0; cursor: pointer; border-radius: 0; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #111; }
-        ::-webkit-scrollbar-thumb { background: #333; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        :root {
+            --bg: #050505;
+            --panel: #111111;
+            --border: #333333;
+            --text: #cccccc;
+            --accent: #0066ff;
+            --accent-hover: #0044cc;
+            --accent-text: #ffffff;
+            --error: #ff3333;
+            --success: #33ff33;
+            --font-ui: 'Segoe UI', system-ui, sans-serif;
+            --font-mono: 'Menlo', 'Consolas', monospace;
+        }
+
+        * { box-sizing: border-box; outline: none; border-radius: 0 !important; }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-ui);
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* --- LAYOUT --- */
+        #container { display: flex; width: 100%; height: 100%; }
+
+        #sidebar {
+            width: 440px; min-width: 320px;
+            display: flex; flex-direction: column;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            z-index: 10;
+        }
+
+        #resizer {
+            width: 4px; cursor: col-resize;
+            background: var(--border);
+            transition: background 0.2s;
+        }
+        #resizer:hover, #resizer.resizing { background: var(--accent); }
+
+        #main-view {
+            flex: 1; position: relative;
+            background: #000; overflow: hidden;
+            cursor: crosshair;
+        }
+
+        /* --- SIDEBAR COMPONENTS --- */
+        .header {
+            padding: 10px 12px;
+            background: #1a1a1a;
+            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            font-family: var(--font-mono); font-size: 11px;
+            letter-spacing: 1px; text-transform: uppercase;
+        }
+        .header-title { color: #fff; font-weight: 700; }
+
+        /* Tabs */
+        .tab-bar { display: flex; background: #0d0d0d; border-bottom: 1px solid var(--border); }
+        .tab {
+            flex: 1; padding: 10px; text-align: center; cursor: pointer;
+            font-size: 11px; color: #666; text-transform: uppercase;
+            border-bottom: 2px solid transparent; font-weight: 600;
+            transition: color 0.2s;
+        }
+        .tab:hover { color: #999; }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        /* Presets */
+        .section-label {
+            padding: 6px 12px; background: #0d0d0d;
+            border-bottom: 1px solid var(--border); border-top: 1px solid var(--border);
+            font-size: 10px; color: #555; text-transform: uppercase;
+            letter-spacing: 1px; font-weight: 700;
+        }
+
+        .presets-container {
+            max-height: 120px; overflow-y: auto;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .preset-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; border-bottom: 1px solid #1a1a1a;
+            cursor: pointer; font-size: 12px; transition: background 0.1s;
+        }
+        .preset-item:hover { background: #1a1a1a; }
+        .preset-item.active { background: var(--accent); color: white; }
+        
+        .icon-btn-small {
+            background: transparent; border: none; color: inherit;
+            cursor: pointer; padding: 2px; opacity: 0.6;
+        }
+        .icon-btn-small:hover { opacity: 1; }
+
+        /* Toolbar */
+        .toolbar { display: flex; gap: 1px; background: var(--border); padding: 1px; }
+        .tool-btn {
+            flex: 1; background: var(--panel); border: none;
+            color: var(--text); padding: 8px; font-size: 11px;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .tool-btn:hover { background: #222; }
+
+        /* Editors */
+        #content-area { flex: 1; position: relative; display: flex; overflow: hidden; }
+
+        #code-editor {
+            width: 100%; height: 100%;
+            background: #080808; color: #d4d4d4;
+            border: none; padding: 12px;
+            font-family: var(--font-mono); font-size: 13px;
+            line-height: 1.5; resize: none;
+        }
+
+        #visual-editor, #analysis-editor {
+            width: 100%; height: 100%;
+            background: #0e0e0e; overflow-y: auto;
+            padding: 0; display: none;
+        }
+
+        /* Visual Controls */
+        .v-section { padding: 15px; border-bottom: 1px solid var(--border); }
+        .v-head {
+            font-size: 10px; text-transform: uppercase;
+            color: var(--accent); font-weight: 700;
+            margin-bottom: 10px; letter-spacing: 0.5px;
+        }
+        .v-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .v-row.tight { margin-bottom: 5px; }
+        .v-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .v-label { font-size: 10px; color: #777; }
+        
+        .v-input, .v-select {
+            background: #1a1a1a; border: 1px solid var(--border);
+            color: white; padding: 6px; width: 100%;
+            font-size: 12px; font-family: var(--font-mono);
+        }
+        .v-input:focus, .v-select:focus { border-color: var(--accent); }
+        
+        .v-color {
+            width: 100%; height: 28px;
+            border: 1px solid var(--border);
+            background: none; cursor: pointer; padding: 0;
+        }
+
+        .check-grid {
+            display: grid; grid-template-columns: repeat(9, 1fr);
+            gap: 1px; background: var(--border); border: 1px solid var(--border);
+        }
+        .check-box-wrapper {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: #1a1a1a; padding: 4px 0; cursor: pointer;
+        }
+        .check-box-wrapper:hover { background: #222; }
+        .check-box-wrapper input { cursor: pointer; margin-bottom: 2px; }
+        .check-box-wrapper span { font-size: 9px; color: #666; }
+        
+        .checkbox-row {
+            display: flex; align-items: center; gap: 8px;
+            color: #ccc; font-size: 11px; cursor: pointer;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 12px; width: 12px;
+            background: var(--accent); margin-top: -5px; cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 2px; background: #333;
+        }
+
+        /* Analysis Graphs */
+        .graph-container {
+            background: #000; border: 1px solid var(--border);
+            height: 150px; position: relative; margin-top: 5px;
+        }
+        .graph-canvas { display: block; width: 100%; height: 100%; }
+        .graph-overlay {
+            position: absolute; top: 4px; left: 4px;
+            font-size: 9px; color: #666; font-family: var(--font-mono);
+        }
+        
+        .progress-bar {
+            height: 4px; width: 100%; background: #222;
+            margin-top: 10px; position: relative;
+        }
+        .progress-fill {
+            height: 100%; background: var(--accent); width: 0%;
+            transition: width 0.1s;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            padding: 0 12px; background: #111;
+            border-top: 1px solid var(--border);
+            font-size: 10px; font-family: var(--font-mono);
+            display: flex; justify-content: space-between;
+            align-items: center; height: 24px; color: #555;
+        }
+        .status-text.error { color: var(--error); }
+        .status-text.ok { color: var(--success); }
+
+        /* HUD */
+        #hud {
+            position: absolute; top: 0; left: 0; width: 100%;
+            padding: 8px; pointer-events: none;
+            display: flex; justify-content: space-between;
+            align-items: flex-start;
+        }
+        .hud-panel {
+            background: rgba(0,0,0,0.85); border: 1px solid var(--border);
+            padding: 6px 12px; pointer-events: auto;
+            display: flex; gap: 12px; align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .hud-group { display: flex; flex-direction: column; gap: 1px; }
+        .hud-label { font-size: 8px; color: #666; text-transform: uppercase; font-family: var(--font-mono); font-weight: 700; }
+        .hud-value { font-size: 12px; font-family: var(--font-mono); color: #fff; }
+
+        .btn-icon {
+            background: transparent; border: 1px solid #333;
+            color: #aaa; width: 28px; height: 28px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .btn-icon:hover { background: #222; border-color: #666; color: #fff; }
+        .btn-icon.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .btn-icon svg { width: 12px; height: 12px; }
+
+        /* Modals */
+        #modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 100;
+            display: none; justify-content: center; align-items: center;
+        }
+        #modal {
+            background: var(--panel); border: 1px solid var(--border);
+            padding: 20px; width: 320px;
+            display: flex; flex-direction: column; gap: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        #modal h3 { margin: 0; font-size: 12px; text-transform: uppercase; color: #666; }
+        #modal input { background: #000; border: 1px solid var(--border); color: white; padding: 10px; font-family: var(--font-mono); font-size: 12px; }
+        #modal-actions { display: flex; gap: 10px; }
+        #modal button { flex: 1; padding: 10px; cursor: pointer; border: none; font-size: 11px; text-transform: uppercase; font-weight: 700; }
+        #modal-save { background: var(--accent); color: white; }
+        #modal-cancel { background: #222; color: #aaa; }
+        
+        .no-select { user-select: none; }
+        
+        .run-btn {
+             width: 100%; background: var(--accent); color: white;
+             border: none; padding: 10px;
+             text-transform: uppercase; font-weight: bold;
+             font-size: 11px; cursor: pointer;
+        }
+        .run-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
     </style>
 </head>
-<body class="flex h-screen w-screen text-xs select-none">
-    <div class="flex flex-col w-1/2 border-r border-[#333] z-20 shadow-xl bg-black">
-        <div class="bg-[#111] p-2 border-b border-[#333] flex flex-wrap gap-4 justify-between items-center shrink-0">
-            <span class="font-bold text-[#0f0] tracking-wider">GPU CA ENGINE</span>
-            <div class="flex gap-4 items-center">
-                <div class="flex items-center gap-2" title="Simulation Speed">
-                    <span class="text-gray-500">SPD</span>
-                    <input type="range" id="sim-speed" min="1" max="120" value="60" class="w-20">
+<body>
+
+<div id="container">
+    <div id="sidebar">
+        <div class="header">
+            <span class="header-title">Universal CA IDE</span>
+            <span id="status-ind" style="color:var(--success)">Ready</span>
+        </div>
+        
+        <div class="tab-bar no-select">
+            <div class="tab active" id="tab-code" onclick="switchTab('code')">Code</div>
+            <div class="tab" id="tab-visual" onclick="switchTab('visual')">Designer</div>
+            <div class="tab" id="tab-analysis" onclick="switchTab('analysis')">Analysis</div>
+        </div>
+
+        <div class="section-label no-select">Presets</div>
+        <div class="presets-container custom-scroll">
+            <div class="presets-list" id="preset-list"></div>
+        </div>
+        
+        <div class="toolbar">
+            <button class="tool-btn" id="btn-save">Save</button>
+            <button class="tool-btn" id="btn-import">Import</button>
+            <button class="tool-btn" id="btn-export">Export</button>
+            <button class="tool-btn" id="btn-reset-cam">Center View</button>
+        </div>
+
+        <div id="content-area">
+            <textarea id="code-editor" spellcheck="false"></textarea>
+            
+            <!-- VISUAL EDITOR -->
+            <div id="visual-editor" class="custom-scroll">
+                <div class="v-section">
+                    <div class="v-head">World Configuration</div>
+                    <div class="v-row">
+                        <div class="v-col"><span class="v-label">Width</span><input type="number" id="v-dim-w" class="v-input" value="200" min="10"></div>
+                        <div class="v-col"><span class="v-label">Height</span><input type="number" id="v-dim-h" class="v-input" value="200" min="10"></div>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2" title="Resolution">
-                    <span class="text-gray-500">RES</span>
-                    <select id="sim-res" class="bg-[#000] border border-[#333] text-[#ccc] px-1 py-0.5 outline-none">
-                        <option value="128">128</option>
-                        <option value="256">256</option>
-                        <option value="512" selected>512</option>
-                        <option value="1024">1024</option>
-                        <option value="2048">2048</option>
-                    </select>
+                <div class="v-section">
+                    <div class="v-head">Initialization</div>
+                    <div class="v-row">
+                        <div class="v-col">
+                            <span class="v-label">Pattern</span>
+                            <select id="v-init-type" class="v-select">
+                                <option value="random">Random Noise</option>
+                                <option value="center">Center Dot</option>
+                                <option value="circle">Center Circle</option>
+                                <option value="empty">Empty (Draw Manual)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="v-row" id="v-row-density">
+                        <div class="v-col">
+                            <span class="v-label">Density / Radius</span>
+                            <input type="range" id="v-init-val" min="0" max="100" value="50">
+                        </div>
+                        <span id="v-init-disp" style="font-size:10px; width:25px; text-align:right">0.5</span>
+                    </div>
+                </div>
+                <div class="v-section">
+                    <div class="v-head">Rule Definition</div>
+                    <div class="v-row">
+                        <div class="v-col">
+                            <span class="v-label">Algorithm Logic</span>
+                            <select id="v-algo-type" class="v-select">
+                                <option value="life">Life-like (B/S)</option>
+                                <option value="generations">Generations (Decay)</option>
+                                <option value="cyclic">Cyclic (Demon)</option>
+                                <option value="average">Weighted Average (Float)</option>
+                            </select>
+                        </div>
+                    </div>
+                     <div class="v-row">
+                        <div class="v-col">
+                            <span class="v-label">Neighborhood Type</span>
+                            <select id="v-neigh-type" class="v-select">
+                                <option value="moore">Moore (8)</option>
+                                <option value="von_neumann">Von Neumann (4)</option>
+                            </select>
+                        </div>
+                        <div class="v-col">
+                            <span class="v-label">Range</span>
+                            <input type="number" id="v-neigh-range" class="v-input" value="1" min="1" max="5">
+                        </div>
+                    </div>
+                    <div id="v-panel-life">
+                        <span class="v-label">Birth Count</span><div class="check-grid" id="v-grid-b"></div><br>
+                        <span class="v-label">Survive Count</span><div class="check-grid" id="v-grid-s"></div>
+                    </div>
+                    <div id="v-panel-gen" style="display:none; margin-top:10px;">
+                        <div class="v-col"><span class="v-label">Decay States</span><input type="number" id="v-states-gen" class="v-input" value="8" min="3" max="255"></div>
+                    </div>
+                    <div id="v-panel-cyclic" style="display:none; margin-top:10px;">
+                        <div class="v-row">
+                            <div class="v-col"><span class="v-label">Total States</span><input type="number" id="v-states-cyc" class="v-input" value="14" min="2" max="255"></div>
+                            <div class="v-col"><span class="v-label">Threshold</span><input type="number" id="v-thresh-cyc" class="v-input" value="1" min="1"></div>
+                        </div>
+                    </div>
+                    <div id="v-panel-avg" style="display:none; margin-top:10px;">
+                        <div class="v-col"><span class="v-label">Smoothing Factor</span><input type="number" id="v-smooth" class="v-input" value="0.1" step="0.01" min="0" max="1"></div>
+                    </div>
+                </div>
+                <div class="v-section">
+                    <div class="v-head">Appearance</div>
+                    <div class="v-row">
+                        <div class="v-col"><span class="v-label">State 0 (Dead)</span><input type="color" id="v-col-0" class="v-color" value="#000000"></div>
+                        <div class="v-col"><span class="v-label">State N (Alive)</span><input type="color" id="v-col-1" class="v-color" value="#ffffff"></div>
+                    </div>
                 </div>
             </div>
-            <div class="flex gap-1">
-                <button id="btn-play" class="bg-[#222] hover:bg-[#333] text-white px-3 py-1 border border-[#444] min-w-[60px]">PAUSE</button>
-                <button id="btn-step" class="bg-[#222] hover:bg-[#333] text-white px-3 py-1 border border-[#444]">STEP</button>
-                <button id="btn-reset" class="bg-[#222] hover:bg-[#333] text-white px-3 py-1 border border-[#444] text-red-400 border-red-900/30">RESET</button>
+
+            <!-- ANALYSIS EDITOR -->
+            <div id="analysis-editor" class="custom-scroll">
+                 <div class="v-section">
+                    <div class="v-head">Simulation Control</div>
+                    <div class="v-row">
+                        <div class="v-col">
+                            <span class="v-label">Simulation Speed (Steps/Frame)</span>
+                            <input type="range" id="a-speed" min="1" max="50" value="1">
+                        </div>
+                        <span id="a-speed-disp" style="font-size:12px; font-weight:bold; width:30px; text-align:right">1x</span>
+                    </div>
+                </div>
+
+                <div class="v-section">
+                    <div class="v-head">Live Monitoring</div>
+                    <div class="graph-container">
+                        <canvas id="live-graph" class="graph-canvas"></canvas>
+                        <div class="graph-overlay">Population Density</div>
+                    </div>
+                    <div class="v-row tight" style="margin-top:5px; justify-content: space-between;">
+                        <span class="v-label">Current: <span id="lbl-pop" style="color:#fff">0%</span></span>
+                        <span class="v-label">Entropy: <span id="lbl-ent" style="color:#fff">0</span></span>
+                    </div>
+                </div>
+
+                <div class="v-section">
+                    <div class="v-head">Parameter Sweep Experiment</div>
+                    <div class="v-label" style="margin-bottom:8px">Run multiple simulations varying a specific parameter to analyze stability or visualize probability clouds.</div>
+                    
+                    <div class="v-row">
+                        <div class="v-col">
+                            <span class="v-label">Target Parameter</span>
+                            <select id="s-param" class="v-select">
+                                <option value="initV">Initial Density / Radius</option>
+                                <option value="smooth">Smoothing (Avg)</option>
+                                <option value="vThreshCyc">Threshold (Cyc)</option>
+                                <option value="range">Range (Neigh)</option>
+                                <option value="vStatesGen">Decay States (Gen)</option>
+                                <option value="vStatesCyc">Total States (Cyc)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="v-row">
+                         <div class="v-col"><span class="v-label">Start</span><input type="number" id="s-start" class="v-input" value="10"></div>
+                         <div class="v-col"><span class="v-label">End</span><input type="number" id="s-end" class="v-input" value="90"></div>
+                         <div class="v-col"><span class="v-label">Steps</span><input type="number" id="s-steps" class="v-input" value="10"></div>
+                    </div>
+                    
+                    <div class="v-row">
+                        <div class="v-col">
+                            <span class="v-label">Generations per Run</span>
+                            <input type="number" id="s-gens" class="v-input" value="200">
+                        </div>
+                    </div>
+
+                    <label class="checkbox-row" style="margin-bottom:15px; margin-top:5px;">
+                        <input type="checkbox" id="s-onion">
+                        <span>Visual Overlay (Onion Skin)</span>
+                    </label>
+
+                    <button id="btn-run-sweep" class="run-btn">Run Experiment</button>
+                    <button id="btn-view-overlay" class="tool-btn" style="margin-top:5px; display:none;">View Overlay Map</button>
+                    
+                    <div class="progress-bar">
+                        <div id="sweep-progress" class="progress-fill"></div>
+                    </div>
+
+                    <div class="graph-container" style="height: 200px; margin-top:10px;">
+                        <canvas id="sweep-graph" class="graph-canvas"></canvas>
+                        <div class="graph-overlay">Experiment Results</div>
+                    </div>
+                </div>
             </div>
+
         </div>
-        <div class="flex-grow relative bg-[#050505] overflow-hidden group cursor-crosshair" id="canvas-container">
-            <div id="canvas-wrapper" class="origin-center w-full h-full flex items-center justify-center">
-                <canvas id="gl-canvas" class="image-pixelated shadow-2xl"></canvas>
-            </div>
-            <div class="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none">
-                <div id="fps-counter" class="font-mono text-[#0f0] bg-black/70 px-2 py-0.5 rounded backdrop-blur-sm">0 FPS</div>
-                <div id="zoom-level" class="font-mono text-gray-500 text-[10px] bg-black/70 px-2 py-0.5 rounded backdrop-blur-sm">100%</div>
-            </div>
-            <div class="absolute bottom-2 left-2 pointer-events-none text-gray-600">Pan: M-Click/Space | Zoom: Scroll</div>
-        </div>
-        <div class="h-8 bg-[#111] border-t border-[#333] flex items-center px-2 gap-2 shrink-0">
-            <span class="text-gray-500 text-[10px] w-8">HIST</span>
-            <input type="range" id="history-slider" min="0" max="0" value="0" class="flex-grow h-4 opacity-50 hover:opacity-100 transition-opacity" disabled>
-            <span id="history-frame" class="text-gray-500 text-[10px] w-12 text-right">0</span>
-        </div>
-        <div class="h-24 bg-[#0a0a0a] border-t border-[#333] p-2 font-mono text-[10px] overflow-auto flex flex-col-reverse" id="console-log">
-            <div class="text-[#444]">> System Ready</div>
+
+        <div class="status-bar">
+            <span id="status-msg">System Ready</span>
+            <span id="dims-display" style="font-family:var(--font-mono)">0x0</span>
         </div>
     </div>
-    <div class="relative w-1/2 bg-[#080808] overflow-hidden flex flex-col" id="editor-area">
-        <div class="absolute top-0 left-0 w-full z-20 p-2 flex justify-between pointer-events-none bg-gradient-to-b from-black/80 to-transparent">
-            <div class="flex gap-2 pointer-events-auto items-center">
-                <select id="preset-select" class="bg-[#111] border border-[#444] text-white px-2 py-1 outline-none hover:border-[#0f0] cursor-pointer shadow-lg">
-                    <option value="" disabled selected>LOAD PRESET</option>
-                    <option value="gol">Game of Life</option>
-                    <option value="high">HighLife</option>
-                    <option value="day">Day & Night</option>
-                    <option value="maze">Maze Generator</option>
-                    <option value="brain">Reaction Diffusion</option>
-                    <option value="cyc">Cyclic Demon</option>
-                </select>
-                <div class="text-[10px] text-gray-500 ml-2" id="compile-status">AUTO-COMPILE ON</div>
+
+    <div id="resizer"></div>
+
+    <div id="main-view">
+        <canvas id="sim-canvas"></canvas>
+
+        <div id="hud">
+            <div class="hud-panel">
+                <button class="btn-icon" id="btn-play" title="Play/Pause (Space)">
+                    <svg viewBox="0 0 24 24" fill="currentColor" id="icon-play"><path d="M8 5v14l11-7z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="currentColor" id="icon-pause" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+                <button class="btn-icon" id="btn-step" title="Step (Right Arrow)">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/></svg>
+                </button>
+                <button class="btn-icon" id="btn-restart" title="Restart (R)">
+                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                </button>
+                <div class="hud-group">
+                    <span class="hud-label">Gen</span>
+                    <span class="hud-value" id="val-gen">0</span>
+                </div>
+                <div class="hud-group">
+                    <span class="hud-label">FPS</span>
+                    <span class="hud-value" id="val-fps">0</span>
+                </div>
             </div>
-            <button id="btn-clear" class="bg-[#222] border border-[#444] text-white px-3 py-1 hover:text-red-400 hover:border-red-400 transition-colors pointer-events-auto shadow-lg">CLEAR GRAPH</button>
+
+            <div class="hud-panel" id="slice-controls" style="display:none;">
+                <div class="hud-group">
+                    <span class="hud-label">Z-Slice</span>
+                    <input type="range" id="slice-slider" min="0" step="1" style="width:80px">
+                </div>
+                <span class="hud-value" id="val-slice">0</span>
+            </div>
         </div>
-        <div id="graph-transform" class="origin-top-left w-full h-full absolute top-0 left-0">
-            <svg id="connections-svg"></svg>
-            <div id="nodes-container"></div>
-        </div>
-        <div id="context-menu"></div>
-        <div class="absolute bottom-2 right-2 text-[10px] text-gray-600 pointer-events-none text-right">R-Click: Add Node<br>Drag: Move | Scroll: Zoom</div>
     </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+    <div id="modal">
+        <h3>Save Preset</h3>
+        <input type="text" id="save-name" placeholder="Preset Name" maxlength="20">
+        <div id="modal-actions">
+            <button id="modal-cancel">Cancel</button>
+            <button id="modal-save">Save</button>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="file-input" accept=".json" style="display:none">
+
 <script>
-const byId = (id) => document.getElementById(id);
-const log = (message, type = 'info') => {
-    const div = document.createElement('div');
-    div.innerHTML = `<span class="opacity-50">${new Date().toLocaleTimeString()}</span> ${message}`;
-    div.style.color = type === 'error' ? '#f55' : (type === 'success' ? '#0f0' : '#888');
-    byId('console-log').prepend(div);
+// --- DEFAULT PRESETS ---
+const SYSTEM_PRESETS = {
+    template: { name: "Empty Template", code: `return {\n    dimensions: [200, 200],\n    init: () => 0,\n    neighborhood: 'moore',\n    getColor: (v) => v ? [255,255,255,255] : [0,0,0,255],\n    update: (v,n) => v\n};` },
+    life: { name: "Game of Life", code: `/* @VISUAL_CONFIG:{"dimW":200,"dimH":200,"initT":"random","initV":15,"algo":"life","b":[3],"s":[2,3],"neigh":"moore","range":1,"c0":"#141419","c1":"#ffffff"} */\nreturn {\n    dimensions: [200, 200],\n    init: (x,y) => Math.random() < 0.15 ? 1 : 0,\n    neighborhood: 'moore',\n    getColor: (v) => v ? [255, 255, 255, 255] : [20, 20, 25, 255],\n    update: (v, n) => {\n        let s = 0;\n        for(let i=0; i<n.length; i++) s += n[i];\n        if(v) return (s === 2 || s === 3) ? 1 : 0;\n        return (s === 3) ? 1 : 0;\n    }\n};` },
+    brain: { name: "Brian's Brain", code: `/* @VISUAL_CONFIG:{"dimW":200,"dimH":200,"initT":"random","initV":50,"algo":"generations","b":[2],"s":[],"genStates":3,"neigh":"moore","range":1,"c0":"#000000","c1":"#ffffff"} */\nreturn {\n    dimensions: [200, 200],\n    init: (x,y) => Math.random() < 0.5 ? 1 : 0,\n    neighborhood: 'moore',\n    getColor: (v) => {\n        if(v===0) return [0, 0, 0, 255];\n        if(v===1) return [255, 255, 255, 255];\n        return [0, 100, 255, 255];\n    },\n    update: (v, n) => {\n        let s = 0;\n        for(let i=0; i<n.length; i++) if(n[i]===1) s++;\n        if(v === 0) {\n            if([2].includes(s)) return 1;\n            return 0;\n        } else if (v === 1) {\n            return 2; \n        }\n        if(v < 3) return v + 1;\n        return 0; \n    }\n};` },
+    cyclic: { name: "Cyclic Demon", code: `/* @VISUAL_CONFIG:{"dimW":150,"dimH":150,"initT":"random","initV":50,"algo":"cyclic","cycStates":14,"cycThresh":1,"neigh":"von_neumann","range":1,"c0":"#ff0000","c1":"#0000ff"} */\nreturn {\n    dimensions: [150, 150],\n    init: () => Math.floor(Math.random() * 14),\n    neighborhood: 'von_neumann',\n    getColor: (v) => {\n        const t = v / 14;\n        const r = Math.sin(t * 6.28) * 127 + 128;\n        const g = Math.sin((t * 6.28) + 2) * 127 + 128;\n        const b = Math.sin((t * 6.28) + 4) * 127 + 128;\n        return [r, g, b, 255];\n    },\n    update: (v, n) => {\n        const next = (v + 1) % 14;\n        let count = 0;\n        for(let i=0; i<n.length; i++) if(n[i] === next) count++;\n        return (count >= 1) ? next : v;\n    }\n};` }
 };
-const debounce = (func, wait) => {
-    let timeout;
-    return (...args) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
+
+const dom = {
+    canvas: document.getElementById('sim-canvas'),
+    codeEditor: document.getElementById('code-editor'),
+    visualEditor: document.getElementById('visual-editor'),
+    analysisEditor: document.getElementById('analysis-editor'),
+    statusInd: document.getElementById('status-ind'),
+    presets: document.getElementById('preset-list'),
+    playBtn: document.getElementById('btn-play'),
+    stepBtn: document.getElementById('btn-step'),
+    restartBtn: document.getElementById('btn-restart'),
+    genVal: document.getElementById('val-gen'),
+    fpsVal: document.getElementById('val-fps'),
+    dimsVal: document.getElementById('dims-display'),
+    sliceCtrl: document.getElementById('slice-controls'),
+    sliceSlider: document.getElementById('slice-slider'),
+    sliceVal: document.getElementById('val-slice'),
+    sidebar: document.getElementById('sidebar'),
+    resizer: document.getElementById('resizer'),
+    mainView: document.getElementById('main-view'),
+    saveBtn: document.getElementById('btn-save'),
+    importBtn: document.getElementById('btn-import'),
+    exportBtn: document.getElementById('btn-export'),
+    resetCamBtn: document.getElementById('btn-reset-cam'),
+    modal: document.getElementById('modal-overlay'),
+    modalInput: document.getElementById('save-name'),
+    modalSave: document.getElementById('modal-save'),
+    modalCancel: document.getElementById('modal-cancel'),
+    fileInput: document.getElementById('file-input'),
+    tabCode: document.getElementById('tab-code'),
+    tabVisual: document.getElementById('tab-visual'),
+    tabAnalysis: document.getElementById('tab-analysis'),
+    // Visual Inputs
+    vDimW: document.getElementById('v-dim-w'), vDimH: document.getElementById('v-dim-h'),
+    vInitType: document.getElementById('v-init-type'), vInitVal: document.getElementById('v-init-val'), vInitDisp: document.getElementById('v-init-disp'),
+    vAlgo: document.getElementById('v-algo-type'), vNeigh: document.getElementById('v-neigh-type'), vRange: document.getElementById('v-neigh-range'),
+    vPanelLife: document.getElementById('v-panel-life'), vPanelGen: document.getElementById('v-panel-gen'), vPanelCyc: document.getElementById('v-panel-cyclic'), vPanelAvg: document.getElementById('v-panel-avg'),
+    vCol0: document.getElementById('v-col-0'), vCol1: document.getElementById('v-col-1'),
+    vStatesGen: document.getElementById('v-states-gen'), vStatesCyc: document.getElementById('v-states-cyc'), vThreshCyc: document.getElementById('v-thresh-cyc'), vSmooth: document.getElementById('v-smooth'),
+    // Analysis Inputs
+    aSpeed: document.getElementById('a-speed'), aSpeedDisp: document.getElementById('a-speed-disp'),
+    liveGraph: document.getElementById('live-graph'), lblPop: document.getElementById('lbl-pop'), lblEnt: document.getElementById('lbl-ent'),
+    sParam: document.getElementById('s-param'), sStart: document.getElementById('s-start'), sEnd: document.getElementById('s-end'), sSteps: document.getElementById('s-steps'), sGens: document.getElementById('s-gens'), sOnion: document.getElementById('s-onion'),
+    btnRunSweep: document.getElementById('btn-run-sweep'), btnViewOverlay: document.getElementById('btn-view-overlay'), sweepProgress: document.getElementById('sweep-progress'), sweepGraph: document.getElementById('sweep-graph')
+};
+
+const ctx = dom.canvas.getContext('2d', { alpha: false });
+
+let state = {
+    gridA: null, gridB: null, dims: [], strides: [], totalSize: 0, offsets: [], config: null, isBufferA: true, gen: 0,
+    running: false, compileTimer: null, visualTimer: null, lastTime: 0, fpsGenStart: 0, slice: 0,
+    offCanvas: document.createElement('canvas'), offCtx: null, imgData: null,
+    cam: { x: 0, y: 0, zoom: 1, drag: false, lastX: 0, lastY: 0, btn: -1 },
+    activeTab: 'code', presets: {}, stepsPerFrame: 1, history: [],
+    sweep: { running: false, data: [], buffer: null, maxHits: 0, showingOverlay: false }
+};
+
+function init() {
+    try { const saved = localStorage.getItem('ca_ide_presets'); if(saved) state.presets = JSON.parse(saved); } catch(e) {}
+    renderPresets(); buildVisualGrids(); setupListeners();
+    loadPresetCode(SYSTEM_PRESETS.life.code);
+    loop();
+}
+
+function setupListeners() {
+    dom.codeEditor.addEventListener('input', () => { clearTimeout(state.compileTimer); setStatus("Editing...", "#eda60c"); state.compileTimer = setTimeout(compile, 800); });
+    dom.playBtn.onclick = togglePlay; dom.stepBtn.onclick = step; dom.restartBtn.onclick = compile;
+    dom.canvas.addEventListener('wheel', onWheel, {passive: false}); dom.canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+    window.addEventListener('keydown', onKey); dom.resizer.addEventListener('mousedown', initResize); window.addEventListener('resize', resizeCanvas);
+    dom.saveBtn.onclick = () => { dom.modal.style.display='flex'; dom.modalInput.focus(); };
+    dom.modalCancel.onclick = () => dom.modal.style.display='none'; dom.modalSave.onclick = saveCurrentPreset;
+    dom.resetCamBtn.onclick = () => resetCam(state.dims[0]||200, state.dims[1]||200);
+    dom.exportBtn.onclick = exportPreset; dom.importBtn.onclick = () => dom.fileInput.click(); dom.fileInput.onchange = importPreset;
+    
+    // Visual inputs
+    dom.visualEditor.querySelectorAll('input, select').forEach(el => el.addEventListener('input', () => {
+        if(el.id==='v-init-val') dom.vInitDisp.innerText=(el.value/100).toFixed(2);
+        updateVisualPanels(); scheduleVisualUpdate();
+    }));
+
+    // Analysis
+    dom.aSpeed.addEventListener('input', e => { state.stepsPerFrame = parseInt(e.target.value); dom.aSpeedDisp.innerText = state.stepsPerFrame + 'x'; });
+    dom.btnRunSweep.onclick = runSweepExperiment;
+    dom.btnViewOverlay.onclick = toggleOverlayView;
+}
+
+// --- VISUAL DESIGNER ---
+function buildVisualGrids() {
+    ['vb','vs'].forEach((p, k) => {
+        const par = k===0?document.getElementById('v-grid-b'):document.getElementById('v-grid-s');
+        for(let i=0; i<=8; i++) {
+            const w=document.createElement('div'); w.className='check-box-wrapper';
+            w.innerHTML=`<input type="checkbox" id="${p}${i}"><span>${i}</span>`;
+            par.appendChild(w);
+            w.onclick=(e)=>{if(e.target.tagName!=='INPUT') {const cb=w.querySelector('input'); cb.checked=!cb.checked; cb.dispatchEvent(new Event('input'));}};
+            w.querySelector('input').onclick=(e)=>e.stopPropagation();
+            w.querySelector('input').addEventListener('input', scheduleVisualUpdate);
+        }
+    });
+}
+function updateVisualPanels() {
+    const t = dom.vAlgo.value;
+    dom.vPanelLife.style.display = (t==='life'||t==='generations')?'block':'none';
+    dom.vPanelGen.style.display = t==='generations'?'block':'none';
+    dom.vPanelCyc.style.display = t==='cyclic'?'block':'none';
+    dom.vPanelAvg.style.display = t==='average'?'block':'none';
+}
+function scheduleVisualUpdate() { clearTimeout(state.visualTimer); setStatus("Syncing...", "#eda60c"); state.visualTimer = setTimeout(() => {dom.codeEditor.value=generateCode(getVisualState()); compile();}, 600); }
+
+function getVisualState() {
+    const b=[], s=[]; for(let i=0; i<=8; i++) { if(document.getElementById('vb'+i).checked) b.push(i); if(document.getElementById('vs'+i).checked) s.push(i); }
+    return {
+        dimW: parseInt(dom.vDimW.value)||200, dimH: parseInt(dom.vDimH.value)||200,
+        initT: dom.vInitType.value, initV: parseInt(dom.vInitVal.value)||50,
+        algo: dom.vAlgo.value, neigh: dom.vNeigh.value, range: parseInt(dom.vRange.value)||1,
+        b, s, genStates: parseInt(dom.vStatesGen.value)||3, cycStates: parseInt(dom.vStatesCyc.value)||14,
+        cycThresh: parseInt(dom.vThreshCyc.value)||1, smooth: parseFloat(dom.vSmooth.value)||0.1,
+        c0: dom.vCol0.value, c1: dom.vCol1.value
     };
-};
-const canvas = byId('gl-canvas');
-const gl = canvas.getContext('webgl', { antialias: false, depth: false, preserveDrawingBuffer: true });
-if (!gl.getExtension('OES_texture_float') && !gl.getExtension('OES_texture_half_float')) {
-    alert('Browser does not support floating point textures.');
 }
-let simWidth = 512, simHeight = 512;
-let targetFPS = 60;
-let simInterval = 1000 / 60;
-let textures = [], framebuffers = [];
-let historyTextures = [];
-const MAX_HISTORY = 120;
-let activeIndex = 0;
-let programs = { display: null, compute: null };
-let quadBuffer;
-let isRunning = true;
-let isScrubbing = false;
-let animationFrameId;
-let lastTime = 0, lastFrameTime = 0, frameCount = 0;
-const createShader = (source, type) => {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        log(gl.getShaderInfoLog(shader), 'error');
-        return null;
+
+function generateCode(vs) {
+    const hexToRgb = (hex) => `[${parseInt(hex.substr(1,2),16)},${parseInt(hex.substr(3,2),16)},${parseInt(hex.substr(5,2),16)},255]`;
+    let c = `/* @VISUAL_CONFIG:${JSON.stringify(vs)} */\nreturn {\n    dimensions: [${vs.dimW}, ${vs.dimH}],\n`;
+    if(vs.algo==='average') c+=`    type: 'float',\n`;
+    
+    // Init
+    c += `    init: (x, y) => {\n`;
+    const cx=Math.floor(vs.dimW/2), cy=Math.floor(vs.dimH/2), high=vs.algo==='cyclic'?vs.cycStates-1:1;
+    if(vs.initT==='center') c+=`        if(x===${cx} && y===${cy}) return ${high};\n        return 0;\n`;
+    else if(vs.initT==='circle') c+=`        if(Math.sqrt((x-${cx})**2 + (y-${cy})**2) < ${vs.initV/2}) return ${high};\n        return 0;\n`;
+    else if(vs.initT==='empty') c+=`        return 0;\n`;
+    else c+=`        return Math.random() < ${(vs.initV/100).toFixed(2)} ? ${vs.algo==='cyclic'?vs.cycStates-1:(vs.algo==='average'?'1.0':'1')} : 0;\n`;
+    c += `    },\n`;
+
+    // Neighborhood
+    if(vs.range>1) {
+        c+=`    neighborhood: (() => {\n        const n=[]; const r=${vs.range};\n`;
+        c+= vs.neigh==='von_neumann' ? `        for(let i=-r; i<=r; i++) if(i!==0) {n.push([i,0]); n.push([0,i]);}\n` : `        for(let y=-r; y<=r; y++) for(let x=-r; x<=r; x++) if(x!==0||y!==0) n.push([x,y]);\n`;
+        c+=`        return n;\n    })(),\n`;
+    } else c+=`    neighborhood: '${vs.neigh}',\n`;
+
+    // Color
+    c+=`    getColor: (v) => {\n`;
+    if(vs.algo==='cyclic') c+=`        const t=v/${vs.cycStates}; const r=Math.sin(t*6.28)*127+128, g=Math.sin((t*6.28)+2)*127+128, b=Math.sin((t*6.28)+4)*127+128;\n        return [r,g,b,255];\n`;
+    else if(vs.algo==='average') c+=`        const c=Math.floor(v*255); return [c,c,c,255];\n`;
+    else {
+        c+=`        if(v===0) return ${hexToRgb(vs.c0)};\n        if(v===1) return ${hexToRgb(vs.c1)};\n`;
+        if(vs.algo==='generations') c+=`        return [0,100,255,255];\n`;
+        c+=`        return [0,0,0,255];\n`;
     }
-    return shader;
-};
-const createProgram = (vertexSrc, fragmentSrc) => {
-    const program = gl.createProgram();
-    const vs = createShader(vertexSrc, gl.VERTEX_SHADER);
-    const fs = createShader(fragmentSrc, gl.FRAGMENT_SHADER);
-    if (!vs || !fs) return null;
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        log(gl.getProgramInfoLog(program), 'error');
-        return null;
+    c+=`    },\n`;
+
+    // Update
+    c+=`    update: (v, n) => {\n`;
+    if(vs.algo==='cyclic') c+=`        const next=(v+1)%${vs.cycStates}; let c=0; for(let x of n) if(x===next) c++; return (c>=${vs.cycThresh}) ? next : v;\n`;
+    else if(vs.algo==='average') c+=`        let s=0; for(let x of n) s+=x; return v*(1-${vs.smooth}) + (s/n.length)*${vs.smooth};\n`;
+    else {
+        c+=`        let s=0; for(let x of n) if(x===1) s++;\n        if(v===0) return [${vs.b}].includes(s) ? 1 : 0;\n        if(v===1) return [${vs.s}].includes(s) ? 1 : ${vs.algo==='generations'?2:0};\n`;
+        if(vs.algo==='generations') c+=`        if(v<${vs.genStates}) return v+1;\n        return 0;\n`;
+        else c+=`        return v;\n`;
     }
-    return program;
-};
-function initEngine() {
-    quadBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    resizeSimulation(simWidth);
-    const vs = 'attribute vec2 p; varying vec2 uv; void main(){ uv=p*0.5+0.5; gl_Position=vec4(p,0.,1.); }';
-    const fs = 'precision mediump float; uniform sampler2D t; varying vec2 uv; void main(){ gl_FragColor=texture2D(t,uv); }';
-    programs.display = createProgram(vs, fs);
-    resetSimulation();
-    renderLoop(0);
+    c+=`    }\n};`;
+    return c;
 }
-function resizeSimulation(size) {
-    simWidth = size; simHeight = size;
-    canvas.width = size; canvas.height = size;
-    textures.forEach(t => gl.deleteTexture(t));
-    framebuffers.forEach(f => gl.deleteFramebuffer(f));
-    historyTextures.forEach(t => gl.deleteTexture(t));
-    textures = []; framebuffers = []; historyTextures = [];
-    for (let i = 0; i < 2; i++) {
-        const t = createTexture();
-        textures.push(t);
-        const f = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, f);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
-        framebuffers.push(f);
-    }
-    activeIndex = 0;
-    fitCanvas();
-}
-function createTexture() {
-    const t = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, simWidth, simHeight, 0, gl.RGBA, gl.FLOAT, null);
-    return t;
-}
-function resetSimulation() {
-    const data = new Float32Array(simWidth * simHeight * 4);
-    for (let i = 0; i < data.length; i += 4) {
-        const v = Math.random();
-        data[i] = v > 0.5 ? 1.0 : 0.0;
-        data[i+1] = v;
-        data[i+2] = Math.random();
-        data[i+3] = 1.0;
-    }
-    gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, simWidth, simHeight, 0, gl.RGBA, gl.FLOAT, data);
-    activeIndex = 0;
-    historyTextures.forEach(t => gl.deleteTexture(t));
-    historyTextures = [];
-    updateHistoryUI();
-    log("Simulation Reset", 'info');
-}
-function recordHistory() {
-    let tex;
-    if (historyTextures.length >= MAX_HISTORY) {
-        tex = historyTextures.shift();
-    } else {
-        tex = createTexture();
-    }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[activeIndex]);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, simWidth, simHeight, 0);
-    historyTextures.push(tex);
-    updateHistoryUI();
-}
-function updateHistoryUI() {
-    const slider = byId('history-slider');
-    slider.max = Math.max(0, historyTextures.length - 1);
-    if (!isScrubbing) {
-        slider.value = slider.max;
-        slider.disabled = historyTextures.length === 0;
-    }
-    byId('history-frame').innerText = `${slider.value} / ${historyTextures.length}`;
-}
-function restoreFromHistory(index) {
-    if (index < 0 || index >= historyTextures.length) return;
-    const histTex = historyTextures[index];
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[activeIndex]);
-    gl.viewport(0, 0, simWidth, simHeight);
-    gl.useProgram(programs.display);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, histTex);
-    gl.uniform1i(gl.getUniformLocation(programs.display, 't'), 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
-function computeStep(time) {
-    if (!programs.compute) return;
-    if (isRunning && !isScrubbing) recordHistory();
-    const nextIndex = 1 - activeIndex;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[nextIndex]);
-    gl.viewport(0, 0, simWidth, simHeight);
-    gl.useProgram(programs.compute);
-    gl.uniform2f(gl.getUniformLocation(programs.compute, 'uRes'), simWidth, simHeight);
-    gl.uniform1f(gl.getUniformLocation(programs.compute, 'uTime'), time * 0.001);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, textures[activeIndex]);
-    gl.uniform1i(gl.getUniformLocation(programs.compute, 'uState'), 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    activeIndex = nextIndex;
-}
-function drawToScreen() {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, simWidth, simHeight);
-    gl.useProgram(programs.display);
-    gl.activeTexture(gl.TEXTURE0);
-    if (isScrubbing) {
-        const idx = parseInt(byId('history-slider').value);
-        if (historyTextures[idx]) gl.bindTexture(gl.TEXTURE_2D, historyTextures[idx]);
-        else gl.bindTexture(gl.TEXTURE_2D, textures[activeIndex]);
-    } else {
-        gl.bindTexture(gl.TEXTURE_2D, textures[activeIndex]);
-    }
-    gl.uniform1i(gl.getUniformLocation(programs.display, 't'), 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
-function renderLoop(time) {
-    animationFrameId = requestAnimationFrame(renderLoop);
-    const delta = time - lastFrameTime;
-    if (isRunning && !isScrubbing) {
-        if (delta > simInterval) {
-            computeStep(time);
-            lastFrameTime = time - (delta % simInterval);
-        }
-    }
-    drawToScreen();
-    frameCount++;
-    if (time - lastTime >= 1000) {
-        byId('fps-counter').innerText = `${frameCount} FPS`;
-        frameCount = 0;
-        lastTime = time;
+
+function syncVisualFromCode() {
+    const m = dom.codeEditor.value.match(/\/\* @VISUAL_CONFIG:(.*?) \*\//);
+    if(m && m[1]) {
+        try {
+            const vs = JSON.parse(m[1]);
+            dom.vDimW.value=vs.dimW; dom.vDimH.value=vs.dimH; dom.vInitType.value=vs.initT||'random'; dom.vInitVal.value=vs.initV;
+            dom.vAlgo.value=vs.algo; dom.vNeigh.value=vs.neigh; dom.vRange.value=vs.range||1;
+            for(let i=0; i<=8; i++) { document.getElementById('vb'+i).checked=(vs.b||[]).includes(i); document.getElementById('vs'+i).checked=(vs.s||[]).includes(i); }
+            dom.vStatesGen.value=vs.genStates; dom.vStatesCyc.value=vs.cycStates; dom.vThreshCyc.value=vs.cycThresh; dom.vSmooth.value=vs.smooth;
+            dom.vCol0.value=vs.c0; dom.vCol1.value=vs.c1;
+            updateVisualPanels();
+        } catch(e){}
     }
 }
-let cvsState = { x: 0, y: 0, scale: 1, isDragging: false, lastX: 0, lastY: 0 };
-const canvasWrapper = byId('canvas-wrapper');
-const canvasContainer = byId('canvas-container');
-function updateCanvasTransform() {
-    canvasWrapper.style.transform = `translate(${cvsState.x}px, ${cvsState.y}px) scale(${cvsState.scale})`;
-    byId('zoom-level').innerText = `${Math.round(cvsState.scale * 100)}%`;
-}
-function fitCanvas() {
-    const rect = canvasContainer.getBoundingClientRect();
-    const aspect = simWidth / simHeight;
-    const containerAspect = rect.width / rect.height;
-    if (containerAspect > aspect) {
-        cvsState.scale = (rect.height * 0.9) / simHeight;
-    } else {
-        cvsState.scale = (rect.width * 0.9) / simWidth;
+
+// --- ANALYSIS & SWEEP ---
+async function runSweepExperiment() {
+    if(state.sweep.running) return;
+    const vs = getVisualState();
+    const param = dom.sParam.value;
+    const start = parseFloat(dom.sStart.value), end = parseFloat(dom.sEnd.value), steps = parseInt(dom.sSteps.value);
+    const gens = parseInt(dom.sGens.value);
+    const useOnion = dom.sOnion.checked;
+    
+    state.sweep.running = true; state.sweep.data = []; state.sweep.showingOverlay = false;
+    dom.btnRunSweep.innerText = "Running..."; dom.btnRunSweep.disabled = true;
+    dom.btnViewOverlay.style.display = 'none';
+
+    if(useOnion) {
+        state.sweep.buffer = new Float32Array(state.totalSize).fill(0);
+        state.sweep.maxHits = 0;
     }
-    cvsState.x = 0;
-    cvsState.y = 0;
-    updateCanvasTransform();
-}
-canvasContainer.addEventListener('wheel', e => {
-    e.preventDefault();
-    cvsState.scale = Math.min(Math.max(0.1, cvsState.scale - e.deltaY * 0.001), 20);
-    updateCanvasTransform();
-});
-canvasContainer.addEventListener('mousedown', e => {
-    if (e.button === 1 || (e.button === 0 && e.getModifierState('Space'))) {
-        cvsState.isDragging = true;
-        cvsState.lastX = e.clientX;
-        cvsState.lastY = e.clientY;
-        canvasContainer.style.cursor = 'grabbing';
-    }
-});
-window.addEventListener('mousemove', e => {
-    if (cvsState.isDragging) {
-        cvsState.x += e.clientX - cvsState.lastX;
-        cvsState.y += e.clientY - cvsState.lastY;
-        cvsState.lastX = e.clientX;
-        cvsState.lastY = e.clientY;
-        updateCanvasTransform();
-    }
-});
-window.addEventListener('mouseup', () => {
-    if (cvsState.isDragging) {
-        cvsState.isDragging = false;
-        canvasContainer.style.cursor = 'crosshair';
-    }
-});
-const NodeDefinitions = {
-    'Output': { cat: 'IO', inputs: [{n:'val',t:'vec'}], outputs: [], glsl: 'gl_FragColor = %1;' },
-    'Input':  { cat: 'IO', inputs: [], outputs: [{n:'self',t:'vec'}], custom: true },
-    'Time':   { cat: 'IO', inputs: [], outputs: [{n:'t',t:'float'}], glsl: 'vec4(uTime)' },
-    'Coord':  { cat: 'IO', inputs: [], outputs: [{n:'uv',t:'vec'}], glsl: 'vec4(gl_FragCoord.xy/uRes, 0.0, 1.0)' },
-    'Number': { cat: 'Param', inputs: [], outputs: [{n:'val',t:'float'}], type: 'float', default: 1.0 },
-    'Color':  { cat: 'Param', inputs: [], outputs: [{n:'col',t:'color'}], type: 'color', default: '#ff0000' },
-    'Add':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(%1 + %2)' },
-    'Sub':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(%1 - %2)' },
-    'Mul':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(%1 * %2)' },
-    'Div':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(%1 / (%2 + 0.00001))' },
-    'Mod':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: 'mod(%1, %2)' },
-    'Mix':    { cat: 'Math', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'},{n:'f',t:'float'}], outputs: [{n:'res',t:'vec'}], glsl: 'mix(%1, %2, %3)' },
-    'Step':   { cat: 'Math', inputs: [{n:'edge',t:'float'},{n:'x',t:'float'}], outputs: [{n:'res',t:'float'}], glsl: 'step(%1, %2)' },
-    'Sin':    { cat: 'Math', inputs: [{n:'x',t:'float'}], outputs: [{n:'res',t:'float'}], glsl: 'sin(%1)' },
-    'Abs':    { cat: 'Math', inputs: [{n:'x',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: 'abs(%1)' },
-    'Eq':     { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'bool',t:'bool'}], glsl: 'vec4(distance(%1, %2) < 0.001 ? 1.0 : 0.0)' },
-    'Neq':    { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'bool',t:'bool'}], glsl: 'vec4(distance(%1, %2) > 0.001 ? 1.0 : 0.0)' },
-    'GT':     { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'bool',t:'bool'}], glsl: 'vec4(%1.x > %2.x ? 1.0 : 0.0)' },
-    'LT':     { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'bool',t:'bool'}], glsl: 'vec4(%1.x < %2.x ? 1.0 : 0.0)' },
-    'And':    { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: 'min(%1, %2)' },
-    'Or':     { cat: 'Logic', inputs: [{n:'a',t:'vec'},{n:'b',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: 'max(%1, %2)' },
-    'Not':    { cat: 'Logic', inputs: [{n:'a',t:'vec'}], outputs: [{n:'res',t:'vec'}], glsl: '(1.0 - %1)' },
-    'Sum8':   { cat: 'CA', inputs: [], outputs: [{n:'sum',t:'vec'}], custom: true }, 
-    'Split':  { cat: 'Vec', inputs: [{n:'vec',t:'vec'}], outputs: [{n:'r',t:'float'},{n:'g',t:'float'},{n:'b',t:'float'},{n:'a',t:'float'}], custom: true },
-    'Pack':   { cat: 'Vec', inputs: [{n:'r',t:'float'},{n:'g',t:'float'},{n:'b',t:'float'},{n:'a',t:'float'}], outputs: [{n:'vec',t:'vec'}], glsl: 'vec4(%1.x, %2.x, %3.x, %4.x)' },
-};
-let nodes = [];
-let nextNodeId = 1;
-let transform = { x: 0, y: 0, k: 1 };
-let draggingNode = null;
-let draggingWire = null;
-const requestCompile = debounce(() => {
-    byId('compile-status').innerText = 'COMPILING...';
-    byId('compile-status').style.color = '#ff0';
-    setTimeout(() => {
-        compileGraph();
-        byId('compile-status').innerText = 'AUTO-COMPILE ON';
-        byId('compile-status').style.color = '#666';
-    }, 10);
-}, 500);
-function createNode(type, x, y, value = null) {
-    const def = NodeDefinitions[type];
-    const id = `n${nextNodeId++}`;
-    const el = document.createElement('div');
-    el.className = 'node';
-    const snap = (v) => Math.round(v / 20) * 20;
-    el.style.left = snap(x) + 'px';
-    el.style.top = snap(y) + 'px';
-    el.id = id;
-    el.dataset.type = type;
-    const header = document.createElement('div');
-    header.className = 'node-header';
-    header.innerHTML = `<span>${type}</span>`;
-    header.onmousedown = (e) => startDragNode(e, id);
-    el.appendChild(header);
-    const body = document.createElement('div');
-    body.className = 'node-body';
-    def.inputs.forEach(inp => {
-        const row = document.createElement('div');
-        row.className = 'socket in';
-        row.innerHTML = `<div class="port" id="${id}_in_${inp.n}" data-node="${id}" data-slot="${inp.n}" data-io="in" data-type="${inp.t}" title="${inp.t}"></div>${inp.n}`;
-        body.appendChild(row);
-    });
-    if (def.type === 'float') {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.step = 0.01;
-        input.value = value ?? def.default;
-        input.id = `${id}_val`;
-        input.oninput = requestCompile;
-        input.onmousedown = (e) => e.stopPropagation();
-        body.appendChild(input);
-    } else if (def.type === 'color') {
-        const input = document.createElement('input');
-        input.type = 'color';
-        input.value = value ?? def.default;
-        input.id = `${id}_val`;
-        input.oninput = requestCompile;
-        body.appendChild(input);
-    }
-    def.outputs.forEach(out => {
-        const row = document.createElement('div');
-        row.className = 'socket out';
-        row.innerHTML = `${out.n}<div class="port" id="${id}_out_${out.n}" data-node="${id}" data-slot="${out.n}" data-io="out" data-type="${out.t}" title="${out.t}"></div>`;
-        body.appendChild(row);
-    });
-    el.appendChild(body);
-    el.querySelectorAll('.port').forEach(port => {
-        port.onmousedown = (e) => startDragWire(e, id, port.dataset.slot, port.dataset.io);
-    });
-    byId('nodes-container').appendChild(el);
-    nodes.push({ id, type });
-    requestCompile();
-    return id;
-}
-const updateTransform = () => byId('graph-transform').style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`;
-byId('editor-area').onwheel = (e) => {
-    e.preventDefault();
-    transform.k = Math.min(Math.max(0.2, transform.k - e.deltaY * 0.001), 3);
-    updateTransform();
-};
-byId('editor-area').onmousedown = (e) => {
-    if (e.button === 1 || (e.button === 0 && e.getModifierState('Space'))) {
-        draggingNode = { type: 'pan', x: e.clientX - transform.x, y: e.clientY - transform.y };
-        byId('graph-transform').style.cursor = 'grabbing';
-        e.preventDefault();
-    }
-};
-window.startDragNode = (e, id) => {
-    if (e.target.tagName === 'INPUT') return;
-    e.stopPropagation();
-    const el = byId(id);
-    draggingNode = { type: 'node', el: el, offsetX: e.clientX / transform.k - parseFloat(el.style.left), offsetY: e.clientY / transform.k - parseFloat(el.style.top) };
-    document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
-    el.classList.add('selected');
-};
-window.startDragWire = (e, nodeId, slot, io) => {
-    e.stopPropagation();
-    if (io === 'in') {
-        const existing = document.querySelector(`path[data-to-node="${nodeId}"][data-to-slot="${slot}"]`);
-        if (existing) { existing.remove(); requestCompile(); }
-        return;
-    }
-    draggingWire = { nodeId, slot };
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.classList.add('active');
-    path.id = 'active-wire';
-    byId('connections-svg').appendChild(path);
-};
-window.onmousemove = (e) => {
-    if (draggingNode?.type === 'pan') {
-        transform.x = e.clientX - draggingNode.x;
-        transform.y = e.clientY - draggingNode.y;
-        updateTransform();
-    }
-    if (draggingNode?.type === 'node') {
-        let nx = e.clientX / transform.k - draggingNode.offsetX;
-        let ny = e.clientY / transform.k - draggingNode.offsetY;
-        nx = Math.round(nx / 20) * 20; ny = Math.round(ny / 20) * 20;
-        draggingNode.el.style.left = nx + 'px';
-        draggingNode.el.style.top = ny + 'px';
-        redrawWires();
-    }
-    if (draggingWire) {
-        const portEl = byId(`${draggingWire.nodeId}_out_${draggingWire.slot}`);
-        if (!portEl) return;
-        const startRect = portEl.getBoundingClientRect();
-        const graphRect = byId('graph-transform').getBoundingClientRect();
-        const x1 = (startRect.left + startRect.width / 2 - graphRect.left) / transform.k;
-        const y1 = (startRect.top + startRect.height / 2 - graphRect.top) / transform.k;
-        const x2 = (e.clientX - graphRect.left) / transform.k;
-        const y2 = (e.clientY - graphRect.top) / transform.k;
-        const dist = Math.abs(x2 - x1) * 0.5;
-        byId('active-wire').setAttribute('d', `M ${x1} ${y1} C ${x1 + dist} ${y1} ${x2 - dist} ${y2} ${x2} ${y2}`);
-    }
-};
-window.onmouseup = (e) => {
-    draggingNode = null;
-    byId('graph-transform').style.cursor = 'default';
-    if (draggingWire) {
-        byId('active-wire').remove();
-        const el = document.elementFromPoint(e.clientX, e.clientY);
-        if (el?.classList.contains('port') && el.dataset.io === 'in') {
-            connectPorts(draggingWire.nodeId, draggingWire.slot, el.dataset.node, el.dataset.slot);
-        }
-        draggingWire = null;
-    }
-};
-function connectPorts(fromNode, fromSlot, toNode, toSlot) {
-    const existing = document.querySelector(`path[data-to-node="${toNode}"][data-to-slot="${toSlot}"]`);
-    if (existing) existing.remove();
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.dataset.fromNode = fromNode;
-    path.dataset.fromSlot = fromSlot;
-    path.dataset.toNode = toNode;
-    path.dataset.toSlot = toSlot;
-    byId('connections-svg').appendChild(path);
-    redrawWires();
-    requestCompile();
-}
-function redrawWires() {
-    const graphRect = byId('graph-transform').getBoundingClientRect();
-    document.querySelectorAll('path:not(.active)').forEach(path => {
-        const fromEl = byId(`${path.dataset.fromNode}_out_${path.dataset.fromSlot}`);
-        const toEl = byId(`${path.dataset.toNode}_in_${path.dataset.toSlot}`);
-        if (!fromEl || !toEl) { path.remove(); return; }
-        const r1 = fromEl.getBoundingClientRect();
-        const r2 = toEl.getBoundingClientRect();
-        const x1 = (r1.left + r1.width / 2 - graphRect.left) / transform.k;
-        const y1 = (r1.top + r1.height / 2 - graphRect.top) / transform.k;
-        const x2 = (r2.left + r2.width / 2 - graphRect.left) / transform.k;
-        const y2 = (r2.top + r2.height / 2 - graphRect.top) / transform.k;
-        const dist = Math.abs(x2 - x1) * 0.5;
-        path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dist} ${y1} ${x2 - dist} ${y2} ${x2} ${y2}`);
-    });
-}
-function compileGraph() {
-    const outputNode = nodes.find(n => n.type === 'Output');
-    if (!outputNode) return;
-    let shaderLines = [];
-    let cache = {};
-    const preamble = `precision highp float; uniform sampler2D uState; uniform vec2 uRes; uniform float uTime; vec4 get(float x, float y) { return texture2D(uState, (gl_FragCoord.xy + vec2(x, y)) / uRes); }`;
-    function resolveNode(nodeId) {
-        if (cache[nodeId]) return cache[nodeId];
-        const node = nodes.find(n => n.id === nodeId);
-        if (!node) return 'vec4(0.0)';
-        const def = NodeDefinitions[node.type];
-        const args = [];
-        def.inputs.forEach(inp => {
-            const wire = document.querySelector(`path[data-to-node="${nodeId}"][data-to-slot="${inp.n}"]`);
-            if (wire) {
-                const srcVar = resolveNode(wire.dataset.fromNode);
-                const srcSlot = wire.dataset.fromSlot;
-                const map = { 'r':'x', 'g':'y', 'b':'z', 'a':'w', 'val':'x', 'bool':'x', 'sum':'xyzw', 'res':'xyzw', 'vec':'xyzw', 'self':'xyzw', 'col':'xyzw', 'uv':'xyzw' };
-                const swizzle = map[srcSlot] || 'xyzw';
-                if (swizzle === 'xyzw') args.push(srcVar);
-                else args.push(`vec4(${srcVar}.${swizzle})`);
-            } else {
-                args.push('vec4(0.0)');
+
+    const stepSize = (end - start) / Math.max(1, steps - 1);
+    
+    for(let i=0; i<steps; i++) {
+        if(!state.sweep.running) break;
+        const val = start + i * stepSize;
+        if(param === 'initV') vs.initV = val;
+        else if(param === 'smooth') vs.smooth = val;
+        else if(param === 'vThreshCyc') vs.cycThresh = Math.round(val);
+        else if(param === 'range') vs.range = Math.round(val);
+        else if(param === 'vStatesGen') vs.genStates = Math.round(val);
+        else if(param === 'vStatesCyc') vs.cycStates = Math.round(val);
+        
+        dom.codeEditor.value = generateCode(vs); compile();
+        
+        for(let g=0; g<gens; g++) { if(!step(true)) break; } // Halt early optimization
+        
+        // Measure
+        let sum = 0;
+        const arr = state.isBufferA ? state.gridA : state.gridB;
+        for(let k=0; k<arr.length; k++) {
+            if(arr[k] > 0) {
+                sum++;
+                if(useOnion) state.sweep.buffer[k] += 1;
             }
-        });
-        const varName = `v_${nodeId}`;
-        let expr = '';
-        if (node.type === 'Number') expr = `vec4(${byId(`${nodeId}_val`).value})`;
-        else if (node.type === 'Color') {
-            const hex = byId(`${nodeId}_val`).value;
-            const r = parseInt(hex.substr(1,2),16)/255;
-            const g = parseInt(hex.substr(3,2),16)/255;
-            const b = parseInt(hex.substr(5,2),16)/255;
-            expr = `vec4(${r}, ${g}, ${b}, 1.0)`;
         }
-        else if (node.type === 'Input') expr = 'get(0.0, 0.0)';
-        else if (node.type === 'Sum8') expr = '(get(0.,1.)+get(0.,-1.)+get(1.,0.)+get(-1.,0.)+get(1.,1.)+get(-1.,1.)+get(1.,-1.)+get(-1.,-1.))';
-        else if (node.type === 'Split') expr = args[0];
-        else {
-            expr = def.glsl;
-            args.forEach((arg, i) => expr = expr.replace(`%${i + 1}`, arg));
-        }
-        shaderLines.push(`vec4 ${varName} = vec4(${expr});`);
-        cache[nodeId] = varName;
-        return varName;
+        state.sweep.data.push({x: val, y: sum/arr.length});
+        if(useOnion) state.sweep.maxHits++;
+        
+        dom.sweepProgress.style.width = ((i+1)/steps)*100 + "%";
+        drawGraph(dom.sweepGraph, state.sweep.data, "Parameter", "Density");
+        await new Promise(r => setTimeout(r, 10));
     }
+    
+    if(useOnion && state.sweep.maxHits > 0) dom.btnViewOverlay.style.display = 'block';
+    
+    state.sweep.running = false;
+    dom.btnRunSweep.innerText = "Run Experiment";
+    dom.btnRunSweep.disabled = false;
+}
+
+function toggleOverlayView() {
+    state.sweep.showingOverlay = !state.sweep.showingOverlay;
+    dom.btnViewOverlay.innerText = state.sweep.showingOverlay ? "Exit Overlay" : "View Overlay Map";
+    draw();
+}
+
+function drawHeatmap() {
+    if(!state.sweep.buffer || state.sweep.maxHits === 0) return;
+    const d=state.imgData.data, buf=state.sweep.buffer, max=state.sweep.maxHits, w=state.dims[0], h=state.dims[1];
+    const zOff = (state.dims.length>2) ? state.slice*state.strides[2] : 0;
+    
+    for(let i=0; i<w*h; i++) {
+        const val = buf[zOff+i] / max; // 0.0 to 1.0
+        // Thermal Map: Black -> Blue -> Cyan -> White
+        let r=0, g=0, b=0;
+        if(val < 0.33) { b = val*3*255; }
+        else if(val < 0.66) { b=255; g=(val-0.33)*3*255; }
+        else { b=255; g=255; r=(val-0.66)*3*255; }
+        
+        const p=i*4; d[p]=r; d[p+1]=g; d[p+2]=b; d[p+3]=255;
+    }
+    state.offCtx.putImageData(state.imgData, 0, 0);
+    
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,dom.canvas.width, dom.canvas.height);
+    ctx.save(); ctx.imageSmoothingEnabled=false; ctx.translate(state.cam.x, state.cam.y); ctx.scale(state.cam.zoom, state.cam.zoom);
+    ctx.drawImage(state.offCanvas, 0, 0);
+    ctx.strokeStyle='#333'; ctx.lineWidth=1/state.cam.zoom; ctx.strokeRect(0,0,state.offCanvas.width, state.offCanvas.height);
+    ctx.restore();
+    
+    // Legend overlay
+    ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(10, 10, 120, 30);
+    ctx.fillStyle='#fff'; ctx.font='10px monospace'; ctx.fillText("Probability Map", 20, 22);
+    ctx.fillStyle='#00f'; ctx.fillRect(20, 28, 10, 8);
+    ctx.fillStyle='#0ff'; ctx.fillRect(35, 28, 10, 8);
+    ctx.fillStyle='#fff'; ctx.fillRect(50, 28, 10, 8);
+}
+
+function updateLiveGraph() {
+    if(!state.gridA) return;
+    const arr = state.isBufferA ? state.gridA : state.gridB;
+    let active = 0;
+    if(state.config.type === 'float') for(let i=0; i<arr.length; i++) active += arr[i];
+    else for(let i=0; i<arr.length; i++) if(arr[i]>0) active++;
+    const den = active / arr.length;
+    state.history.push(den); if(state.history.length > 100) state.history.shift();
+    dom.lblPop.innerText = (den*100).toFixed(1) + "%";
+    dom.lblEnt.innerText = (den * (1-den) * 4).toFixed(2);
+    const data = state.history.map((y, i) => ({x: i, y: y}));
+    drawGraph(dom.liveGraph, data, "Time", "Density", true);
+}
+
+function drawGraph(canvas, data, xLabel, yLabel, isLive) {
+    const c = canvas.getContext('2d'); const w = canvas.width = canvas.offsetWidth; const h = canvas.height = canvas.offsetHeight;
+    c.fillStyle = "#111"; c.fillRect(0,0,w,h); c.strokeStyle = "#0066ff"; c.lineWidth = 2; c.beginPath();
+    if(data.length < 2) return;
+    let minX=data[0].x, maxX=data[0].x, minY=data[0].y, maxY=data[0].y;
+    data.forEach(p => { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+    
+    if (maxY === minY) { maxY += 0.5; minY -= 0.5; }
+    if (isLive) { minY=0; maxY=1; minX=0; maxX=100; } 
+    
+    const mapX = (v) => ((v - minX) / (maxX - minX)) * (w - 20) + 10;
+    const mapY = (v) => h - (((v - minY) / (maxY - minY)) * (h - 20) + 10);
+    c.moveTo(mapX(data[0].x), mapY(data[0].y)); for(let i=1; i<data.length; i++) c.lineTo(mapX(data[i].x), mapY(data[i].y));
+    c.stroke();
+    if(!isLive) { c.fillStyle = "#fff"; data.forEach(p => { c.beginPath(); c.arc(mapX(p.x), mapY(p.y), 2, 0, Math.PI*2); c.fill(); }); }
+}
+
+// --- CORE ---
+function switchTab(t) {
+    state.activeTab = t;
+    ['code','visual','analysis'].forEach(x => {
+        dom['tab'+x.charAt(0).toUpperCase()+x.slice(1)].className = (x===t)?'tab active':'tab';
+        dom[x+'Editor'].style.display = (x===t)?'block':'none';
+    });
+    if(t==='visual') syncVisualFromCode();
+}
+
+function setStatus(msg, col) { dom.statusInd.innerText=msg; dom.statusInd.style.color=col; }
+
+function compile() {
+    state.running = false; updateUI();
     try {
-        const outputWire = document.querySelector(`path[data-to-node="${outputNode.id}"]`);
-        const finalColor = outputWire ? resolveNode(outputWire.dataset.fromNode) : 'vec4(0.0)';
-        const fs = `${preamble} void main() { ${shaderLines.join('\n')} gl_FragColor = ${finalColor}; }`;
-        const vs = `attribute vec2 p; varying vec2 uv; void main(){ uv=p*0.5+0.5; gl_Position=vec4(p,0.,1.); }`;
-        const prog = createProgram(vs, fs);
-        if (prog) {
-            programs.compute = prog;
-            log('Graph Compiled', 'success');
+        const fn = new Function(dom.codeEditor.value); const cfg = fn();
+        if(!cfg.dimensions || !cfg.update) throw "Invalid Config";
+        state.config=cfg; state.dims=cfg.dimensions;
+        state.totalSize = state.dims.reduce((a,b)=>a*b, 1);
+        state.strides=[]; let s=1; for(let i=0; i<state.dims.length; i++) { state.strides.push(s); s*=state.dims[i]; }
+        const isF = cfg.type === 'float';
+        state.gridA = isF ? new Float32Array(state.totalSize) : new Uint8Array(state.totalSize);
+        state.gridB = isF ? new Float32Array(state.totalSize) : new Uint8Array(state.totalSize);
+        state.isBufferA = true; state.gen = 0; state.history = []; state.sweep.showingOverlay = false; dom.btnViewOverlay.style.display='none';
+
+        if(cfg.init) {
+             const d=state.dims, str=state.strides, ga=state.gridA;
+             for(let i=0; i<state.totalSize; i++) {
+                 let args=[]; for(let k=0; k<d.length; k++) args.push(Math.floor(i/str[k]) % d[k]);
+                 ga[i] = cfg.init(...args);
+             }
         }
-    } catch (err) {
-        log(err.message, 'error');
+        let nb = cfg.neighborhood, offsets = [];
+        if(Array.isArray(nb)) offsets = nb.map(v => { let off=0; for(let i=0; i<v.length; i++) off+=v[i]*state.strides[i]; return off; });
+        else {
+             if(state.dims.length===1) offsets=[-1,1];
+             else if(state.dims.length===2) offsets=(nb==='von_neumann') ? [-state.strides[1],-1,1,state.strides[1]] : [-state.strides[1]-1,-state.strides[1],-state.strides[1]+1,-1,1,state.strides[1]-1,state.strides[1],state.strides[1]+1];
+        }
+        state.offsets = offsets;
+        let vw=state.dims[0], vh=state.dims.length===1?(cfg.historyDepth||400):state.dims[1];
+        state.offCanvas.width=vw; state.offCanvas.height=vh; state.offCtx=state.offCanvas.getContext('2d');
+        state.imgData=state.offCtx.createImageData(vw, vh);
+        dom.sliceCtrl.style.display = (state.dims.length>2) ? 'flex' : 'none';
+        if(state.dims.length>2) { dom.sliceSlider.max=state.dims[2]-1; state.slice=Math.floor(state.dims[2]/2); }
+        resetCam(vw, vh); dom.dimsVal.innerText=state.dims.join('x');
+        setStatus("Ready", "var(--success)"); draw();
+    } catch(e) { setStatus("Error", "var(--error)"); console.error(e); }
+}
+
+function resetCam(w, h) {
+    const cw=dom.mainView.offsetWidth, ch=dom.mainView.offsetHeight, z=Math.min((cw-40)/w, (ch-40)/h);
+    state.cam = { x: (cw-w*z)/2, y: (ch-h*z)/2, zoom: Math.max(0.1, z), drag: false };
+    draw();
+}
+function resizeCanvas() { dom.canvas.width = dom.mainView.offsetWidth; dom.canvas.height = dom.mainView.offsetHeight; draw(); }
+function togglePlay() { state.running = !state.running; updateUI(); }
+function updateUI() {
+    dom.playBtn.querySelector('#icon-play').style.display=state.running?'none':'block';
+    dom.playBtn.querySelector('#icon-pause').style.display=state.running?'block':'none';
+    dom.playBtn.classList.toggle('active', state.running);
+}
+
+function step(silent) {
+    if(!state.gridA) return false;
+    const src=state.isBufferA?state.gridA:state.gridB, dst=state.isBufferA?state.gridB:state.gridA;
+    const len=state.totalSize, off=state.offsets, nLen=off.length, upd=state.config.update;
+    const neighbors = new (state.config.type==='float'?Float32Array:Int32Array)(nLen);
+    let changed = false;
+    for(let i=0; i<len; i++) {
+        for(let k=0; k<nLen; k++) { 
+            let p = (i + off[k]) % len; 
+            if(p < 0) p += len; 
+            neighbors[k]=src[p]; 
+        }
+        const v = upd(src[i], neighbors);
+        if(v !== src[i]) changed = true;
+        dst[i] = v;
+    }
+    state.isBufferA = !state.isBufferA; state.gen++; 
+    if(!silent) { dom.genVal.innerText = state.gen; updateLiveGraph(); draw(); }
+    return changed;
+}
+
+function draw() {
+    if(state.sweep.showingOverlay) { drawHeatmap(); return; }
+    if(!state.gridA) return;
+    const src=state.isBufferA?state.gridA:state.gridB, d=state.imgData.data, cf=state.config, w=state.dims[0];
+    if(state.dims.length===1) {
+        const h=state.offCanvas.height;
+        state.offCtx.drawImage(state.offCanvas, 0, 1, w, h-1, 0, 0, w, h-1);
+        const l=state.offCtx.createImageData(w, 1);
+        for(let i=0; i<w; i++) { const c=cf.getColor(src[i]), p=i*4; l.data[p]=c[0]; l.data[p+1]=c[1]; l.data[p+2]=c[2]; l.data[p+3]=255; }
+        state.offCtx.putImageData(l, 0, h-1);
+    } else {
+        const zOff = (state.dims.length>2) ? state.slice*state.strides[2] : 0, h=state.dims[1];
+        for(let i=0; i<w*h; i++) { const c=cf.getColor(src[zOff+i]), p=i*4; d[p]=c[0]; d[p+1]=c[1]; d[p+2]=c[2]; d[p+3]=255; }
+        state.offCtx.putImageData(state.imgData, 0, 0);
+    }
+    ctx.fillStyle='#050505'; ctx.fillRect(0,0,dom.canvas.width, dom.canvas.height);
+    ctx.save(); ctx.imageSmoothingEnabled=false; ctx.translate(state.cam.x, state.cam.y); ctx.scale(state.cam.zoom, state.cam.zoom);
+    ctx.drawImage(state.offCanvas, 0, 0);
+    ctx.strokeStyle='#333'; ctx.lineWidth=1/state.cam.zoom; ctx.strokeRect(0,0,state.offCanvas.width, state.offCanvas.height);
+    ctx.restore();
+}
+
+function loop() {
+    requestAnimationFrame(loop);
+    if(state.running) {
+        for(let i=0; i<state.stepsPerFrame; i++) step(i < state.stepsPerFrame-1);
+        const now=performance.now();
+        if(now-state.lastTime>500) { dom.fpsVal.innerText=Math.round((state.gen-state.fpsGenStart)/((now-state.lastTime)/1000)); state.fpsGenStart=state.gen; state.lastTime=now; }
     }
 }
-byId('sim-speed').oninput = (e) => { targetFPS = parseInt(e.target.value); simInterval = 1000 / targetFPS; };
-byId('sim-res').onchange = (e) => { resizeSimulation(parseInt(e.target.value)); };
-byId('history-slider').oninput = (e) => {
-    isScrubbing = true;
-    isRunning = false;
-    byId('btn-play').innerText = "RESUME";
-    byId('history-frame').innerText = `${e.target.value} / ${historyTextures.length}`;
-};
-byId('btn-reset').onclick = resetSimulation;
-byId('btn-play').onclick = function() {
-    if (isScrubbing) {
-        const idx = parseInt(byId('history-slider').value);
-        if (historyTextures[idx]) restoreFromHistory(idx);
+
+// IO & Interaction
+function renderPresets() {
+    dom.presets.innerHTML = '';
+    const add = (k, n, c, del) => {
+        const el=document.createElement('div'); el.className='preset-item'; el.innerHTML=`<span>${n}</span>`;
+        if(del) { const d=document.createElement('button'); d.className='icon-btn-small'; d.innerHTML='&times;'; d.onclick=(e)=>{e.stopPropagation(); delete state.presets[k]; localStorage.setItem('ca_ide_presets', JSON.stringify(state.presets)); renderPresets();}; el.appendChild(d); }
+        el.onclick=()=>loadPresetCode(c); dom.presets.appendChild(el);
+    };
+    Object.keys(SYSTEM_PRESETS).forEach(k=>add(k, SYSTEM_PRESETS[k].name, SYSTEM_PRESETS[k].code, false));
+    Object.keys(state.presets).forEach(k=>add(k, state.presets[k].name, state.presets[k].code, true));
+}
+function loadPresetCode(c) { dom.codeEditor.value=c; switchTab('code'); compile(); }
+function saveCurrentPreset() { const n=dom.modalInput.value.trim(); if(n) { state.presets['u_'+Date.now()]={name:n, code:dom.codeEditor.value}; localStorage.setItem('ca_ide_presets', JSON.stringify(state.presets)); renderPresets(); dom.modal.style.display='none'; } }
+function exportPreset() { const b=new Blob([JSON.stringify({name:"CA",code:dom.codeEditor.value})],{type:"application/json"}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download="ca_preset.json"; a.click(); }
+function importPreset(e) { const f=e.target.files[0]; if(f){const r=new FileReader(); r.onload=ev=>{try{loadPresetCode(JSON.parse(ev.target.result).code)}catch(e){}}; r.readAsText(f); e.target.value='';} }
+
+function onWheel(e) { e.preventDefault(); const d=e.deltaY<0?1.1:0.9; state.cam.zoom*=d; state.cam.x=e.offsetX-(e.offsetX-state.cam.x)*d; state.cam.y=e.offsetY-(e.offsetY-state.cam.y)*d; draw(); }
+function onDown(e) { state.cam.drag=true; state.cam.lastX=e.clientX; state.cam.lastY=e.clientY; if(e.button===0&&!e.shiftKey) interact(e); }
+function onMove(e) { if(state.cam.drag) { if(e.button===2||e.shiftKey) { state.cam.x+=e.clientX-state.cam.lastX; state.cam.y+=e.clientY-state.cam.lastY; draw(); } else interact(e); state.cam.lastX=e.clientX; state.cam.lastY=e.clientY; } }
+function onUp() { state.cam.drag=false; }
+function onKey(e) { 
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if(e.code==='Space') { e.preventDefault(); togglePlay(); }
+    else if(e.code==='ArrowRight') step(); 
+    else if(e.code==='KeyR') compile(); 
+}
+function interact(e) {
+    if(!state.gridA) return;
+    const r=dom.canvas.getBoundingClientRect();
+    const wx=Math.floor((e.clientX-r.left-state.cam.x)/state.cam.zoom), wy=Math.floor((e.clientY-r.top-state.cam.y)/state.cam.zoom);
+    if(wx>=0 && wy>=0 && wx<state.dims[0] && (state.dims.length>1?wy<state.dims[1]:true)) {
+        let idx = state.dims.length===2 ? wy*state.strides[1]+wx : (state.dims.length===3 ? state.slice*state.strides[2]+wy*state.strides[1]+wx : wx);
+        const arr=state.isBufferA?state.gridA:state.gridB;
+        arr[idx] = state.config.onInteract ? state.config.onInteract(wx,wy,arr[idx]) : 1;
+        draw();
     }
-    isRunning = !isRunning;
-    isScrubbing = false;
-    this.innerText = isRunning ? "PAUSE" : "RESUME";
-    byId('history-slider').value = historyTextures.length - 1;
-};
-byId('btn-step').onclick = () => {
-    isRunning = false;
-    isScrubbing = false;
-    byId('btn-play').innerText = 'RESUME';
-    computeStep(0);
-    drawToScreen();
-};
-byId('btn-clear').onclick = () => {
-    nodes.forEach(n => byId(n.id).remove());
-    nodes = [];
-    byId('connections-svg').innerHTML = '';
-    nextNodeId = 1;
-    requestCompile();
-};
-const Presets = {
-    gol: () => {
-        createNode('Input', 50, 200); createNode('Sum8', 50, 350);
-        createNode('Split', 200, 200); createNode('Split', 200, 350);
-        createNode('Number', 200, 450, 3); createNode('Number', 200, 550, 2);
-        createNode('Eq', 350, 400); createNode('Eq', 350, 500);
-        createNode('And', 500, 300); createNode('Or', 650, 300);
-        createNode('Pack', 800, 200); createNode('Output', 950, 200);
-        connectPorts('n1','self','n3','vec'); connectPorts('n2','sum','n4','vec');
-        connectPorts('n4','r','n7','a'); connectPorts('n5','val','n7','b');
-        connectPorts('n4','r','n8','a'); connectPorts('n6','val','n8','b');
-        connectPorts('n3','r','n9','a'); connectPorts('n8','bool','n9','b');
-        connectPorts('n7','bool','n10','a'); connectPorts('n9','res','n10','b');
-        connectPorts('n10','res','n11','r'); connectPorts('n10','res','n11','g'); connectPorts('n10','res','n11','a');
-        connectPorts('n11','vec','n12','val');
-    },
-    high: () => {
-        createNode('Input', 50, 200); createNode('Sum8', 50, 350);
-        createNode('Split', 200, 200); createNode('Split', 200, 350);
-        createNode('Number', 200, 450, 3); createNode('Number', 200, 550, 2); createNode('Number', 200, 650, 6);
-        createNode('Eq', 350, 400); createNode('Eq', 350, 500); createNode('Eq', 350, 600);
-        createNode('Or', 500, 500); createNode('And', 500, 400); createNode('Or', 650, 400);
-        createNode('Pack', 800, 200); createNode('Output', 950, 200);
-        connectPorts('n1','self','n3','vec'); connectPorts('n2','sum','n4','vec');
-        connectPorts('n4','r','n8','a'); connectPorts('n5','val','n8','b');
-        connectPorts('n4','r','n9','a'); connectPorts('n6','val','n9','b');
-        connectPorts('n4','r','n10','a'); connectPorts('n7','val','n10','b');
-        connectPorts('n8','bool','n11','a'); connectPorts('n10','bool','n11','b');
-        connectPorts('n3','r','n12','a'); connectPorts('n9','bool','n12','b');
-        connectPorts('n11','res','n13','a'); connectPorts('n12','res','n13','b');
-        connectPorts('n13','res','n14','r'); connectPorts('n13','res','n14','g'); connectPorts('n13','res','n14','a');
-        connectPorts('n14','vec','n15','val');
-    },
-    day: () => {
-        createNode('Input', 50, 200); createNode('Sum8', 50, 350); createNode('Split', 200, 200); createNode('Split', 200, 350);
-        createNode('Number', 350, 100, 3); createNode('Number', 350, 200, 4); createNode('Number', 350, 300, 6); createNode('Number', 350, 400, 7); createNode('Number', 350, 500, 8);
-        createNode('Eq', 500, 100); createNode('Eq', 500, 200); createNode('Eq', 500, 300); createNode('Eq', 500, 400); createNode('Eq', 500, 500);
-        createNode('Or', 650, 400); createNode('Or', 800, 350); createNode('Or', 950, 200); createNode('And', 650, 200);
-        createNode('Or', 1100, 200); createNode('Pack', 1200, 200); createNode('Output', 1300, 200);
-        connectPorts('n1','self','n3','vec'); connectPorts('n2','sum','n4','vec');
-        [10,11,12,13,14].forEach((t,i)=>{ connectPorts('n4','r',`n${t}`,'a'); connectPorts(`n${5+i}`,'val',`n${t}`,'b'); });
-        connectPorts('n14','bool','n15','a'); connectPorts('n13','bool','n15','b');
-        connectPorts('n12','bool','n16','a'); connectPorts('n15','res','n16','b');
-        connectPorts('n10','bool','n17','a'); connectPorts('n16','res','n17','b');
-        connectPorts('n11','bool','n18','a'); connectPorts('n3','r','n18','b');
-        connectPorts('n17','res','n19','a'); connectPorts('n18','res','n19','b');
-        connectPorts('n19','res','n20','r'); connectPorts('n19','res','n20','g'); connectPorts('n19','res','n20','a');
-        connectPorts('n20','vec','n21','val');
-    },
-    maze: () => {
-        createNode('Input', 50, 200); createNode('Sum8', 50, 350); createNode('Split', 200, 200); createNode('Split', 200, 350);
-        createNode('Number', 200, 450, 3); createNode('Number', 200, 550, 1); createNode('Number', 200, 650, 5);
-        createNode('Eq', 350, 400); createNode('GT', 350, 500); createNode('LT', 350, 600);
-        createNode('And', 500, 550); createNode('And', 650, 300); createNode('Or', 800, 300);
-        createNode('Pack', 950, 200); createNode('Output', 1100, 200);
-        connectPorts('n1','self','n3','vec'); connectPorts('n2','sum','n4','vec');
-        connectPorts('n4','r','n8','a'); connectPorts('n5','val','n8','b');
-        connectPorts('n4','r','n9','a'); connectPorts('n6','val','n9','b');
-        connectPorts('n4','r','n10','a'); connectPorts('n7','val','n10','b');
-        connectPorts('n9','bool','n11','a'); connectPorts('n10','bool','n11','b');
-        connectPorts('n3','r','n12','a'); connectPorts('n11','res','n12','b');
-        connectPorts('n8','bool','n13','a'); connectPorts('n12','res','n13','b');
-        connectPorts('n13','res','n14','r'); connectPorts('n13','res','n14','g'); connectPorts('n13','res','n14','a');
-        connectPorts('n14','vec','n15','val');
-    },
-    brain: () => {
-        createNode('Input', 50, 200); createNode('Sum8', 50, 350);
-        createNode('Div', 200, 350); createNode('Number', 50, 450, 8);
-        createNode('Sub', 350, 250); createNode('Mul', 500, 250);
-        createNode('Number', 350, 400, 1.2); createNode('Output', 700, 200);
-        connectPorts('n2','sum','n3','a'); connectPorts('n4','val','n3','b');
-        connectPorts('n3','res','n5','a'); connectPorts('n1','self','n5','b');
-        connectPorts('n3','res','n6','a'); connectPorts('n7','val','n6','b');
-        connectPorts('n6','res','n8','val');
-    },
-    cyc: () => {
-        createNode('Input', 50, 200); createNode('Add', 200, 200); createNode('Mod', 350, 200);
-        createNode('Number', 50, 300, 0.05); createNode('Number', 200, 300, 1.0); createNode('Output', 500, 200);
-        connectPorts('n1','self','n2','a'); connectPorts('n4','val','n2','b');
-        connectPorts('n2','res','n3','a'); connectPorts('n5','val','n3','b');
-        connectPorts('n3','res','n6','val');
-    }
-};
-byId('preset-select').onchange = (e) => {
-    byId('btn-clear').click();
-    if(Presets[e.target.value]) setTimeout(() => { Presets[e.target.value](); resetSimulation(); }, 50);
-};
-const contextMenu = byId('context-menu');
-byId('editor-area').oncontextmenu = (e) => {
-    e.preventDefault();
-    contextMenu.innerHTML = '';
-    const categories = {};
-    Object.keys(NodeDefinitions).forEach(k => {
-        const cat = NodeDefinitions[k].cat;
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(k);
-    });
-    Object.keys(categories).forEach(cat => {
-        const h = document.createElement('div');
-        h.innerText = cat.toUpperCase();
-        h.style.cssText = 'background:#222;padding:4px 8px;font-size:9px;color:#666;border-bottom:1px solid #333';
-        contextMenu.appendChild(h);
-        categories[cat].forEach(type => {
-            const item = document.createElement('div');
-            item.className = 'menu-item';
-            item.innerText = type;
-            item.onclick = () => {
-                const r = byId('nodes-container').getBoundingClientRect();
-                createNode(type, (e.clientX - r.left)/transform.k, (e.clientY - r.top)/transform.k);
-                contextMenu.style.display = 'none';
-            };
-            contextMenu.appendChild(item);
-        });
-    });
-    contextMenu.style.left = e.clientX + 'px';
-    contextMenu.style.top = e.clientY + 'px';
-    contextMenu.style.display = 'block';
-};
-window.onclick = (e) => { if(!e.target.closest('#context-menu')) contextMenu.style.display='none'; };
-initEngine();
-Presets.gol();
+}
+function initResize(e) { e.preventDefault(); dom.resizer.classList.add('resizing'); const sx=e.clientX, sw=dom.sidebar.offsetWidth; const mm=ev=>{dom.sidebar.style.width=(sw+ev.clientX-sx)+'px'; resizeCanvas();}; const mu=()=>{dom.resizer.classList.remove('resizing'); window.removeEventListener('mousemove',mm); window.removeEventListener('mouseup',mu);}; window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu); }
+
+init();
 </script>
 </body>
 </html>
