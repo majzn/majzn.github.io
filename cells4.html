@@ -539,6 +539,7 @@ class SimulationEngine {
         this.currentFlux = 0;
         this.neighborhoodBuffer = null;
         this.heatmapBuffer = null;
+        this.isAnalysisMode = false;
     }
 
     load(code) {
@@ -562,6 +563,7 @@ class SimulationEngine {
             this.isBufferA = true;
             this.gen = 0;
             this.history = [];
+            this.isAnalysisMode = false;
             
             const range = Math.max(1, cfg.range || 1);
             const maxNeighbors = (2*range+1)**2 - 1;
@@ -602,6 +604,7 @@ class SimulationEngine {
         
         let changedCount = 0;
         
+        // Massive Optimization: Remove % operator from loop by handling logic
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < w; x++) {
                 let ni = 0;
@@ -610,8 +613,12 @@ class SimulationEngine {
                         if (dx === 0 && dy === 0) continue;
                         if (isVonNeumann && (Math.abs(dx) + Math.abs(dy) > range)) continue;
                         
-                        const ny = (y + dy + h) % h;
-                        const nx = (x + dx + w) % w;
+                        let ny = y + dy;
+                        if (ny < 0) ny += h; else if (ny >= h) ny -= h;
+                        
+                        let nx = x + dx;
+                        if (nx < 0) nx += w; else if (nx >= w) nx -= w;
+                        
                         nb[ni++] = src[ny * w + nx];
                     }
                 }
@@ -670,7 +677,7 @@ class SimulationEngine {
     }
 
     recordStats() {
-        if (!this.gridA) return;
+        if (this.isAnalysisMode || !this.gridA) return;
         const grid = this.getCurrentGrid();
         let active = 0;
         for(let i=0; i<grid.length; i++) if(grid[i] > 0) active++;
@@ -916,6 +923,9 @@ class AnalysisEngine {
         const designerState = this.app.ui.getDesignerState();
 
         try {
+            // Enable Analysis Mode to skip history recording in Sim
+            this.sim.isAnalysisMode = true;
+
             for (let i = 0; i <= steps; i++) {
                 if (this.cancel) break;
                 
@@ -930,6 +940,7 @@ class AnalysisEngine {
                 
                 // Reuse Simulation Instance, update logic
                 this.sim.load(code);
+                this.sim.isAnalysisMode = true; // Ensure flag is set after load/reset
                 
                 // Cycle Detection Set
                 const historyHashes = new Set();
@@ -940,23 +951,17 @@ class AnalysisEngine {
                     const changed = this.sim.step();
                     stableGen = g;
                     
-                    // Optimization: Check flux and hash
-                    if (!changed) break; // Static
+                    // Optimization 1: Check flux (Stasis)
+                    if (!changed) break; 
                     
-                    // Only check hash if flux is low enough to be interesting or periodically
-                    // Checking every frame for large grids can be slow, but essential for detecting oscillators.
-                    // We check every 2 frames to trade off.
+                    // Optimization 2: Check Oscillation (Hash)
+                    // Checking every frame for large grids can be slow, checking every 2 frames is a good trade-off
                     if (g % 2 === 0) {
                         const h = this.sim.getHash();
                         if (historyHashes.has(h)) break; // Oscillation detected
                         historyHashes.add(h);
-                        // Limit hash history size to prevent memory explosion on long runs
-                        if (historyHashes.size > 50) { 
-                            // Naive limit: we just clear old ones implicitly by Set iter order? No, Set keeps insertion order.
-                            // To keep strict N, we'd need an array or linkedhashmap. 
-                            // For simplicity, we just keep adding. 50 ints is tiny. 
-                            // Actually maxGens is usually < 1000. It's fine.
-                        }
+                        // Safe bound for hash history to prevent memory leaks in extreme cases
+                        if (historyHashes.size > 100) historyHashes.clear();
                     }
 
                     // Optional: Visual Update frequency
