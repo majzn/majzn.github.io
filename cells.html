@@ -584,11 +584,20 @@ let state = {
     sweep: { running: false, data: [], buffer: null, maxHits: 0, showingOverlay: false }
 };
 
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+});
+
 function init() {
     try { const saved = localStorage.getItem('ca_ide_presets'); if(saved) state.presets = JSON.parse(saved); } catch(e) {}
     renderPresets(); buildVisualGrids(); setupListeners();
-    loadPresetCode(SYSTEM_PRESETS.life.code);
-    loop();
+    
+    // Safety delay to ensure layout is ready
+    setTimeout(() => {
+        resizeCanvas();
+        loadPresetCode(SYSTEM_PRESETS.life.code);
+        loop();
+    }, 100);
 }
 
 function setupListeners() {
@@ -730,7 +739,7 @@ async function runSweepExperiment() {
     const stepSize = (end - start) / Math.max(1, steps - 1);
     
     for(let i=0; i<steps; i++) {
-        if(!state.sweep.running) break; // Allow abort
+        if(!state.sweep.running) break;
         const val = start + i * stepSize;
         if(param === 'initV') vs.initV = val;
         else if(param === 'smooth') vs.smooth = val;
@@ -741,7 +750,7 @@ async function runSweepExperiment() {
         
         dom.codeEditor.value = generateCode(vs); compile();
         
-        for(let g=0; g<gens; g++) step(true);
+        for(let g=0; g<gens; g++) { if(!step(true)) break; } // Halt early optimization
         
         // Measure
         let sum = 0;
@@ -825,7 +834,6 @@ function drawGraph(canvas, data, xLabel, yLabel, isLive) {
     let minX=data[0].x, maxX=data[0].x, minY=data[0].y, maxY=data[0].y;
     data.forEach(p => { if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
     
-    // Safety check for flat line
     if (maxY === minY) { maxY += 0.5; minY -= 0.5; }
     if (isLive) { minY=0; maxY=1; minX=0; maxX=100; } 
     
@@ -880,17 +888,31 @@ function compile() {
         state.imgData=state.offCtx.createImageData(vw, vh);
         dom.sliceCtrl.style.display = (state.dims.length>2) ? 'flex' : 'none';
         if(state.dims.length>2) { dom.sliceSlider.max=state.dims[2]-1; state.slice=Math.floor(state.dims[2]/2); }
-        resetCam(vw, vh); dom.dimsVal.innerText=state.dims.join('x');
-        setStatus("Ready", "var(--success)"); draw();
+        
+        // Wait for next frame to ensure DOM is ready for resetCam measurement
+        requestAnimationFrame(() => {
+            resetCam(vw, vh); 
+            dom.dimsVal.innerText=state.dims.join('x');
+            setStatus("Ready", "var(--success)"); 
+            draw();
+        });
+        
     } catch(e) { setStatus("Error", "var(--error)"); console.error(e); }
 }
 
 function resetCam(w, h) {
-    const cw=dom.mainView.offsetWidth, ch=dom.mainView.offsetHeight, z=Math.min((cw-40)/w, (ch-40)/h);
+    const cw=dom.mainView.offsetWidth, ch=dom.mainView.offsetHeight;
+    if(cw===0 || ch===0) return; // Prevent 0 size issues
+    const z=Math.min((cw-40)/w, (ch-40)/h) || 1;
     state.cam = { x: (cw-w*z)/2, y: (ch-h*z)/2, zoom: Math.max(0.1, z), drag: false };
     draw();
 }
-function resizeCanvas() { dom.canvas.width = dom.mainView.offsetWidth; dom.canvas.height = dom.mainView.offsetHeight; draw(); }
+function resizeCanvas() { 
+    const w = dom.mainView.offsetWidth, h = dom.mainView.offsetHeight;
+    if(w===0 || h===0) return;
+    dom.canvas.width = w; dom.canvas.height = h; 
+    draw(); 
+}
 function togglePlay() { state.running = !state.running; updateUI(); }
 function updateUI() {
     dom.playBtn.querySelector('#icon-play').style.display=state.running?'none':'block';
@@ -899,20 +921,24 @@ function updateUI() {
 }
 
 function step(silent) {
-    if(!state.gridA) return;
+    if(!state.gridA) return false;
     const src=state.isBufferA?state.gridA:state.gridB, dst=state.isBufferA?state.gridB:state.gridA;
     const len=state.totalSize, off=state.offsets, nLen=off.length, upd=state.config.update;
     const neighbors = new (state.config.type==='float'?Float32Array:Int32Array)(nLen);
+    let changed = false;
     for(let i=0; i<len; i++) {
         for(let k=0; k<nLen; k++) { 
             let p = (i + off[k]) % len; 
             if(p < 0) p += len; 
             neighbors[k]=src[p]; 
         }
-        dst[i] = upd(src[i], neighbors);
+        const v = upd(src[i], neighbors);
+        if(v !== src[i]) changed = true;
+        dst[i] = v;
     }
-    state.isBufferA = !state.isBufferA; state.gen++; dom.genVal.innerText = state.gen;
-    if(!silent) { updateLiveGraph(); draw(); }
+    state.isBufferA = !state.isBufferA; state.gen++; 
+    if(!silent) { dom.genVal.innerText = state.gen; updateLiveGraph(); draw(); }
+    return changed;
 }
 
 function draw() {
@@ -985,7 +1011,6 @@ function interact(e) {
 }
 function initResize(e) { e.preventDefault(); dom.resizer.classList.add('resizing'); const sx=e.clientX, sw=dom.sidebar.offsetWidth; const mm=ev=>{dom.sidebar.style.width=(sw+ev.clientX-sx)+'px'; resizeCanvas();}; const mu=()=>{dom.resizer.classList.remove('resizing'); window.removeEventListener('mousemove',mm); window.removeEventListener('mouseup',mu);}; window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu); }
 
-init();
 </script>
 </body>
 </html>
