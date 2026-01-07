@@ -1,0 +1,2422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Volumetric Clouds - Infinite Flight v2</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #000; 
+            user-select: none; 
+            font-family: 'Segoe UI', sans-serif; 
+        }
+        canvas { 
+            display: block; 
+        }
+        
+        #ui-layer {
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            pointer-events: none; 
+            z-index: 10;
+        }
+
+        #start-screen {
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            background: rgba(0,0,0,0.8); 
+            backdrop-filter: blur(10px);
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center;
+            z-index: 100; 
+            transition: opacity 0.5s; 
+            cursor: pointer; 
+            pointer-events: auto;
+        }
+        #start-screen.fade-out { 
+            opacity: 0; 
+            pointer-events: none; 
+        }
+        #start-btn {
+            padding: 20px 40px; 
+            border: 2px solid white; 
+            color: white;
+            font-size: 1.5rem; 
+            font-family: monospace; 
+            letter-spacing: 4px;
+            background: transparent; 
+            transition: all 0.2s;
+        }
+        #start-btn:hover { 
+            background: white; 
+            color: black; 
+        }
+
+        #loading {
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.9); 
+            font-family: monospace; 
+            font-size: 1.2rem; 
+            letter-spacing: 2px;
+            transition: opacity 0.5s ease-out;
+            text-align: center;
+            background: rgba(0,0,0,0.5); 
+            padding: 20px; 
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        #progress-bar {
+            width: 300px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #progress-fill {
+            width: 0%;
+            height: 100%;
+            background: #00ff88;
+            transition: width 0.1s linear;
+        }
+
+        #overlay {
+            position: absolute; 
+            bottom: 20px; 
+            left: 20px;
+            color: white; 
+            font-family: 'Segoe UI', sans-serif;
+            text-align: left; 
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px; 
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: opacity 0.3s;
+        }
+
+        #telemetry {
+            position: absolute; 
+            top: 20px; 
+            right: 20px;
+            text-align: right; 
+            color: rgba(255, 255, 255, 0.9);
+            font-family: monospace; 
+            font-size: 0.9rem;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+
+        #audio-status {
+            color: #888; 
+            font-weight: bold; 
+            margin-top: 8px; 
+            font-size: 0.8em; 
+            letter-spacing: 1px;
+        }
+        #audio-status.active { 
+            color: #00ff88; 
+        }
+        #chord-display {
+            color: #aaa; 
+            font-size: 0.8em; 
+            margin-top: 5px; 
+            font-family: monospace;
+        }
+
+        h1 { 
+            margin: 0 0 10px 0; 
+            font-weight: 300; 
+            font-size: 1.2rem; 
+            letter-spacing: 2px; 
+        }
+        
+        .control-row { 
+            margin: 4px 0; 
+            display: flex; 
+            align-items: center; 
+        }
+        .key {
+            display: inline-block; 
+            padding: 2px 6px;
+            background: rgba(255,255,255,0.1); 
+            border-radius: 4px;
+            font-family: monospace; 
+            color: #fff; 
+            margin: 0 2px;
+            border: 1px solid rgba(255,255,255,0.2);
+            font-size: 0.9rem; 
+            transition: background 0.1s, border-color 0.1s;
+        }
+        .key.active { 
+            background: #fff; 
+            color: #000; 
+            border-color: #fff; 
+            box-shadow: 0 0 10px white; 
+        }
+
+        .hidden { 
+            opacity: 0 !important; 
+            pointer-events: none !important; 
+        }
+        .lil-gui { 
+            --width: 320px; 
+        }
+    </style>
+</head>
+<body>
+    <div id="start-screen">
+        <div id="start-btn">CLICK TO ENGAGE SYSTEMS</div>
+        <div style="margin-top: 20px; color: #aaa; font-family: monospace;">Generative Audio Engine Ready</div>
+    </div>
+
+    <div id="loading">
+        <div id="loading-text">GENERATING 3D NOISE ASSETS...</div>
+        <div id="progress-bar"><div id="progress-fill"></div></div>
+    </div>
+    
+    <div id="ui-layer">
+        <div id="telemetry">
+            ALT: <span id="val-alt">0</span> ft<br>
+            SPD: <span id="val-spd">0</span> kts<br>
+            POS: <span id="val-pos">0, 0</span><br>
+            DENS: <span id="val-dens">0%</span>
+        </div>
+
+        <div id="overlay">
+            <h1>AIRCRAFT CONTROLS</h1>
+            <div style="line-height: 1.6; font-size: 0.9rem;">
+                <div class="control-row"><span class="key" id="k-w">W</span><span class="key" id="k-s">S</span> Dive / Climb</div>
+                <div class="control-row"><span class="key" id="k-a">A</span><span class="key" id="k-d">D</span> Roll Left / Right</div>
+                <div class="control-row"><span class="key" id="k-l">←</span><span class="key" id="k-r">→</span> Yaw Left / Right</div>
+                <div class="control-row"><span class="key" id="k-u">↑</span><span class="key" id="k-dn">↓</span> Throttle +/-</div>
+                <div class="control-row"><span class="key">H</span> Toggle UI</div>
+                <div id="audio-status">AUDIO STANDBY</div>
+                <div id="chord-display">Scale: Initializing...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+        // Core System Variables
+        let renderer, scene, camera, flightControls, audioManager;
+        let cloudTarget, denoiseTarget, rayTarget, historyTarget, taaTarget;
+        let cloudMat, denoiseMat, rayMat, compositeMat, taaMat;
+        let postScene, postQuad;
+        let clock = new THREE.Clock();
+        let uiGui;
+        let globalNoiseData = null; 
+        let noiseWorker = null;
+        let spatialSoundSystem = null;
+        
+        // --- Web Worker Code for Background Asset Generation ---
+        const NOISE_WORKER_CODE = `
+            self.onmessage = function(e) {
+                const size = e.data.size || 128;
+                const seed = e.data.seed || Date.now();
+                const totalPixels = size * size * size;
+                const data = new Float32Array(totalPixels);
+                
+                // Permutation table for Perlin Noise
+                const p = new Uint8Array(512);
+                const perm = new Uint8Array(256);
+                
+                // Seeded random
+                let seedVal = seed;
+                const random = () => { 
+                    seedVal = (seedVal * 9301 + 49297) % 233280; 
+                    return seedVal / 233280; 
+                };
+
+                for(let i=0; i<256; i++) perm[i] = i;
+                for(let i=255; i>0; i--) { 
+                    const r = Math.floor(random() * (i+1)); 
+                    [perm[i], perm[r]] = [perm[r], perm[i]]; 
+                }
+                for(let i=0; i<512; i++) p[i] = perm[i & 255];
+
+                // Noise Helper Functions
+                const fade = t => t*t*t*(t*(t*6-15)+10);
+                const lerp = (a, b, t) => a+t*(b-a);
+                const grad = (hash, x, y, z) => { 
+                    const h = hash & 15; 
+                    const u = h<8?x:y; 
+                    const v = h<4?y:h==12||h==14?x:z; 
+                    return ((h&1)==0?u:-u)+((h&2)==0?v:-v); 
+                };
+                
+                const pnoise = (x, y, z, period) => {
+                    const X = Math.floor(x)%period, Y = Math.floor(y)%period, Z = Math.floor(z)%period;
+                    const fx = x-Math.floor(x), fy = y-Math.floor(y), fz = z-Math.floor(z);
+                    const u = fade(fx), v = fade(fy), w = fade(fz);
+                    const X1 = (X+1)%period, Y1 = (Y+1)%period, Z1 = (Z+1)%period;
+                    
+                    const g000 = grad(p[p[p[X]+Y]+Z], fx, fy, fz), g100 = grad(p[p[p[X1]+Y]+Z], fx-1, fy, fz);
+                    const g010 = grad(p[p[p[X]+Y1]+Z], fx, fy-1, fz), g110 = grad(p[p[p[X1]+Y1]+Z], fx-1, fy-1, fz);
+                    const g001 = grad(p[p[p[X]+Y]+Z1], fx, fy, fz-1), g101 = grad(p[p[p[X1]+Y]+Z1], fx-1, fy, fz-1);
+                    const g011 = grad(p[p[p[X]+Y1]+Z1], fx, fy-1, fz-1), g111 = grad(p[p[p[X1]+Y1]+Z1], fx-1, fy-1, fz-1);
+                    
+                    return lerp(lerp(lerp(g000, g100, u), lerp(g010, g110, u), v), lerp(lerp(g001, g101, u), lerp(g011, g111, u), v), w);
+                };
+
+                let idx = 0; 
+                const freq = 8.0; 
+                
+                // Generation Loop with Progress Reporting
+                for(let z=0; z<size; z++) {
+                    // Report progress every slice
+                    if (z % 4 === 0) {
+                        self.postMessage({progress: z/size});
+                    }
+                    
+                    for(let y=0; y<size; y++) {
+                        for(let x=0; x<size; x++) {
+                            const nx = x/size, ny = y/size, nz = z/size;
+                            let total = 0.0, amplitude = 0.5, f = freq;
+                            
+                            // Fractal Brownian Motion (FBM)
+                            for(let k=0; k<4; k++) { 
+                                total += pnoise(nx*f, ny*f, nz*f, Math.floor(f)) * amplitude; 
+                                amplitude *= 0.5; 
+                                f *= 2.0; 
+                            }
+                            
+                            data[idx++] = total * 0.5 + 0.5;
+                        }
+                    }
+                }
+                
+                self.postMessage({done: true, data: data, size: size});
+            };
+        `;
+        
+        const DEFAULT_CONFIG = {
+            autoSun: false,
+            autoWeather: false,
+            timeScale: 1.0,
+            sunElevation: 12,
+            sunAzimuth: 180,
+            sunIntensity: 1.0,
+            cloudColorTop: '#ffffff',
+            cloudColorBottom: '#5c6e8c',
+            skyColorZenith: '#3a76c4',
+            skyColorHorizon: '#e8f4f8',
+            skySunsetZenith: '#2a3b55',
+            skySunsetHorizon: '#ff8800',
+            groundColor: '#050508',
+            cloudCover: 0.6,
+            cloudDensity: 1.0,
+            cloudAbsorption: 1.2,
+            cloudBottom: 1500, 
+            cloudTop: 4500,    
+            noiseScale: 2.2,
+            erosion: 0.5,
+            densityProfile: 0.6, 
+            fadeBottom: 0.15,
+            fadeTop: 0.15,
+            macroScale1: 4.0,       
+            macroScale2: 10.0, 
+            macroStrength2: 0.5,
+            macroScale3: 20.0,
+            macroStrength3: 0.25, 
+            macroCoverage: 0.3,    
+            macroDensity: 0.5,     
+            windSpeed: 0.15,
+            windAngle: 0.0,
+            silverLining: 0.7, 
+            silverSpread: 0.5, 
+            ambientIntensity: 0.2,
+            powder: 1.0,
+            resolution: 0.5,    
+            steps: 96,          
+            lightSteps: 12, 
+            noiseOctaves: 3,    
+            dithering: true,
+            lodDistance: 20000.0,
+            maxDist: 100000.0, 
+            enableDenoise: true,
+            enableTAA: true,
+            taaBlend: 0.9,
+            rayleigh: 1.2, 
+            mieCoefficient: 0.005,
+            mieDirectionalG: 0.8,
+            fogDensity: 0.000015,
+            godRays: true,
+            rayIntensity: 1.0,
+            rayDensity: 1.2,
+            rayWeight: 0.58,
+            rayDecay: 0.985,
+            rayExposure: 0.55,
+            raySamples: 60,
+            masterVolume: 0.5,
+            volSynths: 0.6,
+            volBass: 0.7,
+            volWind: 0.4,
+            volReverb: 0.7,
+            volCabin: 0.4,
+            volArp: 0.5,
+            volAtmos: 0.5,
+            volSFX: 0.6,
+            textureSize: 128
+        };
+
+        const CONFIG = { ...DEFAULT_CONFIG };
+
+        const AUTOMATION = {
+            sun: { enabled: false, speed: 0.1, minElev: -5, maxElev: 45 },
+            weather: { enabled: false, speed: 0.05, minCover: 0.3, maxCover: 0.8 },
+            density: { enabled: false, speed: 0.03, minDensity: 0.5, maxDensity: 2.0 },
+            erosion: { enabled: false, speed: 0.1, minErosion: 0.2, maxErosion: 0.8 },
+            wind: { enabled: false, speed: 0.05, minSpeed: 0.0, maxSpeed: 2.0 },
+            detail: { enabled: false, speed: 0.05, minScale: 1.5, maxScale: 4.0 }
+        };
+
+        // --- Generative Music Theory ---
+        const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const SCALES = {
+            AEOLIAN: [0, 2, 3, 5, 7, 8, 10], 
+            DORIAN:  [0, 2, 3, 5, 7, 9, 10], 
+            PHRYGIAN:[0, 1, 3, 5, 7, 8, 10], 
+            LYDIAN:  [0, 2, 4, 6, 7, 9, 11]  
+        };
+        const mtof = (note) => 440 * Math.pow(2, (note - 69) / 12);
+
+        const HARMONIC_PROGRESSION = [
+            { scale: 'AEOLIAN', rootOff: 0, bars: 8 },  
+            { scale: 'DORIAN',  rootOff: 5, bars: 4 },  
+            { scale: 'AEOLIAN', rootOff: 0, bars: 4 },  
+            { scale: 'PHRYGIAN',rootOff: 7, bars: 2 },  
+            { scale: 'PHRYGIAN',rootOff: 2, bars: 2 },  
+            { scale: 'AEOLIAN', rootOff: 0, bars: 4 }   
+        ];
+
+        // --- Spatial Audio System ---
+        class SpatialSoundSystem {
+            constructor(ctx, destination) {
+                this.ctx = ctx;
+                this.destination = destination;
+                this.emitters = [];
+                this.nextThunderTime = 0;
+            }
+
+            update(dt, playerPos, camQuat) {
+                // Random Thunder Spawning
+                if (Math.random() < 0.002) {
+                    this.spawnThunder(playerPos);
+                }
+
+                // Update emitters
+                this.emitters = this.emitters.filter(e => e.active);
+                this.emitters.forEach(e => e.update(dt, playerPos, camQuat));
+            }
+
+            spawnThunder(playerPos) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 5000 + Math.random() * 15000;
+                const pos = new THREE.Vector3(
+                    playerPos.x + Math.sin(angle) * dist,
+                    playerPos.y + (Math.random() * 2000),
+                    playerPos.z + Math.cos(angle) * dist
+                );
+
+                const emitter = new ThunderEmitter(this.ctx, this.destination, pos);
+                this.emitters.push(emitter);
+
+                // Visual Flash
+                if (cloudMat) {
+                    const originalIntensity = CONFIG.sunIntensity;
+                    cloudMat.uniforms.uSunIntensity.value = originalIntensity * 8.0;
+                    setTimeout(() => {
+                        cloudMat.uniforms.uSunIntensity.value = originalIntensity;
+                    }, 100);
+                }
+            }
+        }
+
+        class ThunderEmitter {
+            constructor(ctx, dest, position) {
+                this.ctx = ctx;
+                this.pos = position;
+                this.active = true;
+                this.life = 5.0; // Seconds
+
+                // Setup Panner
+                this.panner = ctx.createPanner();
+                this.panner.panningModel = 'HRTF';
+                this.panner.distanceModel = 'exponential';
+                this.panner.refDistance = 2000;
+                this.panner.maxDistance = 50000;
+                this.panner.rolloffFactor = 0.5;
+                this.panner.connect(dest);
+                
+                // Synthesis
+                const t = ctx.currentTime;
+                
+                // Crack
+                const osc = ctx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(50, t);
+                osc.frequency.exponentialRampToValueAtTime(10, t + 1.5);
+                
+                // Rumble
+                const noise = ctx.createBufferSource();
+                const bSize = ctx.sampleRate * 2;
+                const buff = ctx.createBuffer(1, bSize, ctx.sampleRate);
+                const data = buff.getChannelData(0);
+                for(let i=0; i<bSize; i++) data[i] = Math.random() * 2 - 1;
+                noise.buffer = buff;
+
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(CONFIG.volSFX, t + 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 2.5);
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, t);
+                filter.frequency.exponentialRampToValueAtTime(100, t + 1.0);
+
+                osc.connect(filter);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.panner);
+                
+                osc.start(t);
+                osc.stop(t + 2.5);
+                noise.start(t);
+                noise.stop(t + 2.5);
+            }
+
+            update(dt, playerPos, camQuat) {
+                this.life -= dt;
+                if (this.life <= 0) {
+                    this.active = false;
+                    try { this.panner.disconnect(); } catch(e){}
+                    return;
+                }
+                
+                // Calculate relative position for wrapping world
+                let relX = this.pos.x - playerPos.x;
+                let relZ = this.pos.z - playerPos.z;
+                
+                // Wrap logic
+                const WRAP = 200000;
+                if (Math.abs(relX) > WRAP/2) relX -= Math.sign(relX) * WRAP;
+                if (Math.abs(relZ) > WRAP/2) relZ -= Math.sign(relZ) * WRAP;
+
+                // Safety check for NaNs
+                if (!isFinite(relX) || !isFinite(relZ) || !isFinite(this.pos.y) || !isFinite(playerPos.y)) return;
+
+                this.panner.positionX.value = relX;
+                this.panner.positionY.value = this.pos.y - playerPos.y;
+                this.panner.positionZ.value = relZ;
+                
+                // Update listener orientation (usually done globally, but safe to refresh)
+                const orient = new THREE.Vector3(0, 0, -1).applyQuaternion(camQuat);
+                const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camQuat);
+                
+                if (this.ctx.listener.forwardX) {
+                    this.ctx.listener.forwardX.value = orient.x;
+                    this.ctx.listener.forwardY.value = orient.y;
+                    this.ctx.listener.forwardZ.value = orient.z;
+                    this.ctx.listener.upX.value = up.x;
+                    this.ctx.listener.upY.value = up.y;
+                    this.ctx.listener.upZ.value = up.z;
+                }
+            }
+        }
+
+        class AtmosphereAudio {
+            constructor() {
+                this.ctx = null;
+                this.masterGain = null;
+                this.windNodes = {};
+                this.reverbNodes = {};
+                this.delayNodes = {};
+                this.busses = {}; 
+                this.droneNodes = { osc: [] }; 
+                this.bassNodes = {};
+                this.cabinNodes = {};
+                this.initialized = false;
+                
+                // Sequencer
+                this.tempo = 90; 
+                this.nextNoteTime = 0;
+                this.scheduleAheadTime = 0.1;
+                this.current16thNote = 0;
+                this.barCount = 0;
+                this.cycleCount = 0; 
+                
+                // Harmony
+                this.rootNoteBase = 58; // Bb
+                this.progressionIndex = 0;
+                this.barsInCurrentStage = 0;
+                this.currentScaleType = 'AEOLIAN';
+                this.currentRoot = 58;
+
+                // Input State
+                this.currentPadType = 'IDLE'; 
+                this.activePad = null; 
+                this.speedFactor = 0.0;
+                this.synthVolumeMult = 1.0;
+                this.cloudDensity = 0.0;
+                this.timeOfDay = 1.0; 
+                this.altitudeFactor = 0.0; 
+                
+                this.masterFilter = null;
+            }
+
+            init() {
+                if (this.initialized) return;
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                    
+                    // --- Routing ---
+                    this.masterGain = this.ctx.createGain();
+                    this.masterGain.gain.value = CONFIG.masterVolume;
+                    
+                    const compressor = this.ctx.createDynamicsCompressor();
+                    compressor.threshold.value = -18;
+                    compressor.ratio.value = 8;
+                    
+                    this.masterFilter = this.ctx.createBiquadFilter();
+                    this.masterFilter.type = 'lowpass';
+                    this.masterFilter.frequency.value = 20000;
+
+                    this.masterGain.connect(compressor);
+                    compressor.connect(this.masterFilter);
+                    this.masterFilter.connect(this.ctx.destination);
+
+                    // --- Busses ---
+                    ['synth', 'bass', 'wind', 'cabin', 'arp', 'atmos', 'sfx'].forEach(busName => {
+                        this.busses[busName] = this.ctx.createGain();
+                        this.busses[busName].connect(this.masterGain);
+                    });
+
+                    this.setupReverb();
+                    this.setupDelay();
+                    this.setupWind();
+                    this.setupCabin();
+                    this.setupDrone();
+                    this.setupBass();
+
+                    // Initialize Spatial Audio
+                    spatialSoundSystem = new SpatialSoundSystem(this.ctx, this.busses.sfx);
+
+                    this.initialized = true;
+                    this.nextNoteTime = this.ctx.currentTime + 0.1;
+                    this.updateStatus(true);
+                    this.scheduler(); 
+                } catch (e) { 
+                    console.warn("Audio Init Failed", e);
+                    this.updateStatus(false);
+                }
+            }
+
+            // Wrapper to prevent Non-Finite errors in AudioParams
+            safeSetParam(param, value, time, timeConstant = 0.1) {
+                if (param && isFinite(value) && isFinite(time)) {
+                    try {
+                        param.setTargetAtTime(value, time, timeConstant);
+                    } catch (e) {
+                        // Ignore sporadic audio timing errors
+                    }
+                }
+            }
+
+            updateStatus(success) {
+                const el = document.getElementById('audio-status');
+                if (success) {
+                    el.innerText = "AUDIO ONLINE";
+                    el.classList.add('active');
+                } else {
+                    el.innerText = "AUDIO FAILED";
+                }
+            }
+
+            updateVolumes() {
+                if(!this.initialized) return;
+                
+                const now = this.ctx.currentTime;
+                // Calculate dynamic fade based on speed (Stationary = Silence for Music)
+                const movementFade = THREE.MathUtils.smoothstep(this.speedFactor, 0.0, 0.15);
+                
+                this.safeSetParam(this.masterGain.gain, CONFIG.masterVolume, now, 0.1);
+                
+                const droneVol = 0.04 * (0.2 + 0.8 * movementFade);
+                this.droneNodes.osc.forEach(d => this.safeSetParam(d.gain.gain, droneVol, now, 0.5));
+
+                this.safeSetParam(this.busses.synth.gain, CONFIG.volSynths * movementFade, now, 0.1);
+                this.safeSetParam(this.busses.bass.gain, CONFIG.volBass * movementFade, now, 0.1);
+                this.safeSetParam(this.busses.arp.gain, CONFIG.volArp * movementFade, now, 0.1);
+                this.safeSetParam(this.busses.atmos.gain, CONFIG.volAtmos * movementFade, now, 0.1);
+                this.safeSetParam(this.busses.cabin.gain, CONFIG.volCabin, now, 0.1);
+                this.safeSetParam(this.busses.sfx.gain, CONFIG.volSFX, now, 0.1);
+                this.safeSetParam(this.reverbNodes.input.gain, CONFIG.volReverb, now, 0.1);
+            }
+
+            setupReverb() {
+                const duration = 5.0;
+                const decay = 4.0;
+                const len = this.ctx.sampleRate * duration;
+                const buffer = this.ctx.createBuffer(2, len, this.ctx.sampleRate);
+                for (let c = 0; c < 2; c++) {
+                    const data = buffer.getChannelData(c);
+                    for (let i = 0; i < len; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+                    }
+                }
+                this.reverbNodes.convolver = this.ctx.createConvolver();
+                this.reverbNodes.convolver.buffer = buffer;
+                this.reverbNodes.input = this.ctx.createGain();
+                this.reverbNodes.input.connect(this.reverbNodes.convolver);
+                this.reverbNodes.convolver.connect(this.masterGain);
+            }
+
+            setupDelay() {
+                this.delayNodes.delay = this.ctx.createDelay(1.0);
+                this.delayNodes.delay.delayTime.value = 0.35; 
+                this.delayNodes.feedback = this.ctx.createGain();
+                this.delayNodes.feedback.gain.value = 0.4;
+                
+                this.delayNodes.delay.connect(this.delayNodes.feedback);
+                this.delayNodes.feedback.connect(this.delayNodes.delay);
+                this.delayNodes.delay.connect(this.busses.atmos);
+            }
+
+            setupWind() {
+                const bSize = 2 * this.ctx.sampleRate;
+                const buff = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+                const data = buff.getChannelData(0);
+                let b0=0, b1=0, b2=0, b3=0, b4=0, b5=0, b6=0;
+                for(let i=0; i<bSize; i++) {
+                    let white = Math.random() * 2 - 1;
+                    b0 = 0.99886 * b0 + white * 0.0555179;
+                    b1 = 0.99332 * b1 + white * 0.0750759;
+                    b2 = 0.96900 * b2 + white * 0.1538520;
+                    b3 = 0.86650 * b3 + white * 0.3104856;
+                    b4 = 0.55000 * b4 + white * 0.5329522;
+                    b5 = -0.7616 * b5 - white * 0.0168980;
+                    data[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+                    data[i] *= 0.11; 
+                    b6 = white * 0.115926;
+                }
+                const src = this.ctx.createBufferSource();
+                src.buffer = buff;
+                src.loop = true;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 200;
+                const gain = this.ctx.createGain();
+                gain.gain.value = 0.0;
+                src.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.busses.wind); 
+                this.windNodes = { src, filter, gain };
+                src.start();
+            }
+
+            setupCabin() {
+                const bSize = 2 * this.ctx.sampleRate;
+                const buff = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+                const data = buff.getChannelData(0);
+                let lastOut = 0;
+                for(let i=0; i<bSize; i++) {
+                    let white = Math.random() * 2 - 1;
+                    data[i] = (lastOut + (0.02 * white)) / 1.02;
+                    lastOut = data[i];
+                    data[i] *= 3.5; 
+                }
+                
+                const src = this.ctx.createBufferSource();
+                src.buffer = buff;
+                src.loop = true;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 120; 
+                const gain = this.ctx.createGain();
+                gain.gain.value = 0.3; 
+                src.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.busses.cabin);
+                this.cabinNodes = { src, filter, gain };
+                src.start();
+            }
+
+            setupDrone() {
+                this.droneNodes.osc = [];
+                const freqs = [0.5, 1.0, 1.5];
+                freqs.forEach(mult => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = 'triangle';
+                    osc.frequency.value = mtof(this.rootNoteBase - 24) * mult;
+                    const gain = this.ctx.createGain();
+                    gain.gain.value = 0.04; 
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 150; 
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.reverbNodes.input); 
+                    osc.start();
+                    this.droneNodes.osc.push({osc, gain, filter, mult});
+                });
+            }
+
+            setupBass() {
+                this.bassNodes.gain = this.ctx.createGain();
+                this.bassNodes.gain.gain.value = 1.0; 
+                this.bassNodes.filter = this.ctx.createBiquadFilter();
+                this.bassNodes.filter.type = 'lowpass';
+                this.bassNodes.filter.frequency.value = 200;
+                this.bassNodes.gain.connect(this.bassNodes.filter);
+                this.bassNodes.filter.connect(this.busses.bass);
+            }
+
+            getScaleNotes(root, type) {
+                const scale = SCALES[type];
+                return scale.map(interval => root + interval);
+            }
+            
+            getKeyName() {
+                const noteName = NOTES[this.currentRoot % 12];
+                return `${noteName} ${this.currentScaleType}`;
+            }
+
+            advanceHarmony() {
+                this.progressionIndex++;
+                if (this.progressionIndex >= HARMONIC_PROGRESSION.length) {
+                    this.progressionIndex = 0;
+                    this.cycleCount++; 
+                }
+
+                const stage = HARMONIC_PROGRESSION[this.progressionIndex];
+                
+                this.currentScaleType = stage.scale;
+                this.currentRoot = this.rootNoteBase + stage.rootOff;
+                this.barsInCurrentStage = 0; 
+
+                while(this.currentRoot > 65) this.currentRoot -= 12;
+                while(this.currentRoot < 45) this.currentRoot += 12;
+
+                const now = this.ctx.currentTime;
+                this.droneNodes.osc.forEach(node => {
+                    const targetFreq = mtof(this.currentRoot - 24) * node.mult;
+                    this.safeSetParam(node.osc.frequency, targetFreq, now, 4.0);
+                    const cutoff = 100 + (this.timeOfDay * 200);
+                    this.safeSetParam(node.filter.frequency, cutoff, now, 2.0);
+                });
+
+                document.getElementById('chord-display').innerText = `Key: ${this.getKeyName()} | Stage: ${this.progressionIndex + 1}/${HARMONIC_PROGRESSION.length} | Cycle: ${this.cycleCount}`;
+            }
+
+            getNotesForType(type) {
+                const s = this.getScaleNotes(this.currentRoot, this.currentScaleType);
+                
+                if (type === 'IDLE') return [s[0], s[4]]; 
+                if (type === 'RISE') return [s[0], s[4], s[0]+12, s[2]+12];
+                if (type === 'FALL') return [s[0], s[2], s[4], s[0]-12]; 
+                if (type === 'ROLL_L') return [s[3]-12, s[3], s[5], s[0]+12]; 
+                if (type === 'ROLL_R') return [s[4]-12, s[4], s[6], s[1]+12]; 
+                if (type === 'YAW_L') return [s[1]-12, s[1], s[3], s[5]];
+                if (type === 'YAW_R') return [s[5]-12, s[5], s[0]+12, s[2]+12]; 
+                if (type === 'THROTTLE_UP') return [s[0]-12, s[0], s[2], s[4], s[6], s[1]+12];
+                if (type === 'THROTTLE_DOWN') return [s[0]-24, s[0]-12, s[4]-12];
+                return [];
+            }
+
+            getConfigForType(type) {
+                if (type.includes('YAW')) return { pan: type.includes('L') ? -0.4 : 0.4, glide: type.includes('L') ? -1 : 1, vol: 0.35 };
+                if (type.includes('ROLL')) return { pan: type.includes('L') ? -0.7 : 0.7, glide: 0, vol: 0.4 };
+                if (type.includes('THROTTLE')) return { pan: 0, glide: 0, vol: 0.5 };
+                if (type === 'RISE') return { pan: 0, glide: 0, vol: 0.45 };
+                if (type === 'FALL') return { pan: 0, glide: 0, vol: 0.45 };
+                return { pan: 0, glide: 0, vol: 0.35 };
+            }
+
+            startPad(notes, config, time) {
+                const oscs = [];
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(config.vol * this.synthVolumeMult, time + 1.0); 
+
+                const panner = this.ctx.createStereoPanner();
+                panner.pan.value = config.pan;
+
+                gain.connect(panner);
+                panner.connect(this.busses.synth);
+                panner.connect(this.reverbNodes.input);
+
+                notes.forEach((midi, i) => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = 'sawtooth'; 
+                    
+                    const freq = mtof(midi);
+                    if (config.glide !== 0) {
+                        osc.frequency.setValueAtTime(mtof(midi - config.glide), time);
+                        osc.frequency.exponentialRampToValueAtTime(freq, time + 0.5);
+                    } else {
+                        osc.frequency.value = freq;
+                    }
+
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    const dayBright = 200 + (this.timeOfDay * 400);
+                    filter.frequency.value = dayBright + (this.speedFactor * 800); 
+                    
+                    osc.detune.value = (i % 2 === 0 ? 6 : -6);
+
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    osc.start(time);
+                    oscs.push(osc);
+                });
+
+                return { oscs, gain };
+            }
+
+            transitionPad(newType, time) {
+                if (this.currentPadType === newType) return;
+                
+                if (newType !== 'IDLE' && this.currentPadType !== newType && this.speedFactor > 0.1) {
+                    this.triggerInputArp(newType, time);
+                }
+
+                if (this.activePad) {
+                    const pad = this.activePad;
+                    const gainParam = pad.gain.gain;
+                    try {
+                        gainParam.cancelScheduledValues(time);
+                        gainParam.setTargetAtTime(0, time, 0.4); 
+                    } catch(e) {}
+                    pad.oscs.forEach(o => {
+                         try { o.stop(time + 2.0); } catch(e){}
+                    });
+                }
+
+                this.currentPadType = newType;
+                
+                if (newType !== 'IDLE') {
+                    const notes = this.getNotesForType(newType);
+                    const config = this.getConfigForType(newType);
+                    this.activePad = this.startPad(notes, config, time);
+                    try {
+                        this.safeSetParam(this.activePad.gain.gain, config.vol * this.synthVolumeMult * 0.6, time + 1.5, 1.0);
+                    } catch(e) {}
+                } else {
+                    this.activePad = null;
+                }
+            }
+
+            triggerInputArp(type, time) {
+                const notes = this.getNotesForType(type).slice(0, 4); 
+                let speed = 0.06;
+
+                // Deterministic Shuffle based on beat
+                const shuffleType = Math.floor(time) % 2; 
+                if (shuffleType === 1) notes.reverse();
+                
+                notes.forEach((midi, i) => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = this.altitudeFactor > 0.6 ? 'sine' : 'triangle';
+                    osc.frequency.value = mtof(midi + 24); 
+                    
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0, time + i * speed);
+                    gain.gain.linearRampToValueAtTime(0.08, time + i * speed + 0.01);
+                    gain.gain.exponentialRampToValueAtTime(0.001, time + i * speed + 0.3);
+                    
+                    const pan = this.ctx.createStereoPanner();
+                    pan.pan.value = (Math.sin(time) * 0.5);
+
+                    osc.connect(gain);
+                    gain.connect(pan);
+                    pan.connect(this.busses.arp);
+                    pan.connect(this.reverbNodes.input);
+                    
+                    osc.start(time + i * speed);
+                    osc.stop(time + i * speed + 0.4);
+                });
+            }
+
+            playBassPulse(midi, time, duration) {
+                const osc = this.ctx.createOscillator();
+                if (this.altitudeFactor > 0.7) osc.type = 'sawtooth';
+                else if (this.altitudeFactor > 0.4) osc.type = 'square';
+                else osc.type = 'triangle';
+
+                osc.frequency.value = mtof(midi - 24); 
+                
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                
+                const variation = Math.floor(this.cycleCount / 2) % 2;
+                const baseCutoff = (variation === 0 ? 80 : 60) + (this.speedFactor * 400); 
+                
+                filter.frequency.setValueAtTime(baseCutoff, time);
+                filter.frequency.exponentialRampToValueAtTime(baseCutoff * 0.5, time + duration * 0.5);
+
+                const gain = this.ctx.createGain();
+                const vol = 0.5 + (this.speedFactor * 0.5); 
+                
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(vol, time + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.bassNodes.gain);
+                osc.start(time);
+                osc.stop(time + duration + 0.1);
+            }
+            
+            playHighArp(midi, time, duration) {
+                const osc = this.ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = mtof(midi + 24); 
+                
+                const gain = this.ctx.createGain();
+                const arpVol = 0.08 * this.synthVolumeMult * (0.5 + 0.5 * this.timeOfDay);
+                
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(arpVol, time + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+                
+                const panner = this.ctx.createStereoPanner();
+                panner.pan.value = Math.sin(time * 2) * 0.5; // Deterministic panning
+                
+                osc.connect(gain);
+                gain.connect(panner);
+                panner.connect(this.busses.arp);
+                panner.connect(this.reverbNodes.input); 
+                
+                osc.start(time);
+                osc.stop(time + duration + 0.1);
+            }
+
+            playSpacePluck(time) {
+                // Deterministic high note based on chord
+                const scale = this.getScaleNotes(this.currentRoot, this.currentScaleType);
+                // Cycle through chord tones in high register
+                const noteIndex = Math.floor(time) % 4;
+                const midi = scale[noteIndex * 2 % 7] + 36; // High register chord tones
+                
+                const osc = this.ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = mtof(midi);
+                
+                const gain = this.ctx.createGain();
+                const vol = 0.05 * this.altitudeFactor * this.synthVolumeMult;
+                
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(vol, time + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3); 
+                
+                const pan = this.ctx.createStereoPanner();
+                pan.pan.value = Math.cos(time);
+
+                osc.connect(gain);
+                gain.connect(pan);
+                pan.connect(this.busses.atmos);
+                
+                osc.start(time);
+                osc.stop(time + 0.4);
+            }
+
+            playEarthyDrone(time) {
+                // Deterministic note choice
+                const scale = this.getScaleNotes(this.currentRoot, this.currentScaleType);
+                // Alternate Root/5th every bar
+                const noteIndex = (Math.floor(this.barCount) % 2 === 0) ? 0 : 4; 
+                const note = scale[noteIndex] - 12;
+                
+                const osc = this.ctx.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.value = mtof(note);
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 400;
+
+                const gain = this.ctx.createGain();
+                const vol = 0.15 * (1.0 - this.altitudeFactor) * this.synthVolumeMult;
+                
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(vol, time + 0.5); // Slow attack
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 3.0); // Long decay
+
+                const panner = this.ctx.createStereoPanner();
+                panner.pan.value = 0; 
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(panner);
+                panner.connect(this.busses.atmos);
+                panner.connect(this.reverbNodes.input);
+
+                osc.start(time);
+                osc.stop(time + 3.2);
+            }
+
+            scheduler() {
+                while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
+                    this.scheduleNote(this.current16thNote, this.nextNoteTime);
+                    this.nextNote();
+                }
+                setTimeout(() => this.scheduler(), 25);
+            }
+
+            nextNote() {
+                const secondsPerBeat = 60.0 / this.tempo;
+                this.nextNoteTime += 0.25 * secondsPerBeat; 
+                this.current16thNote++;
+                if (this.current16thNote === 16) {
+                    this.current16thNote = 0;
+                    this.barCount++;
+                    this.barsInCurrentStage++; 
+
+                    const currentStage = HARMONIC_PROGRESSION[this.progressionIndex];
+                    if (this.barsInCurrentStage >= currentStage.bars) {
+                        this.advanceHarmony();
+                    }
+                }
+            }
+
+            shouldPlayAtmosphere(beatNumber) {
+                // Deterministic pattern: Every 4 beats, offset by cycle
+                const offset = this.cycleCount % 4;
+                return (beatNumber % 16) === (offset * 4);
+            }
+
+            scheduleNote(beatNumber, time) {
+                if (this.speedFactor < 0.05) return;
+
+                const scale = this.getScaleNotes(this.currentRoot, this.currentScaleType);
+                const step = 60.0 / this.tempo;
+                
+                let playBass = false;
+                let bassDur = step * 2;
+                let note = scale[0];
+                
+                if (this.currentPadType.includes('ROLL')) note = scale[3];
+                else if (this.currentPadType === 'FALL') note = scale[5];
+
+                if (this.speedFactor < 0.5) {
+                    if (beatNumber % 8 === 0) playBass = true;
+                } else {
+                    if (beatNumber % 2 === 0) {
+                        playBass = true;
+                        bassDur = step / 2;
+                        if (this.speedFactor > 0.8 && beatNumber % 4 !== 0) note += 12;
+                    }
+                }
+
+                if (playBass) this.playBassPulse(note, time, bassDur);
+
+                const arpVariation = this.cycleCount % 3; 
+                
+                if (beatNumber % 4 === 0) {
+                    let arpIndex = 0;
+                    if (arpVariation === 0) arpIndex = (beatNumber / 4) % 4; 
+                    else if (arpVariation === 1) arpIndex = 3 - ((beatNumber / 4) % 4); 
+                    else arpIndex = [0, 2, 1, 3][(beatNumber/4)%4]; 
+
+                    const offsets = [0, 4, 2, 1]; 
+                    const arpNote = scale[offsets[arpIndex]];
+                    this.playHighArp(arpNote, time, step);
+                }
+
+                // ATMOSPHERIC LAYERS - Deterministic
+                if (this.shouldPlayAtmosphere(beatNumber)) {
+                    if (this.altitudeFactor > 0.6) {
+                        this.playSpacePluck(time); // Removed random offset
+                    }
+                    if (this.altitudeFactor < 0.4) {
+                        this.playEarthyDrone(time);
+                    }
+                }
+            }
+
+            resume() {
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume().then(() => this.updateStatus(true));
+                } else if (!this.initialized) {
+                    this.init();
+                }
+            }
+
+            update(keys, speed, altitude, density, sunElevation, pos, quat) {
+                if (!this.initialized) return;
+
+                const now = this.ctx.currentTime;
+                this.speedFactor = THREE.MathUtils.clamp(speed / 4000.0, 0.0, 1.0); 
+                
+                // If density is NaN/invalid, default to 0 to prevent audio glitches
+                this.cloudDensity = isFinite(density) ? density : 0.0; 
+
+                this.timeOfDay = Math.max(0, Math.sin(THREE.MathUtils.degToRad(sunElevation))); 
+                this.altitudeFactor = THREE.MathUtils.clamp(altitude / 20000, 0.0, 1.0); 
+
+                this.updateVolumes();
+
+                const cloudMuffle = 20000 - (this.cloudDensity * 19000); 
+                const nightMuffle = 2000 + (this.timeOfDay * 18000); 
+                const targetCutoff = Math.min(cloudMuffle, nightMuffle);
+                this.safeSetParam(this.masterFilter.frequency, Math.max(200, targetCutoff), now, 0.2);
+
+                const targetReverb = CONFIG.volReverb + (this.altitudeFactor * 0.4);
+                this.safeSetParam(this.reverbNodes.input.gain, targetReverb, now, 0.5);
+
+                this.tempo = 60 + (this.speedFactor * 80); 
+                
+                this.synthVolumeMult = 1.0 + (this.speedFactor * 0.5);
+
+                const windFreq = (100 + this.speedFactor * 2000);
+                this.safeSetParam(this.windNodes.filter.frequency, windFreq, now, 0.1);
+                this.safeSetParam(this.windNodes.gain.gain, this.speedFactor * 0.8 * CONFIG.volWind, now, 0.1);
+
+                const cabinRumbleFreq = 100 + (this.speedFactor * 50);
+                this.safeSetParam(this.cabinNodes.filter.frequency, cabinRumbleFreq, now, 0.1);
+                this.safeSetParam(this.cabinNodes.gain.gain, CONFIG.volCabin * (0.5 + 0.5*this.speedFactor), now, 0.1);
+
+                let type = 'IDLE';
+                if (keys.yawLeft) type = 'YAW_L';
+                else if (keys.yawRight) type = 'YAW_R';
+                else if (keys.throttleUp) type = 'THROTTLE_UP';
+                else if (keys.throttleDown) type = 'THROTTLE_DOWN';
+                else if (keys.pitchUp) type = 'RISE';
+                else if (keys.pitchDown) type = 'FALL';
+                else if (keys.rollLeft) type = 'ROLL_L';
+                else if (keys.rollRight) type = 'ROLL_R';
+                
+                if (this.speedFactor < 0.05) type = 'IDLE';
+
+                this.transitionPad(type, now);
+
+                // Update Spatial Audio
+                if (spatialSoundSystem) {
+                    spatialSoundSystem.update(0.016, pos, quat);
+                }
+            }
+        }
+
+        const VERTEX_SHADER = `
+            precision highp float;
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = vec4(position, 1.0);
+            }
+        `;
+
+        const CLOUD_FRAGMENT = `
+            precision highp float;
+            precision highp sampler3D;
+
+            varying vec2 vUv;
+
+            uniform vec3 uCameraPos;
+            uniform float uCameraY; 
+            uniform mat4 uInverseView;
+            uniform mat4 uInverseProj;
+            uniform float uTime;
+            uniform vec3 uSunDir;
+            uniform vec3 uSunColor;
+            uniform float uSunIntensity;
+            uniform vec3 uWorldOffset;
+
+            uniform vec3 uCloudColorTop;
+            uniform vec3 uCloudColorBottom;
+            uniform vec3 uSkyColorZenith;
+            uniform vec3 uSkyColorHorizon;
+            uniform vec3 uSkySunsetZenith;
+            uniform vec3 uSkySunsetHorizon;
+            uniform vec3 uGroundColor;
+            
+            uniform float uCloudCover;
+            uniform float uCloudDensity;
+            uniform float uCloudAbsorption;
+            uniform float uCloudBottom;
+            uniform float uCloudTop;
+            uniform float uDetailScale;
+            uniform float uWindSpeed;
+            uniform vec2 uWindDir;
+            uniform float uErosion;
+            uniform float uFadeBottom;
+            uniform float uFadeTop;
+            uniform float uDensityProfile;
+            
+            uniform float uMacroScale1;
+            uniform float uMacroScale2;
+            uniform float uMacroStrength2;
+            uniform float uMacroScale3;
+            uniform float uMacroStrength3;
+            uniform float uMacroCoverage;
+            uniform float uMacroDensity;
+            
+            uniform float uSilverLining;
+            uniform float uSilverSpread;
+            uniform float uAmbientIntensity;
+            uniform float uPowder;
+            
+            uniform float uSteps;
+            uniform int uLightSteps;
+            uniform int uNoiseOctaves;
+            uniform bool uDithering;
+            uniform float uLodDistance;
+            uniform float uMaxDist;
+            
+            uniform float uRayleigh;
+            uniform float uMieCoeff;
+            uniform float uMieG;
+            uniform float uFogDensity;
+
+            uniform sampler3D uNoiseTexture;
+
+            float getIGNoise(vec2 uv) {
+                vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
+                return fract(magic.z * fract(dot(uv, magic.xy)));
+            }
+
+            float hg(float a, float g) {
+                float g2 = g*g;
+                return (1.0 - g2) / (4.0 * 3.14159 * pow(1.0 + g2 - 2.0 * g * a, 1.5));
+            }
+
+            float phase(float a) {
+                float forward = hg(a, 0.8 * uSilverSpread);
+                float backward = hg(a, -0.3);
+                return mix(forward, backward, 1.0 - uSilverLining);
+            }
+
+            float sampleDetailNoise(vec3 pAbsolute, int octaves, float dist) {
+                vec3 wind = vec3(uWindDir.x, 0.0, uWindDir.y) * uTime * uWindSpeed * 0.05;
+                vec3 uv = (pAbsolute * 0.0001 * uDetailScale) + wind;
+                
+                float lod = smoothstep(0.0, uLodDistance, dist);
+                
+                float n = texture(uNoiseTexture, uv).r;
+                float total = n * 0.5;
+                float norm = 0.5;
+                
+                if (octaves > 1 && lod < 0.9) {
+                    float n2 = texture(uNoiseTexture, uv * 2.03 + 0.1).r;
+                    float w2 = 0.35 * (1.0 - lod * 0.5); 
+                    total += n2 * w2;
+                    norm += w2;
+                }
+                
+                if (octaves > 2 && lod < 0.5) {
+                    float n3 = texture(uNoiseTexture, uv * 4.01 + 0.2).r;
+                    float w3 = 0.15 * (1.0 - lod * 2.0); 
+                    total += n3 * w3;
+                    norm += w3;
+                }
+                return total / norm;
+            }
+
+            float getDensity(vec3 pAbsolute, int octaves, float dist) {
+                float thickness = uCloudTop - uCloudBottom;
+                float h = (pAbsolute.y - uCloudBottom) / thickness; 
+                
+                if (h < 0.0 || h > 1.0) return 0.0;
+
+                vec3 wind = vec3(uWindDir.x, 0.0, uWindDir.y) * uTime * uWindSpeed * 0.01;
+                
+                vec3 uv1 = (pAbsolute * 0.00001 * uMacroScale1) + wind;
+                float m1 = texture(uNoiseTexture, uv1).r;
+                
+                // --- LOD Implementation for Macro Noise ---
+                float macro = m1;
+                float macroLod = smoothstep(uLodDistance * 0.5, uLodDistance * 2.0, dist);
+
+                if (macroLod < 0.9) {
+                    vec3 uv2 = (pAbsolute * 0.00001 * uMacroScale2) + wind * 0.5 + vec3(0.4);
+                    float m2 = texture(uNoiseTexture, uv2).r;
+                    macro = mix(macro, m2, uMacroStrength2 * (1.0 - macroLod));
+                }
+                
+                if (macroLod < 0.5) {
+                    vec3 uv3 = (pAbsolute * 0.00001 * uMacroScale3) + wind * 0.25 + vec3(0.8);
+                    float m3 = texture(uNoiseTexture, uv3).r;
+                    macro = mix(macro, m3, uMacroStrength3 * (1.0 - macroLod * 2.0)); 
+                }
+                
+                float biasedH = pow(h, 0.5 + (1.0 - uDensityProfile)); 
+                float botLimit = (1.0 - macro) * uFadeBottom * 0.8;
+                float gradBot = smoothstep(botLimit, uFadeBottom + 0.01, biasedH);
+                float topLimit = (1.0 - macro) * uFadeTop * 0.8;
+                float gradTop = 1.0 - smoothstep(1.0 - uFadeTop - 0.01, 1.0 - topLimit, biasedH);
+                float grad = gradBot * gradTop;
+                
+                if (grad < 0.001) return 0.0;
+                
+                float localCover = uCloudCover + (macro - 0.5) * uMacroCoverage;
+                localCover = clamp(localCover, 0.0, 1.0);
+                
+                float densityMult = 1.0 + (macro - 0.5) * uMacroDensity;
+                densityMult = max(0.0, densityMult);
+
+                float noise = sampleDetailNoise(pAbsolute, octaves, dist);
+                float erosion = mix(noise, pow(noise, 2.5), uErosion);
+                float d = smoothstep(1.0 - localCover, 1.0, erosion);
+                float distFade = 1.0 - smoothstep(uMaxDist * 0.8, uMaxDist, dist);
+                
+                return d * grad * uCloudDensity * densityMult * distFade;
+            }
+
+            float getLight(vec3 pAbsolute, vec3 sunDir, float ph, float jitter) {
+                float thickness = uCloudTop - uCloudBottom;
+                float step = 25.0; 
+                float dist = 0.0;
+                vec3 pos = pAbsolute + sunDir * step * jitter;
+                
+                for(int i = 0; i < 24; i++) { 
+                    if (i >= uLightSteps) break;
+                    if(pos.y > uCloudTop || pos.y < uCloudBottom) break;
+                    
+                    float d = getDensity(pos, 2, 10000.0);
+                    dist += d * step;
+                    
+                    if (dist > 8.0) break;
+                    step *= 1.4; 
+                    pos += sunDir * step;
+                }
+                
+                float T = exp(-dist * uCloudAbsorption);
+                float powder = 1.0 - exp(-dist * uCloudAbsorption * 2.0);
+                float finalPowder = mix(1.0, powder, uPowder); 
+                return T * (0.3 + 0.7 * finalPowder) * ph;
+            }
+
+            vec3 computeSky(vec3 rd, vec3 sunDir) {
+                float sunY = sunDir.y;
+                float mu = dot(rd, sunDir);
+                float sunsetT = smoothstep(0.2, -0.1, sunY);
+                vec3 zenColor = mix(uSkyColorZenith, uSkySunsetZenith, sunsetT);
+                vec3 horColor = mix(uSkyColorHorizon, uSkySunsetHorizon, sunsetT);
+                if (sunY < -0.1) {
+                    float nightT = smoothstep(-0.1, -0.4, sunY);
+                    vec3 nightColor = vec3(0.02, 0.02, 0.05);
+                    zenColor = mix(zenColor, nightColor, nightT);
+                    horColor = mix(horColor, nightColor, nightT);
+                }
+                float gradient = pow(min(1.0, abs(rd.y) + 0.1), 0.5); 
+                vec3 sky = mix(horColor, zenColor, gradient);
+                float sunScat = 1.0 / (4.0 * 3.14159) * ((1.0 - uMieG*uMieG) / pow(1.0 + uMieG*uMieG - 2.0*uMieG*mu, 1.5));
+                float hazeMix = smoothstep(-0.1, 0.1, sunY); 
+                vec3 sunHaloColor = mix(vec3(1.0, 0.5, 0.2), uSunColor, hazeMix);
+                sky += sunHaloColor * sunScat * uMieCoeff * 10.0;
+                float sunDisk = smoothstep(0.9995, 0.9999, mu);
+                sky += sunDisk * uSunColor * 50.0 * uSunIntensity; 
+                if (rd.y < 0.0) {
+                     float groundFog = 1.0 - exp(-20000.0 * uFogDensity); 
+                     sky = mix(uGroundColor, sky, groundFog * 0.5); 
+                     sky = mix(sky, horColor, smoothstep(-0.2, 0.0, rd.y));
+                }
+                return sky;
+            }
+
+            void main() {
+                vec4 ndc = vec4(vUv * 2.0 - 1.0, -1.0, 1.0);
+                vec4 view = uInverseProj * ndc;
+                view /= view.w;
+                vec3 world = (uInverseView * view).xyz;
+                vec3 ro = uCameraPos; 
+                vec3 rd = normalize(world - ro);
+                vec3 col = computeSky(rd, uSunDir);
+
+                float rdy = rd.y;
+                if (abs(rdy) < 1e-5) rdy = sign(rdy) * 1e-5;
+
+                float absCamY = ro.y + uCameraY;
+                float tBot = (uCloudBottom - absCamY) / rdy;
+                float tTop = (uCloudTop - absCamY) / rdy;
+                
+                float tNear = min(tBot, tTop);
+                float tFar = max(tBot, tTop);
+
+                tNear = max(0.0, tNear);
+                tFar = min(tFar, uMaxDist);
+
+                float marchDist = tFar - tNear;
+                
+                if (marchDist > 0.0) {
+                    float baseStep = 150.0; 
+                    float layerThickness = uCloudTop - uCloudBottom;
+                    float maxStepAllowed = layerThickness * 0.25; 
+                    
+                    float dither = 0.0;
+                    if (uDithering) dither = getIGNoise(gl_FragCoord.xy);
+                    
+                    float t = tNear + dither * baseStep;
+                    float sunDot = dot(rd, uSunDir);
+                    float ph = phase(sunDot);
+                    vec4 sum = vec4(0.0);
+
+                    for(int i = 0; i < 512; i++) {
+                        if (sum.a >= 0.99) break;
+                        if (t > tFar) break;
+                        if (float(i) > uSteps * 1.5) break; 
+
+                        vec3 currP = ro + rd * t;
+                        vec3 absP = currP + vec3(uWorldOffset.x, uCameraY, uWorldOffset.z);
+                        
+                        float currentStep = baseStep * (1.0 + t * 0.0001);
+                        currentStep = min(currentStep, maxStepAllowed);
+                        
+                        if (absP.y >= uCloudBottom - 100.0 && absP.y <= uCloudTop + 100.0) {
+                            float d = getDensity(absP, uNoiseOctaves, t);
+                            if (d > 0.001) {
+                                float lit = getLight(absP, uSunDir, ph, dither);
+                                float relH = clamp((absP.y - uCloudBottom) / layerThickness, 0.0, 1.0);
+                                vec3 cloudBase = mix(uCloudColorBottom, uCloudColorTop, relH);
+                                vec3 ambient = mix(cloudBase, uSunColor * 0.1, 0.2) * uAmbientIntensity;
+                                vec3 radiance = uSunColor * lit * 2.5 + ambient;
+                                float alpha = 1.0 - exp(-d * currentStep * uCloudAbsorption);
+                                sum.rgb += radiance * alpha * (1.0 - sum.a);
+                                sum.a += alpha * (1.0 - sum.a);
+                            }
+                        }
+                        t += currentStep;
+                    }
+                    float fogAmount = 1.0 - exp(-tNear * uFogDensity);
+                    vec3 fogColor = computeSky(rd, uSunDir); 
+                    sum.rgb = mix(sum.rgb, fogColor, fogAmount);
+                    col = mix(col, sum.rgb, sum.a);
+                }
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `;
+
+        const DENOISE_FRAGMENT = `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tDiffuse;
+            uniform vec2 uResolution;
+            uniform bool uEnable;
+            void main() {
+                if (!uEnable) { gl_FragColor = texture2D(tDiffuse, vUv); return; }
+                vec2 texel = 1.0 / uResolution;
+                vec3 center = texture2D(tDiffuse, vUv).rgb;
+                vec3 sum = center * 0.25;
+                float total = 0.25;
+                vec3 n1 = texture2D(tDiffuse, vUv + vec2(1, 0) * texel).rgb;
+                vec3 n2 = texture2D(tDiffuse, vUv + vec2(-1, 0) * texel).rgb;
+                vec3 n3 = texture2D(tDiffuse, vUv + vec2(0, 1) * texel).rgb;
+                vec3 n4 = texture2D(tDiffuse, vUv + vec2(0, -1) * texel).rgb;
+                sum += (n1 + n2 + n3 + n4) * 0.125; total += 0.5;
+                vec3 d1 = texture2D(tDiffuse, vUv + vec2(1, 1) * texel).rgb;
+                vec3 d2 = texture2D(tDiffuse, vUv + vec2(-1, 1) * texel).rgb;
+                vec3 d3 = texture2D(tDiffuse, vUv + vec2(1, -1) * texel).rgb;
+                vec3 d4 = texture2D(tDiffuse, vUv + vec2(-1, -1) * texel).rgb;
+                sum += (d1 + d2 + d3 + d4) * 0.0625; total += 0.25;
+                gl_FragColor = vec4(sum / total, 1.0);
+            }
+        `;
+
+        const TAA_FRAGMENT = `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tCurrent; 
+            uniform sampler2D tHistory;
+            uniform mat4 uInvViewProj; 
+            uniform mat4 uPrevViewProj;
+            uniform float uBlend; 
+            uniform bool uEnable;
+            uniform vec2 uResolution; // Passed uniform instead of using textureSize()
+            
+            void main() {
+                if (!uEnable) { 
+                    gl_FragColor = texture2D(tCurrent, vUv); 
+                    return; 
+                }
+                
+                // Reprojection by Rotation (Skybox assumption + Cloud Field Distance approx)
+                // Since world is infinite and wrapping, standard world-space reproj is tricky.
+                // We assume cloud sphere is far enough that rotation dominates jitter.
+                vec4 clip = vec4(vUv * 2.0 - 1.0, 1.0, 1.0); // max depth
+                vec4 world = uInvViewProj * clip; 
+                world /= world.w;
+                vec4 prevClip = uPrevViewProj * world; 
+                prevClip /= prevClip.w;
+                vec2 prevUv = prevClip.xy * 0.5 + 0.5;
+
+                vec4 curr = texture2D(tCurrent, vUv);
+                
+                if (prevUv.x < 0.0 || prevUv.x > 1.0 || prevUv.y < 0.0 || prevUv.y > 1.0) {
+                     gl_FragColor = curr; 
+                     return;
+                }
+                
+                vec4 hist = texture2D(tHistory, prevUv);
+                
+                // Neighborhood Clamping (to reduce ghosting)
+                vec2 texel = 1.0 / uResolution;
+                vec3 n1 = texture2D(tCurrent, vUv + vec2(1,0)*texel).rgb;
+                vec3 n2 = texture2D(tCurrent, vUv - vec2(1,0)*texel).rgb;
+                vec3 n3 = texture2D(tCurrent, vUv + vec2(0,1)*texel).rgb;
+                vec3 n4 = texture2D(tCurrent, vUv - vec2(0,1)*texel).rgb;
+                
+                vec3 minC = min(curr.rgb, min(min(n1, n2), min(n3, n4)));
+                vec3 maxC = max(curr.rgb, max(max(n1, n2), max(n3, n4)));
+                
+                hist.rgb = clamp(hist.rgb, minC, maxC);
+
+                gl_FragColor = mix(curr, hist, uBlend);
+            }
+        `;
+
+        const GODRAY_FRAGMENT = `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tDiffuse;
+            uniform vec2 uSunPosScreen;
+            uniform float uDensity;
+            uniform float uDecay;
+            uniform float uWeight;
+            uniform float uExposure;
+            uniform bool uSunVisible;
+            uniform int uSamples;
+            float getIGNoise(vec2 uv) {
+                vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
+                return fract(magic.z * fract(dot(uv, magic.xy)));
+            }
+            void main() {
+                if (!uSunVisible) { gl_FragColor = vec4(0.0); return; }
+                vec2 uv = vUv;
+                vec2 delta = (uv - uSunPosScreen) * uDensity / float(uSamples);
+                float dither = getIGNoise(gl_FragCoord.xy);
+                uv -= delta * dither;
+                vec3 color = texture2D(tDiffuse, uv).rgb;
+                float decay = 1.0;
+                vec3 accum = vec3(0.0);
+                for(int i=0; i<200; i++) {
+                    if (i >= uSamples) break;
+                    uv -= delta;
+                    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+                    vec3 s = texture2D(tDiffuse, uv).rgb;
+                    float luma = dot(s, vec3(0.2126, 0.7152, 0.0722));
+                    float thresh = smoothstep(0.9, 1.2, luma);
+                    s *= thresh;
+                    accum += s * uWeight * decay;
+                    decay *= uDecay;
+                }
+                gl_FragColor = vec4(accum * uExposure, 1.0);
+            }
+        `;
+
+        const COMPOSITE_FRAGMENT = `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tColor;
+            uniform sampler2D tGodRays;
+            uniform float uRayIntensity;
+            vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+            void main() {
+                vec3 col = texture2D(tColor, vUv).rgb;
+                vec3 rays = texture2D(tGodRays, vUv).rgb;
+                vec3 final = col + rays * uRayIntensity;
+                final = aces(final);
+                final = pow(final, vec3(1.0/2.2));
+                gl_FragColor = vec4(final, 1.0);
+            }
+        `;
+
+        class FlightControls {
+            constructor(camera) {
+                this.camera = camera;
+                this.worldPos = new THREE.Vector3(0, 3000, 5000);
+                this.currentSpeed = 0.0; 
+                this.maxSpeed = 3000.0;
+                this.throttle = 0.0;
+                this.velocity = new THREE.Vector3();
+                this.pitchRate = 1.2;
+                this.rollRate = 1.5;
+                this.yawRate = 0.5;
+                this.throttleRate = 0.5;
+                this.pitchStability = 0.5;
+                this.rollStability = 2.0;
+                this.keys = {
+                    pitchUp: false, pitchDown: false, rollLeft: false, rollRight: false,
+                    yawLeft: false, yawRight: false, throttleUp: false, throttleDown: false
+                };
+                this._rotQuat = new THREE.Quaternion();
+                this._euler = new THREE.Euler();
+                this._forward = new THREE.Vector3();
+                this.initEvents();
+            }
+
+            initEvents() {
+                this.onKeyDown = (e) => this.handleKey(e, true);
+                this.onKeyUp = (e) => this.handleKey(e, false);
+                document.addEventListener('keydown', this.onKeyDown);
+                document.addEventListener('keyup', this.onKeyUp);
+                
+                const startBtn = document.getElementById('start-screen');
+                startBtn.addEventListener('click', () => {
+                    startBtn.classList.add('fade-out');
+                    if (audioManager) audioManager.resume();
+                });
+            }
+
+            handleKey(e, isDown) {
+                // UI Visuals
+                const setKeyActive = (id, active) => {
+                    const el = document.getElementById(id);
+                    if(el) active ? el.classList.add('active') : el.classList.remove('active');
+                };
+
+                switch (e.code) {
+                    case 'KeyW': this.keys.pitchDown = isDown; setKeyActive('k-w', isDown); break;
+                    case 'KeyS': this.keys.pitchUp = isDown; setKeyActive('k-s', isDown); break;
+                    case 'KeyA': this.keys.rollLeft = isDown; setKeyActive('k-a', isDown); break;
+                    case 'KeyD': this.keys.rollRight = isDown; setKeyActive('k-d', isDown); break;
+                    case 'ArrowLeft': this.keys.yawLeft = isDown; setKeyActive('k-l', isDown); break;
+                    case 'ArrowRight': this.keys.yawRight = isDown; setKeyActive('k-r', isDown); break;
+                    case 'ArrowUp': this.keys.throttleUp = isDown; setKeyActive('k-u', isDown); break;
+                    case 'ArrowDown': this.keys.throttleDown = isDown; setKeyActive('k-dn', isDown); break;
+                    case 'KeyH':
+                        if (isDown) {
+                            const ui = document.querySelector('.lil-gui');
+                            const over = document.getElementById('overlay');
+                            if (ui) ui.style.display = ui.style.display === 'none' ? 'block' : 'none';
+                            if (over) over.classList.toggle('hidden');
+                        }
+                        break;
+                }
+            }
+
+            update(dt) {
+                const inputPitch = (this.keys.pitchDown ? 1 : 0) + (this.keys.pitchUp ? -1 : 0);
+                const inputRoll = (this.keys.rollRight ? -1 : 0) + (this.keys.rollLeft ? 1 : 0);
+                const inputYaw = (this.keys.yawRight ? -1 : 0) + (this.keys.yawLeft ? 1 : 0);
+                const inputThrottle = (this.keys.throttleUp ? 1 : 0) + (this.keys.throttleDown ? -1 : 0);
+
+                if (inputThrottle !== 0) {
+                    this.throttle += inputThrottle * this.throttleRate * dt;
+                    this.throttle = THREE.MathUtils.clamp(this.throttle, 0.0, 1.0);
+                }
+
+                let targetSpeed = this.throttle * this.maxSpeed;
+                this.currentSpeed = THREE.MathUtils.lerp(this.currentSpeed, targetSpeed, dt * 0.5);
+
+                let pitch = inputPitch * this.pitchRate * dt;
+                let roll = inputRoll * this.rollRate * dt;
+                let yaw = inputYaw * this.yawRate * dt;
+
+                this._rotQuat.setFromEuler(this._euler.set(pitch, yaw, roll, 'YXZ'));
+                this.camera.quaternion.multiply(this._rotQuat);
+
+                this._euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
+                this._euler.x = Math.max(-1.5, Math.min(1.5, this._euler.x)); 
+
+                if (inputPitch === 0) {
+                    let pitchFactor = 1.0 - Math.exp(-this.pitchStability * dt);
+                    this._euler.x = THREE.MathUtils.lerp(this._euler.x, 0, pitchFactor);
+                }
+                if (inputRoll === 0) {
+                    let rollFactor = 1.0 - Math.exp(-this.rollStability * dt);
+                    this._euler.z = THREE.MathUtils.lerp(this._euler.z, 0, rollFactor);
+                }
+
+                this.camera.quaternion.setFromEuler(this._euler);
+                this.camera.quaternion.normalize();
+
+                this._forward.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
+                let targetVelocity = this._forward.multiplyScalar(this.currentSpeed);
+                this.velocity.lerp(targetVelocity, dt * 1.5);
+
+                this.worldPos.addScaledVector(this.velocity, dt);
+                
+                document.getElementById('val-alt').innerText = Math.round(this.worldPos.y * 3.28);
+                document.getElementById('val-spd').innerText = Math.round(this.currentSpeed * 1.94);
+                document.getElementById('val-pos').innerText = `${(this.worldPos.z/1000).toFixed(1)}, ${(this.worldPos.x/1000).toFixed(1)}`;
+            }
+        }
+
+        // --- CPU Noise Sampling for Audio Density ---
+        function sampleNoiseData(x, y, z) {
+            if (!globalNoiseData) return 0.0;
+            
+            // Detect actual data size to avoid out-of-bounds access when config changes
+            // but data hasn't finished regenerating yet.
+            const dataSize = Math.round(Math.pow(globalNoiseData.length, 1.0/3.0));
+            
+            let ix = Math.floor(x); let fx = x - ix;
+            let iy = Math.floor(y); let fy = y - iy;
+            let iz = Math.floor(z); let fz = z - iz;
+
+            const idx = (x, y, z) => {
+                return ((x % dataSize + dataSize) % dataSize) + 
+                       ((y % dataSize + dataSize) % dataSize) * dataSize + 
+                       ((z % dataSize + dataSize) % dataSize) * dataSize * dataSize;
+            };
+
+            const lerp = (a, b, t) => a + t * (b - a);
+
+            const c000 = globalNoiseData[idx(ix, iy, iz)];
+            const c100 = globalNoiseData[idx(ix+1, iy, iz)];
+            const c010 = globalNoiseData[idx(ix, iy+1, iz)];
+            const c110 = globalNoiseData[idx(ix+1, iy+1, iz)];
+            const c001 = globalNoiseData[idx(ix, iy, iz+1)];
+            const c101 = globalNoiseData[idx(ix+1, iy, iz+1)];
+            const c011 = globalNoiseData[idx(ix, iy+1, iz+1)];
+            const c111 = globalNoiseData[idx(ix+1, iy+1, iz+1)];
+
+            const c00 = lerp(c000, c100, fx);
+            const c10 = lerp(c010, c110, fx);
+            const c01 = lerp(c001, c101, fx);
+            const c11 = lerp(c011, c111, fx);
+
+            const val0 = lerp(c00, c10, fy);
+            const val1 = lerp(c01, c11, fy);
+
+            return lerp(val0, val1, fz);
+        }
+
+        function generateNoiseTexture(size) {
+            return new Promise((resolve) => {
+                if (!noiseWorker) {
+                    const blob = new Blob([NOISE_WORKER_CODE], {type: 'application/javascript'});
+                    noiseWorker = new Worker(URL.createObjectURL(blob));
+                }
+                
+                const progressFill = document.getElementById('progress-fill');
+                
+                noiseWorker.onmessage = function(e) {
+                    if (e.data.progress) {
+                        progressFill.style.width = (e.data.progress * 100) + '%';
+                    } else if (e.data.done) {
+                        globalNoiseData = e.data.data;
+                        
+                        const tex = new THREE.Data3DTexture(e.data.data, size, size, size);
+                        tex.format = THREE.RedFormat; 
+                        tex.type = THREE.FloatType;
+                        tex.minFilter = THREE.LinearFilter; 
+                        tex.magFilter = THREE.LinearFilter;
+                        tex.wrapS = THREE.RepeatWrapping; 
+                        tex.wrapT = THREE.RepeatWrapping; 
+                        tex.wrapR = THREE.RepeatWrapping;
+                        tex.needsUpdate = true;
+                        
+                        resolve(tex);
+                    }
+                };
+                
+                noiseWorker.postMessage({size: size});
+            });
+        }
+
+        function getCPUDensity(pAbsolute, time) {
+            if (!globalNoiseData) return 0.0;
+            
+            // Safety: Ensure we use the actual data size for scale calculation to match sampling
+            const dataSize = Math.round(Math.pow(globalNoiseData.length, 1.0/3.0));
+            const h = (pAbsolute.y - CONFIG.cloudBottom) / (CONFIG.cloudTop - CONFIG.cloudBottom);
+            if (h < 0.0 || h > 1.0) return 0.0;
+
+            const wind = new THREE.Vector3(Math.sin(CONFIG.windAngle), 0, Math.cos(CONFIG.windAngle))
+                         .multiplyScalar(time * CONFIG.windSpeed);
+            
+            // Adjust scale based on texture size
+            const scale = dataSize / 128.0; 
+            
+            let uv1 = pAbsolute.clone().multiplyScalar(0.00001 * CONFIG.macroScale1).add(wind);
+            let m1 = sampleNoiseData(uv1.x * 128 * scale, uv1.y * 128 * scale, uv1.z * 128 * scale);
+
+            let uv2 = pAbsolute.clone().multiplyScalar(0.00001 * CONFIG.macroScale2).add(wind.clone().multiplyScalar(0.5)).addScalar(0.4);
+            let m2 = sampleNoiseData(uv2.x * 128 * scale, uv2.y * 128 * scale, uv2.z * 128 * scale);
+
+            let macro = THREE.MathUtils.lerp(m1, m2, CONFIG.macroStrength2);
+            
+            let biasedH = Math.pow(h, 0.5 + (1.0 - CONFIG.densityProfile));
+            let botLimit = (1.0 - macro) * CONFIG.fadeBottom * 0.8;
+            let gradBot = THREE.MathUtils.smoothstep(botLimit, CONFIG.fadeBottom + 0.01, biasedH);
+            let topLimit = (1.0 - macro) * CONFIG.fadeTop * 0.8;
+            let gradTop = 1.0 - THREE.MathUtils.smoothstep(1.0 - CONFIG.fadeTop - 0.01, 1.0 - topLimit, biasedH);
+            let grad = gradBot * gradTop;
+
+            if (grad < 0.001) return 0.0;
+
+            // Final safety check for NaN
+            const res = 0.5 * grad * CONFIG.cloudDensity;
+            return isFinite(res) ? res : 0.0;
+        }
+
+        const PresetManager = {
+            presets: {
+                "Default": DEFAULT_CONFIG,
+                "Stormy": { ...DEFAULT_CONFIG, cloudColorBottom: '#1a1f26', cloudColorTop: '#55606e', cloudCover: 0.8, cloudDensity: 2.0, cloudAbsorption: 3.5, erosion: 0.2, sunElevation: 5, lightSteps: 12 },
+                "Sunset": { ...DEFAULT_CONFIG, sunElevation: -1.5, cloudColorBottom: '#2d1c30', cloudColorTop: '#ff9d6b', cloudCover: 0.5, godRays: true, rayWeight: 0.8, rayDecay: 0.99, raySamples: 100 },
+                "Performance": { ...DEFAULT_CONFIG, resolution: 0.25, steps: 32, lightSteps: 4, godRays: false, noiseOctaves: 1, enableDenoise: false, enableTAA: false }
+            },
+            savePreset: () => {
+                const blob = new Blob([JSON.stringify(CONFIG, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'cloud_preset.json';
+                a.click();
+            },
+            loadFromFile: () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'application/json';
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if(!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        try {
+                            const data = JSON.parse(ev.target.result);
+                            Object.assign(CONFIG, data);
+                            if(uiGui) {
+                                uiGui.controllersRecursive().forEach(c => c.updateDisplay());
+                                window.dispatchEvent(new Event('resize')); 
+                            }
+                        } catch(err) { console.error("Invalid Preset File"); }
+                    };
+                    reader.readAsText(file);
+                };
+                input.click();
+            },
+            loadPreset: (name) => {
+                let data = PresetManager.presets[name];
+                if (data) {
+                    Object.assign(CONFIG, data);
+                    if (uiGui) {
+                        uiGui.controllersRecursive().forEach(c => c.updateDisplay());
+                        if (data.resolution !== undefined) window.dispatchEvent(new Event('resize')); 
+                    }
+                }
+            },
+            exportClipboard: () => {
+                navigator.clipboard.writeText(JSON.stringify(CONFIG));
+                alert("Preset copied to clipboard!");
+            },
+            regenerateNoise: async () => {
+                const el = document.getElementById('loading');
+                el.classList.remove('hidden');
+                el.style.opacity = '1';
+                document.getElementById('loading-text').innerText = "REGENERATING NOISE...";
+                
+                // Clear existing
+                globalNoiseData = null;
+                
+                const tex = await generateNoiseTexture(CONFIG.textureSize);
+                cloudMat.uniforms.uNoiseTexture.value = tex;
+                
+                el.style.opacity = '0';
+                setTimeout(() => el.classList.add('hidden'), 500);
+            }
+        };
+
+        async function init() {
+            // Audio Manager init
+            audioManager = new AtmosphereAudio();
+
+            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+            renderer.setPixelRatio(1.0); 
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const rtParams = { type: THREE.HalfFloatType, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
+            cloudTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
+            denoiseTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
+            historyTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
+            taaTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
+            rayTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
+
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200000);
+            
+            flightControls = new FlightControls(camera);
+
+            // Async load assets
+            const noiseTex = await generateNoiseTexture(CONFIG.textureSize);
+            const el = document.getElementById('loading');
+            el.style.opacity = '0';
+            setTimeout(() => el.classList.add('hidden'), 500);
+
+            cloudMat = new THREE.ShaderMaterial({
+                vertexShader: VERTEX_SHADER,
+                fragmentShader: CLOUD_FRAGMENT,
+                uniforms: {
+                    uTime: { value: 0 },
+                    uCameraPos: { value: new THREE.Vector3() },
+                    uCameraY: { value: flightControls.worldPos.y },
+                    uInverseView: { value: new THREE.Matrix4() },
+                    uInverseProj: { value: new THREE.Matrix4() },
+                    uSunDir: { value: new THREE.Vector3() },
+                    uSunColor: { value: new THREE.Color(1.0, 1.0, 1.0) },
+                    uSunIntensity: { value: CONFIG.sunIntensity },
+                    uWorldOffset: { value: new THREE.Vector3() },
+                    
+                    uCloudColorTop: { value: new THREE.Color(CONFIG.cloudColorTop) },
+                    uCloudColorBottom: { value: new THREE.Color(CONFIG.cloudColorBottom) },
+                    uSkyColorZenith: { value: new THREE.Color(CONFIG.skyColorZenith) },
+                    uSkyColorHorizon: { value: new THREE.Color(CONFIG.skyColorHorizon) },
+                    uSkySunsetZenith: { value: new THREE.Color(CONFIG.skySunsetZenith) },
+                    uSkySunsetHorizon: { value: new THREE.Color(CONFIG.skySunsetHorizon) },
+                    uGroundColor: { value: new THREE.Color(CONFIG.groundColor) },
+                    
+                    uCloudCover: { value: CONFIG.cloudCover },
+                    uCloudDensity: { value: CONFIG.cloudDensity },
+                    uCloudAbsorption: { value: CONFIG.cloudAbsorption },
+                    uCloudBottom: { value: CONFIG.cloudBottom },
+                    uCloudTop: { value: CONFIG.cloudTop },
+                    uDetailScale: { value: CONFIG.noiseScale },
+                    uWindSpeed: { value: CONFIG.windSpeed },
+                    uWindDir: { value: new THREE.Vector2(Math.sin(CONFIG.windAngle), Math.cos(CONFIG.windAngle)) },
+                    uErosion: { value: CONFIG.erosion },
+                    uDensityProfile: { value: CONFIG.densityProfile },
+                    uFadeBottom: { value: CONFIG.fadeBottom },
+                    uFadeTop: { value: CONFIG.fadeTop },
+                    
+                    uMacroScale1: { value: CONFIG.macroScale1 },
+                    uMacroScale2: { value: CONFIG.macroScale2 },
+                    uMacroStrength2: { value: CONFIG.macroStrength2 },
+                    uMacroScale3: { value: CONFIG.macroScale3 },
+                    uMacroStrength3: { value: CONFIG.macroStrength3 },
+                    uMacroCoverage: { value: CONFIG.macroCoverage },
+                    uMacroDensity: { value: CONFIG.macroDensity },
+                    
+                    uSilverLining: { value: CONFIG.silverLining },
+                    uSilverSpread: { value: CONFIG.silverSpread },
+                    uAmbientIntensity: { value: CONFIG.ambientIntensity },
+                    uPowder: { value: CONFIG.powder },
+                    
+                    uSteps: { value: CONFIG.steps },
+                    uLightSteps: { value: CONFIG.lightSteps },
+                    uNoiseOctaves: { value: CONFIG.noiseOctaves },
+                    uDithering: { value: CONFIG.dithering },
+                    uLodDistance: { value: CONFIG.lodDistance },
+                    uMaxDist: { value: CONFIG.maxDist },
+                    
+                    uRayleigh: { value: CONFIG.rayleigh },
+                    uMieCoeff: { value: CONFIG.mieCoefficient },
+                    uMieG: { value: CONFIG.mieDirectionalG },
+                    uFogDensity: { value: CONFIG.fogDensity },
+                    
+                    uNoiseTexture: { value: noiseTex }
+                },
+                depthWrite: false, depthTest: false
+            });
+
+            denoiseMat = new THREE.ShaderMaterial({
+                vertexShader: VERTEX_SHADER,
+                fragmentShader: DENOISE_FRAGMENT,
+                uniforms: { tDiffuse: { value: null }, uResolution: { value: new THREE.Vector2() }, uEnable: { value: CONFIG.enableDenoise } },
+                depthWrite: false, depthTest: false
+            });
+
+            taaMat = new THREE.ShaderMaterial({
+                vertexShader: VERTEX_SHADER,
+                fragmentShader: TAA_FRAGMENT,
+                uniforms: { 
+                    tCurrent: { value: null },
+                    tHistory: { value: null },
+                    uInvViewProj: { value: new THREE.Matrix4() },
+                    uPrevViewProj: { value: new THREE.Matrix4() },
+                    uBlend: { value: CONFIG.taaBlend },
+                    uEnable: { value: CONFIG.enableTAA },
+                    uResolution: { value: new THREE.Vector2() }
+                },
+                depthWrite: false, depthTest: false
+            });
+
+            rayMat = new THREE.ShaderMaterial({
+                vertexShader: VERTEX_SHADER,
+                fragmentShader: GODRAY_FRAGMENT,
+                uniforms: {
+                    tDiffuse: { value: null },
+                    uSunPosScreen: { value: new THREE.Vector2() },
+                    uSunVisible: { value: true },
+                    uDensity: { value: CONFIG.rayDensity },
+                    uDecay: { value: CONFIG.rayDecay },
+                    uWeight: { value: CONFIG.rayWeight },
+                    uExposure: { value: CONFIG.rayExposure },
+                    uSamples: { value: CONFIG.raySamples }
+                },
+                depthWrite: false, depthTest: false
+            });
+
+            compositeMat = new THREE.ShaderMaterial({
+                vertexShader: VERTEX_SHADER,
+                fragmentShader: COMPOSITE_FRAGMENT,
+                uniforms: { tColor: { value: null }, tGodRays: { value: null }, uRayIntensity: { value: CONFIG.rayIntensity } },
+                depthWrite: false, depthTest: false
+            });
+
+            const quadGeo = new THREE.PlaneGeometry(2, 2);
+            const quad = new THREE.Mesh(quadGeo, cloudMat);
+            quad.frustumCulled = false;
+            scene.add(quad);
+
+            postScene = new THREE.Scene();
+            postQuad = new THREE.Mesh(quadGeo, rayMat);
+            postScene.add(postQuad);
+
+            uiGui = new GUI({ title: 'Cloud Engine v2' });
+            
+            const presetF = uiGui.addFolder('Presets');
+            const presetNames = Object.keys(PresetManager.presets);
+            const presetParams = { load: 'Default' };
+            presetF.add(presetParams, 'load', presetNames).name('Load Preset').onChange(v => PresetManager.loadPreset(v));
+            presetF.add(PresetManager, 'savePreset').name('Save to File');
+            presetF.add(PresetManager, 'loadFromFile').name('Load from File');
+            presetF.add(PresetManager, 'exportClipboard').name('Copy to Clipboard');
+
+            const genF = uiGui.addFolder('Texture Gen (Asset Pre-Gen)');
+            genF.add(CONFIG, 'textureSize', [64, 128, 256]).name('Noise Size');
+            genF.add(PresetManager, 'regenerateNoise').name('Regenerate Now');
+
+            const autoF = uiGui.addFolder('Automation');
+            autoF.add(CONFIG, 'autoSun').name('Cycle Sun');
+            const autoSunF = autoF.addFolder('Sun Cycle');
+            autoSunF.add(AUTOMATION.sun, 'enabled').name('Enabled');
+            autoSunF.add(AUTOMATION.sun, 'speed', 0.01, 1.0).name('Speed');
+            autoSunF.add(AUTOMATION.sun, 'minElev', -10, 20).name('Min Elev');
+            autoSunF.add(AUTOMATION.sun, 'maxElev', 20, 90).name('Max Elev');
+            const autoWeatherF = autoF.addFolder('Weather Cycle');
+            autoWeatherF.add(AUTOMATION.weather, 'enabled').name('Cover Enabled');
+            autoWeatherF.add(AUTOMATION.weather, 'speed', 0.01, 0.5).name('Cover Speed');
+            autoWeatherF.add(AUTOMATION.weather, 'minCover', 0.0, 1.0).name('Min Cover');
+            autoWeatherF.add(AUTOMATION.weather, 'maxCover', 0.0, 1.0).name('Max Cover');
+            autoWeatherF.add(AUTOMATION.density, 'enabled').name('Density Enabled');
+            autoWeatherF.add(AUTOMATION.density, 'speed', 0.01, 0.5).name('Density Speed');
+            autoWeatherF.add(AUTOMATION.density, 'minDensity', 0.1, 3.0).name('Min Density');
+            autoWeatherF.add(AUTOMATION.density, 'maxDensity', 0.1, 3.0).name('Max Density');
+            const autoErosionF = autoF.addFolder('Erosion Cycle');
+            autoErosionF.add(AUTOMATION.erosion, 'enabled').name('Enabled');
+            autoErosionF.add(AUTOMATION.erosion, 'speed', 0.01, 0.5).name('Speed');
+            autoErosionF.add(AUTOMATION.erosion, 'minErosion', 0.0, 1.0).name('Min');
+            autoErosionF.add(AUTOMATION.erosion, 'maxErosion', 0.0, 1.0).name('Max');
+            const autoWindF = autoF.addFolder('Wind Cycle');
+            autoWindF.add(AUTOMATION.wind, 'enabled').name('Enabled');
+            autoWindF.add(AUTOMATION.wind, 'speed', 0.01, 0.5).name('Cycle Speed');
+            autoWindF.add(AUTOMATION.wind, 'minSpeed', 0.0, 5.0).name('Min Wind');
+            autoWindF.add(AUTOMATION.wind, 'maxSpeed', 0.0, 5.0).name('Max Wind');
+            const autoDetailF = autoF.addFolder('Detail Cycle');
+            autoDetailF.add(AUTOMATION.detail, 'enabled').name('Enabled');
+            autoDetailF.add(AUTOMATION.detail, 'speed', 0.01, 0.5).name('Speed');
+            autoDetailF.add(AUTOMATION.detail, 'minScale', 0.1, 5.0).name('Min Scale');
+            autoDetailF.add(AUTOMATION.detail, 'maxScale', 0.1, 5.0).name('Max Scale');
+
+            const envF = uiGui.addFolder('Environment');
+            envF.add(CONFIG, 'sunElevation', -10, 90).name('Sun Elevation').step(0.1);
+            envF.add(CONFIG, 'sunAzimuth', 0, 360).name('Sun Azimuth');
+            envF.add(CONFIG, 'sunIntensity', 0, 10).name('Sun Intensity').onChange(v => cloudMat.uniforms.uSunIntensity.value = v);
+            
+            const colorF = uiGui.addFolder('Colors');
+            colorF.addColor(CONFIG, 'cloudColorTop').name('Cloud Top').onChange(v => cloudMat.uniforms.uCloudColorTop.value.set(v));
+            colorF.addColor(CONFIG, 'cloudColorBottom').name('Cloud Bottom').onChange(v => cloudMat.uniforms.uCloudColorBottom.value.set(v));
+            colorF.addColor(CONFIG, 'skyColorZenith').name('Day Sky Top').onChange(v => cloudMat.uniforms.uSkyColorZenith.value.set(v));
+            colorF.addColor(CONFIG, 'skyColorHorizon').name('Day Sky Bot').onChange(v => cloudMat.uniforms.uSkyColorHorizon.value.set(v));
+            colorF.addColor(CONFIG, 'skySunsetZenith').name('Sunset Sky Top').onChange(v => cloudMat.uniforms.uSkySunsetZenith.value.set(v));
+            colorF.addColor(CONFIG, 'skySunsetHorizon').name('Sunset Sky Bot').onChange(v => cloudMat.uniforms.uSkySunsetHorizon.value.set(v));
+            colorF.addColor(CONFIG, 'groundColor').name('Ground Color').onChange(v => cloudMat.uniforms.uGroundColor.value.set(v));
+
+            const atmosF = uiGui.addFolder('Atmosphere');
+            atmosF.add(CONFIG, 'rayleigh', 0, 5).name('Sky Blue').onChange(v => cloudMat.uniforms.uRayleigh.value = v);
+            atmosF.add(CONFIG, 'mieCoefficient', 0, 0.05).name('Haze').onChange(v => cloudMat.uniforms.uMieCoeff.value = v);
+            atmosF.add(CONFIG, 'mieDirectionalG', 0, 0.99).name('Sun Glow').onChange(v => cloudMat.uniforms.uMieG.value = v);
+            atmosF.add(CONFIG, 'fogDensity', 0.000001, 0.0001).name('Fog Density').onChange(v => cloudMat.uniforms.uFogDensity.value = v);
+            
+            const cloudF = uiGui.addFolder('Cloud Properties');
+            cloudF.add(CONFIG, 'cloudCover', 0, 1).name('Coverage').onChange(v => cloudMat.uniforms.uCloudCover.value = v);
+            cloudF.add(CONFIG, 'cloudDensity', 0, 3).name('Density').onChange(v => cloudMat.uniforms.uCloudDensity.value = v);
+            cloudF.add(CONFIG, 'cloudAbsorption', 0, 5).name('Absorption').onChange(v => cloudMat.uniforms.uCloudAbsorption.value = v);
+            cloudF.add(CONFIG, 'noiseScale', 1, 5).name('Detail Scale').onChange(v => cloudMat.uniforms.uDetailScale.value = v);
+            cloudF.add(CONFIG, 'erosion', 0, 1).name('Erosion').onChange(v => cloudMat.uniforms.uErosion.value = v);
+            cloudF.add(CONFIG, 'densityProfile', 0, 1).name('Shape Profile').onChange(v => cloudMat.uniforms.uDensityProfile.value = v);
+            cloudF.add(CONFIG, 'windSpeed', 0, 2.0).name('Wind Speed').onChange(v => cloudMat.uniforms.uWindSpeed.value = v);
+            cloudF.add(CONFIG, 'windAngle', 0, Math.PI*2).name('Wind Angle').onChange(v => cloudMat.uniforms.uWindDir.value.set(Math.sin(v), Math.cos(v)));
+            
+            const styleF = uiGui.addFolder('Lighting Style');
+            styleF.add(CONFIG, 'silverLining', 0, 1).name('Silver Lining').onChange(v => cloudMat.uniforms.uSilverLining.value = v);
+            styleF.add(CONFIG, 'silverSpread', 0.1, 2).name('Scatter Spread').onChange(v => cloudMat.uniforms.uSilverSpread.value = v);
+            styleF.add(CONFIG, 'ambientIntensity', 0, 1).name('Ambient Str').onChange(v => cloudMat.uniforms.uAmbientIntensity.value = v);
+            styleF.add(CONFIG, 'powder', 0, 1).name('Dark Edges').onChange(v => cloudMat.uniforms.uPowder.value = v);
+
+            const macroF = uiGui.addFolder('Large Scale Variation');
+            macroF.add(CONFIG, 'macroScale1', 1.0, 10.0).name('Macro Scale 1').onChange(v => cloudMat.uniforms.uMacroScale1.value = v);
+            macroF.add(CONFIG, 'macroScale2', 1.0, 20.0).name('Macro Scale 2').onChange(v => cloudMat.uniforms.uMacroScale2.value = v);
+            macroF.add(CONFIG, 'macroStrength2', 0.0, 2.0).name('Mix Layer 2').onChange(v => cloudMat.uniforms.uMacroStrength2.value = v);
+            macroF.add(CONFIG, 'macroScale3', 10.0, 40.0).name('Macro Scale 3').onChange(v => cloudMat.uniforms.uMacroScale3.value = v);
+            macroF.add(CONFIG, 'macroStrength3', 0.0, 2.0).name('Mix Layer 3').onChange(v => cloudMat.uniforms.uMacroStrength3.value = v);
+            macroF.add(CONFIG, 'macroCoverage', 0.0, 2.0).name('Coverage Infl.').onChange(v => cloudMat.uniforms.uMacroCoverage.value = v);
+            macroF.add(CONFIG, 'macroDensity', 0.0, 2.0).name('Density Infl.').onChange(v => cloudMat.uniforms.uMacroDensity.value = v);
+
+            const geomF = uiGui.addFolder('Cloud Geometry');
+            geomF.add(CONFIG, 'cloudBottom', 1000, 3000).name('Altitude Bottom').onChange(v => cloudMat.uniforms.uCloudBottom.value = v);
+            geomF.add(CONFIG, 'cloudTop', 3000, 8000).name('Altitude Top').onChange(v => cloudMat.uniforms.uCloudTop.value = v);
+            geomF.add(CONFIG, 'fadeBottom', 0.0, 1.0).name('Bottom Fade').onChange(v => cloudMat.uniforms.uFadeBottom.value = v);
+            geomF.add(CONFIG, 'fadeTop', 0.0, 1.0).name('Top Fade').onChange(v => cloudMat.uniforms.uFadeTop.value = v);
+            
+            const renderF = uiGui.addFolder('Performance / Quality');
+            const onResChange = () => {
+                const w = window.innerWidth, h = window.innerHeight;
+                cloudTarget.setSize(w * CONFIG.resolution, h * CONFIG.resolution);
+                denoiseTarget.setSize(w * CONFIG.resolution, h * CONFIG.resolution);
+                historyTarget.setSize(w * CONFIG.resolution, h * CONFIG.resolution);
+                taaTarget.setSize(w * CONFIG.resolution, h * CONFIG.resolution);
+                rayTarget.setSize(w/2, h/2);
+                denoiseMat.uniforms.uResolution.value.set(w * CONFIG.resolution, h * CONFIG.resolution);
+                taaMat.uniforms.uResolution.value.set(w * CONFIG.resolution, h * CONFIG.resolution);
+            };
+            renderF.add(CONFIG, 'resolution', 0.1, 1.0).name('Res Scale').onChange(onResChange);
+            renderF.add(CONFIG, 'steps', 16, 256).step(1).name('Ray Steps').onChange(v => cloudMat.uniforms.uSteps.value = v);
+            renderF.add(CONFIG, 'lightSteps', 4, 16).step(1).name('Shadow Steps').onChange(v => cloudMat.uniforms.uLightSteps.value = v);
+            renderF.add(CONFIG, 'noiseOctaves', 1, 3).step(1).name('Noise Octaves').onChange(v => cloudMat.uniforms.uNoiseOctaves.value = v);
+            renderF.add(CONFIG, 'dithering').name('Dithering').onChange(v => cloudMat.uniforms.uDithering.value = v);
+            renderF.add(CONFIG, 'lodDistance', 1000, 50000).name('LOD Distance').onChange(v => cloudMat.uniforms.uLodDistance.value = v);
+            renderF.add(CONFIG, 'maxDist', 50000, 300000).name('Render Distance').onChange(v => cloudMat.uniforms.uMaxDist.value = v);
+            renderF.add(CONFIG, 'enableDenoise').name('Smart Denoise').onChange(v => denoiseMat.uniforms.uEnable.value = v);
+            renderF.add(CONFIG, 'enableTAA').name('Temporal Upsampling').onChange(v => taaMat.uniforms.uEnable.value = v);
+            renderF.add(CONFIG, 'taaBlend', 0.5, 0.99).name('TAA Blend').onChange(v => taaMat.uniforms.uBlend.value = v);
+
+            const rayF = uiGui.addFolder('God Rays');
+            rayF.add(CONFIG, 'raySamples', 20, 200).step(10).name('Quality (Samples)').onChange(v => rayMat.uniforms.uSamples.value = v);
+            rayF.add(CONFIG, 'rayIntensity', 0, 2).name('Mix Intensity').onChange(v => compositeMat.uniforms.uRayIntensity.value = v);
+            rayF.add(CONFIG, 'rayWeight', 0, 1).name('Ray Weight').onChange(v => rayMat.uniforms.uWeight.value = v);
+            rayF.add(CONFIG, 'rayDensity', 0, 2).name('Ray Density').onChange(v => rayMat.uniforms.uDensity.value = v);
+            rayF.add(CONFIG, 'rayDecay', 0.8, 1.0).name('Ray Decay').onChange(v => rayMat.uniforms.uDecay.value = v);
+            rayF.add(CONFIG, 'rayExposure', 0, 1).name('Ray Exposure').onChange(v => rayMat.uniforms.uExposure.value = v);
+
+            const audioF = uiGui.addFolder('Audio Mixer');
+            audioF.add(CONFIG, 'masterVolume', 0, 1).name('Master').onChange(() => audioManager.updateVolumes());
+            audioF.add(CONFIG, 'volSynths', 0, 1).name('Synths').onChange(() => audioManager.updateVolumes());
+            audioF.add(CONFIG, 'volBass', 0, 1).name('Bass').onChange(() => audioManager.updateVolumes());
+            audioF.add(CONFIG, 'volWind', 0, 1).name('Wind').onChange(() => audioManager.updateVolumes());
+            audioF.add(CONFIG, 'volReverb', 0, 1).name('Reverb').onChange(() => audioManager.updateVolumes());
+            audioF.add(CONFIG, 'volCabin', 0, 1).name('Cabin').onChange(() => audioManager.updateVolumes());
+            audioF.add(CONFIG, 'volArp', 0, 1).name('Arps').onChange(() => audioManager.updateVolumes());
+            audioF.add(CONFIG, 'volAtmos', 0, 1).name('Atmos').onChange(() => audioManager.updateVolumes());
+            audioF.add(CONFIG, 'volSFX', 0, 1).name('Spatial SFX').onChange(() => audioManager.updateVolumes());
+
+            // Helper to recursively update GUI display
+            const updateGuiDisplay = (gui) => {
+                if(gui.controllers) gui.controllers.forEach(c => c.updateDisplay());
+                if(gui.folders) gui.folders.forEach(f => updateGuiDisplay(f));
+            };
+
+            const onResize = () => {
+                const w = window.innerWidth, h = window.innerHeight;
+                renderer.setSize(w, h);
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                onResChange();
+            };
+            window.addEventListener('resize', onResize);
+            onResize(); 
+
+            const dummyCam = new THREE.Camera();
+            const prevViewProj = new THREE.Matrix4();
+            const currentViewProj = new THREE.Matrix4();
+            let frameCount = 0;
+
+            function render() {
+                requestAnimationFrame(render);
+                
+                const dt = clock.getDelta();
+                const elapsed = clock.getElapsedTime();
+                
+                if (CONFIG.autoSun || AUTOMATION.sun.enabled) {
+                    const s = AUTOMATION.sun;
+                    const range = s.maxElev - s.minElev;
+                    const midpoint = s.minElev + range / 2;
+                    CONFIG.sunElevation = midpoint + (range / 2) * Math.sin(elapsed * s.speed);
+                }
+                
+                if (CONFIG.autoWeather || AUTOMATION.weather.enabled) {
+                    const w = AUTOMATION.weather;
+                    const range = w.maxCover - w.minCover;
+                    const mid = w.minCover + range / 2;
+                    cloudMat.uniforms.uCloudCover.value = mid + (range / 2) * Math.sin(elapsed * w.speed);
+                }
+
+                if (AUTOMATION.density.enabled) {
+                    const d = AUTOMATION.density;
+                    const range = d.maxDensity - d.minDensity;
+                    const mid = d.minDensity + range / 2;
+                    cloudMat.uniforms.uCloudDensity.value = mid + (range / 2) * Math.cos(elapsed * d.speed);
+                }
+
+                if (AUTOMATION.erosion.enabled) {
+                    const e = AUTOMATION.erosion;
+                    const range = e.maxErosion - e.minErosion;
+                    const mid = e.minErosion + range / 2;
+                    cloudMat.uniforms.uErosion.value = mid + (range / 2) * Math.sin(elapsed * e.speed);
+                }
+
+                if (AUTOMATION.wind.enabled) {
+                    const w = AUTOMATION.wind;
+                    const range = w.maxSpeed - w.minSpeed;
+                    const mid = w.minSpeed + range / 2;
+                    cloudMat.uniforms.uWindSpeed.value = mid + (range / 2) * Math.sin(elapsed * w.speed);
+                    // Slowly rotate wind direction
+                    const angle = elapsed * w.speed * 0.5;
+                    cloudMat.uniforms.uWindDir.value.set(Math.sin(angle), Math.cos(angle));
+                }
+
+                if (AUTOMATION.detail.enabled) {
+                    const d = AUTOMATION.detail;
+                    const range = d.maxScale - d.minScale;
+                    const mid = d.minScale + range / 2;
+                    cloudMat.uniforms.uDetailScale.value = mid + (range / 2) * Math.sin(elapsed * d.speed);
+                }
+
+                // Recursive GUI Update (if automation changes values)
+                if (frameCount % 10 === 0) updateGuiDisplay(uiGui);
+
+                cloudMat.uniforms.uTime.value += dt;
+                flightControls.update(dt);
+                
+                // Calculate density at player position for Audio
+                const localDensity = getCPUDensity(flightControls.worldPos, cloudMat.uniforms.uTime.value);
+                document.getElementById('val-dens').innerText = Math.round(localDensity * 100) + '%';
+                
+                audioManager.update(
+                    flightControls.keys,
+                    flightControls.currentSpeed, 
+                    flightControls.worldPos.y,
+                    localDensity,
+                    CONFIG.sunElevation,
+                    flightControls.worldPos,
+                    camera.quaternion
+                );
+
+                const WRAP_PERIOD = 200000.0;
+                const offsetX = flightControls.worldPos.x % WRAP_PERIOD;
+                const offsetZ = flightControls.worldPos.z % WRAP_PERIOD;
+                
+                cloudMat.uniforms.uWorldOffset.value.set(offsetX, 0, offsetZ);
+                cloudMat.uniforms.uCameraY.value = flightControls.worldPos.y;
+
+                const phi = THREE.MathUtils.degToRad(90 - CONFIG.sunElevation);
+                const theta = THREE.MathUtils.degToRad(CONFIG.sunAzimuth);
+                const sunDir = new THREE.Vector3(
+                    Math.sin(phi) * Math.cos(theta),
+                    Math.cos(phi),
+                    Math.sin(phi) * Math.sin(theta)
+                ).normalize();
+                
+                const sunLightColor = new THREE.Color(
+                    1.0, 
+                    0.3 + 0.7 * Math.max(0, (CONFIG.sunElevation+5)/25), 
+                    0.1 + 0.9 * Math.max(0, (CONFIG.sunElevation+5)/25)
+                ).multiplyScalar(Math.sin(THREE.MathUtils.degToRad(Math.max(0, CONFIG.sunElevation+5))) + 0.1);
+                
+                cloudMat.uniforms.uSunDir.value.copy(sunDir);
+                cloudMat.uniforms.uSunColor.value.copy(sunLightColor);
+                cloudMat.uniforms.uCameraPos.value.copy(camera.position);
+                cloudMat.uniforms.uInverseView.value.copy(camera.matrixWorld);
+                cloudMat.uniforms.uInverseProj.value.copy(camera.projectionMatrixInverse);
+
+                // --- TAA Camera Jitter ---
+                if (CONFIG.enableTAA) {
+                    const jitterX = (Math.random() - 0.5) / (window.innerWidth * CONFIG.resolution);
+                    const jitterY = (Math.random() - 0.5) / (window.innerHeight * CONFIG.resolution);
+                    camera.setViewOffset(window.innerWidth, window.innerHeight, jitterX * window.innerWidth, jitterY * window.innerHeight, window.innerWidth, window.innerHeight);
+                } else {
+                    camera.clearViewOffset();
+                }
+
+                // Update Camera Matrices after Jitter
+                camera.updateMatrixWorld();
+                camera.updateProjectionMatrix();
+                
+                const camDir = new THREE.Vector3();
+                camera.getWorldDirection(camDir);
+                const isSunVisible = camDir.dot(sunDir) > 0.0;
+                rayMat.uniforms.uSunVisible.value = isSunVisible;
+
+                if (isSunVisible) {
+                    const sunWorld = camera.position.clone().add(sunDir.clone().multiplyScalar(10000));
+                    sunWorld.project(camera);
+                    rayMat.uniforms.uSunPosScreen.value.set(sunWorld.x * 0.5 + 0.5, sunWorld.y * 0.5 + 0.5);
+                }
+
+                // 1. Render Clouds
+                renderer.setRenderTarget(cloudTarget);
+                renderer.render(scene, dummyCam);
+
+                // 2. Denoise
+                postQuad.material = denoiseMat;
+                denoiseMat.uniforms.tDiffuse.value = cloudTarget.texture;
+                renderer.setRenderTarget(denoiseTarget);
+                renderer.render(postScene, dummyCam);
+
+                // 3. TAA / Temporal Upsampling
+                currentViewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+                
+                postQuad.material = taaMat;
+                taaMat.uniforms.tCurrent.value = denoiseTarget.texture;
+                taaMat.uniforms.tHistory.value = historyTarget.texture;
+                taaMat.uniforms.uInvViewProj.value.copy(currentViewProj).invert();
+                taaMat.uniforms.uPrevViewProj.value.copy(prevViewProj);
+                renderer.setRenderTarget(taaTarget);
+                renderer.render(postScene, dummyCam);
+
+                // 4. God Rays
+                postQuad.material = rayMat;
+                rayMat.uniforms.tDiffuse.value = taaTarget.texture;
+                renderer.setRenderTarget(rayTarget);
+                renderer.render(postScene, dummyCam);
+
+                // 5. Composite to Screen
+                postQuad.material = compositeMat;
+                compositeMat.uniforms.tColor.value = taaTarget.texture;
+                compositeMat.uniforms.tGodRays.value = rayTarget.texture;
+                renderer.setRenderTarget(null);
+                renderer.render(postScene, dummyCam);
+
+                // Swap History Buffers
+                const temp = historyTarget;
+                historyTarget = taaTarget;
+                taaTarget = temp;
+                
+                prevViewProj.copy(currentViewProj);
+                frameCount++;
+            }
+
+            render();
+        }
+
+        init();
+    </script>
+</body>
+</html>
