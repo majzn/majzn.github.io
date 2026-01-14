@@ -3,196 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Volumetric Clouds - Infinite Flight v2</title>
+    <title>Ultimate Volumetric Cloud Layers</title>
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background: #000; 
-            user-select: none; 
-            font-family: 'Segoe UI', sans-serif; 
-        }
-        canvas { 
-            display: block; 
-        }
+        body { margin: 0; overflow: hidden; background: #000; user-select: none; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
         
         #ui-layer {
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%;
-            pointer-events: none; 
-            z-index: 10;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10;
         }
 
         #start-screen {
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%;
-            background: rgba(0,0,0,0.8); 
-            backdrop-filter: blur(10px);
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center;
-            z-index: 100; 
-            transition: opacity 0.5s; 
-            cursor: pointer; 
-            pointer-events: auto;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; transition: opacity 0.5s; cursor: pointer; pointer-events: auto;
         }
-        #start-screen.fade-out { 
-            opacity: 0; 
-            pointer-events: none; 
-        }
+        #start-screen.fade-out { opacity: 0; pointer-events: none; }
         #start-btn {
-            padding: 20px 40px; 
-            border: 2px solid white; 
-            color: white;
-            font-size: 1.5rem; 
-            font-family: monospace; 
-            letter-spacing: 4px;
-            background: transparent; 
-            transition: all 0.2s;
+            padding: 20px 40px; border: 2px solid white; color: white;
+            font-size: 1.5rem; font-family: monospace; letter-spacing: 4px;
+            background: transparent; transition: all 0.2s;
         }
-        #start-btn:hover { 
-            background: white; 
-            color: black; 
-        }
+        #start-btn:hover { background: white; color: black; }
 
         #loading {
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
+            position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%);
             color: rgba(255, 255, 255, 0.9); 
-            font-family: monospace; 
-            font-size: 1.2rem; 
-            letter-spacing: 2px;
+            font-family: monospace; font-size: 1.2rem; letter-spacing: 2px;
             transition: opacity 0.5s ease-out;
             text-align: center;
-            background: rgba(0,0,0,0.5); 
-            padding: 20px; 
-            border-radius: 8px;
+            background: rgba(0,0,0,0.5); padding: 20px; border-radius: 8px;
             backdrop-filter: blur(5px);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            align-items: center;
-        }
-
-        #progress-bar {
-            width: 300px;
-            height: 4px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        #progress-fill {
-            width: 0%;
-            height: 100%;
-            background: #00ff88;
-            transition: width 0.1s linear;
         }
 
         #overlay {
-            position: absolute; 
-            bottom: 20px; 
-            left: 20px;
-            color: white; 
-            font-family: 'Segoe UI', sans-serif;
-            text-align: left; 
-            pointer-events: auto;
+            position: absolute; bottom: 20px; left: 20px;
+            color: white; font-family: 'Segoe UI', sans-serif;
+            text-align: left; pointer-events: auto;
             background: rgba(0, 0, 0, 0.6);
-            padding: 20px; 
-            border-radius: 8px;
+            padding: 20px; border-radius: 8px;
             backdrop-filter: blur(5px);
             border: 1px solid rgba(255,255,255,0.1);
             transition: opacity 0.3s;
         }
 
         #telemetry {
-            position: absolute; 
-            top: 20px; 
-            right: 20px;
-            text-align: right; 
-            color: rgba(255, 255, 255, 0.9);
-            font-family: monospace; 
-            font-size: 0.9rem;
+            position: absolute; top: 20px; right: 20px;
+            text-align: right; color: rgba(255, 255, 255, 0.9);
+            font-family: monospace; font-size: 0.9rem;
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
             pointer-events: none;
         }
 
         #audio-status {
-            color: #888; 
-            font-weight: bold; 
-            margin-top: 8px; 
-            font-size: 0.8em; 
-            letter-spacing: 1px;
+            color: #888; font-weight: bold; margin-top: 8px; font-size: 0.8em; letter-spacing: 1px;
         }
-        #audio-status.active { 
-            color: #00ff88; 
-        }
+        #audio-status.active { color: #00ff88; }
         #chord-display {
-            color: #aaa; 
-            font-size: 0.8em; 
-            margin-top: 5px; 
-            font-family: monospace;
+            color: #aaa; font-size: 0.8em; margin-top: 5px; font-family: monospace;
         }
 
-        h1 { 
-            margin: 0 0 10px 0; 
-            font-weight: 300; 
-            font-size: 1.2rem; 
-            letter-spacing: 2px; 
-        }
+        h1 { margin: 0 0 10px 0; font-weight: 300; font-size: 1.2rem; letter-spacing: 2px; }
         
-        .control-row { 
-            margin: 4px 0; 
-            display: flex; 
-            align-items: center; 
-        }
+        .control-row { margin: 4px 0; display: flex; align-items: center; }
         .key {
-            display: inline-block; 
-            padding: 2px 6px;
-            background: rgba(255,255,255,0.1); 
-            border-radius: 4px;
-            font-family: monospace; 
-            color: #fff; 
-            margin: 0 2px;
+            display: inline-block; padding: 2px 6px;
+            background: rgba(255,255,255,0.1); border-radius: 4px;
+            font-family: monospace; color: #fff; margin: 0 2px;
             border: 1px solid rgba(255,255,255,0.2);
-            font-size: 0.9rem; 
-            transition: background 0.1s, border-color 0.1s;
+            font-size: 0.9rem; transition: background 0.1s, border-color 0.1s;
         }
-        .key.active { 
-            background: #fff; 
-            color: #000; 
-            border-color: #fff; 
-            box-shadow: 0 0 10px white; 
-        }
+        .key.active { background: #fff; color: #000; border-color: #fff; box-shadow: 0 0 10px white; }
 
-        .hidden { 
-            opacity: 0 !important; 
-            pointer-events: none !important; 
-        }
-        .lil-gui { 
-            --width: 320px; 
-        }
+        .hidden { opacity: 0 !important; pointer-events: none !important; }
+        .lil-gui { --width: 320px; }
     </style>
 </head>
 <body>
     <div id="start-screen">
-        <div id="start-btn">CLICK TO ENGAGE SYSTEMS</div>
-        <div style="margin-top: 20px; color: #aaa; font-family: monospace;">Generative Audio Engine Ready</div>
+        <div id="start-btn">ENGAGE LAYER SYSTEM</div>
+        <div style="margin-top: 20px; color: #aaa; font-family: monospace;">Multi-Scale Cloud Engine</div>
     </div>
 
-    <div id="loading">
-        <div id="loading-text">GENERATING 3D NOISE ASSETS...</div>
-        <div id="progress-bar"><div id="progress-fill"></div></div>
-    </div>
+    <div id="loading">GENERATING NOISE TEXTURE...</div>
     
     <div id="ui-layer">
         <div id="telemetry">
@@ -203,7 +98,7 @@
         </div>
 
         <div id="overlay">
-            <h1>AIRCRAFT CONTROLS</h1>
+            <h1>CONTROLS</h1>
             <div style="line-height: 1.6; font-size: 0.9rem;">
                 <div class="control-row"><span class="key" id="k-w">W</span><span class="key" id="k-s">S</span> Dive / Climb</div>
                 <div class="control-row"><span class="key" id="k-a">A</span><span class="key" id="k-d">D</span> Roll Left / Right</div>
@@ -229,135 +124,97 @@
         import * as THREE from 'three';
         import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
-        // Core System Variables
         let renderer, scene, camera, flightControls, audioManager;
-        let cloudTarget, denoiseTarget, rayTarget, historyTarget, taaTarget;
-        let cloudMat, denoiseMat, rayMat, compositeMat, taaMat;
+        let worldScene, terrainMesh, terrainTarget, dirLight; 
+        let cloudTarget, denoiseTarget, rayTarget;
+        let cloudMat, denoiseMat, rayMat, compositeMat;
         let postScene, postQuad;
         let clock = new THREE.Clock();
-        let uiGui;
-        let globalNoiseData = null; 
-        let noiseWorker = null;
-        let spatialSoundSystem = null;
+        let uiGui, layersFolder; 
         
-        // --- Web Worker Code for Background Asset Generation ---
-        const NOISE_WORKER_CODE = `
-            self.onmessage = function(e) {
-                const size = e.data.size || 128;
-                const seed = e.data.seed || Date.now();
-                const totalPixels = size * size * size;
-                const data = new Float32Array(totalPixels);
-                
-                // Permutation table for Perlin Noise
-                const p = new Uint8Array(512);
-                const perm = new Uint8Array(256);
-                
-                // Seeded random
-                let seedVal = seed;
-                const random = () => { 
-                    seedVal = (seedVal * 9301 + 49297) % 233280; 
-                    return seedVal / 233280; 
-                };
-
-                for(let i=0; i<256; i++) perm[i] = i;
-                for(let i=255; i>0; i--) { 
-                    const r = Math.floor(random() * (i+1)); 
-                    [perm[i], perm[r]] = [perm[r], perm[i]]; 
-                }
-                for(let i=0; i<512; i++) p[i] = perm[i & 255];
-
-                // Noise Helper Functions
-                const fade = t => t*t*t*(t*(t*6-15)+10);
-                const lerp = (a, b, t) => a+t*(b-a);
-                const grad = (hash, x, y, z) => { 
-                    const h = hash & 15; 
-                    const u = h<8?x:y; 
-                    const v = h<4?y:h==12||h==14?x:z; 
-                    return ((h&1)==0?u:-u)+((h&2)==0?v:-v); 
-                };
-                
-                const pnoise = (x, y, z, period) => {
-                    const X = Math.floor(x)%period, Y = Math.floor(y)%period, Z = Math.floor(z)%period;
-                    const fx = x-Math.floor(x), fy = y-Math.floor(y), fz = z-Math.floor(z);
-                    const u = fade(fx), v = fade(fy), w = fade(fz);
-                    const X1 = (X+1)%period, Y1 = (Y+1)%period, Z1 = (Z+1)%period;
-                    
-                    const g000 = grad(p[p[p[X]+Y]+Z], fx, fy, fz), g100 = grad(p[p[p[X1]+Y]+Z], fx-1, fy, fz);
-                    const g010 = grad(p[p[p[X]+Y1]+Z], fx, fy-1, fz), g110 = grad(p[p[p[X1]+Y1]+Z], fx-1, fy-1, fz);
-                    const g001 = grad(p[p[p[X]+Y]+Z1], fx, fy, fz-1), g101 = grad(p[p[p[X1]+Y]+Z1], fx-1, fy, fz-1);
-                    const g011 = grad(p[p[p[X]+Y1]+Z1], fx, fy-1, fz-1), g111 = grad(p[p[p[X1]+Y1]+Z1], fx-1, fy-1, fz-1);
-                    
-                    return lerp(lerp(lerp(g000, g100, u), lerp(g010, g110, u), v), lerp(lerp(g001, g101, u), lerp(g011, g111, u), v), w);
-                };
-
-                let idx = 0; 
-                const freq = 8.0; 
-                
-                // Generation Loop with Progress Reporting
-                for(let z=0; z<size; z++) {
-                    // Report progress every slice
-                    if (z % 4 === 0) {
-                        self.postMessage({progress: z/size});
-                    }
-                    
-                    for(let y=0; y<size; y++) {
-                        for(let x=0; x<size; x++) {
-                            const nx = x/size, ny = y/size, nz = z/size;
-                            let total = 0.0, amplitude = 0.5, f = freq;
-                            
-                            // Fractal Brownian Motion (FBM)
-                            for(let k=0; k<4; k++) { 
-                                total += pnoise(nx*f, ny*f, nz*f, Math.floor(f)) * amplitude; 
-                                amplitude *= 0.5; 
-                                f *= 2.0; 
-                            }
-                            
-                            data[idx++] = total * 0.5 + 0.5;
-                        }
-                    }
-                }
-                
-                self.postMessage({done: true, data: data, size: size});
-            };
-        `;
         
-        const DEFAULT_CONFIG = {
-            autoSun: false,
-            autoWeather: false,
-            timeScale: 1.0,
+        const MAX_LAYERS = 4;
+
+        // small helpers to keep uniform allocation concise and explicit
+        function allocFloat(n) { return new Float32Array(n); }
+        function allocVec2Array(n) { return Array.from({length:n}, () => new THREE.Vector2()); }
+        function allocVec3Array(n) { return Array.from({length:n}, () => new THREE.Vector3()); }
+        
+        
+        const createDefaultLayer = (id) => ({
+            id: id,
+            active: true,
+            name: `Layer ${id + 1}`,
+            bottom: 2000 + (id * 3000),
+            top: 4500 + (id * 3000),
+            density: 1.0,
+            // densityUI is the user-facing slider value (0..1) mapped exponentially to density
+            densityUI: Math.pow(1.0 / 3.0, 1.0 / 3.0),
+            coverage: 0.55,
+            colorTop: '#ffffff',
+            colorBottom: '#5c6e8c',
+            
+            
+            scaleMacro: 0.15, 
+            macroOctaves: 2,
+            scaleMicro: 3.0,  
+            microOctaves: 3,
+            detailMix: 0.8, 
+            turbulence: 0.15, 
+            coverageExponent: 1.0, 
+            
+            absorption: 0.2, 
+            silver: 0.15, 
+            darkEdge: 0.08, 
+            scattering: 0.08, 
+            microContrast: 1.0, 
+            
+            macroDensity: 0.2, 
+            macroFalloff: 2.0, 
+            macroCoreBias: 1.0, 
+            macroEdgeSoftness: 0.15, 
+            
+            windSpeed: 0.2 + (id * 0.1),
+            windAngle: 0.0,
+            erosion: 0.6,
+            type: 0.5 
+        });
+
+        const LAYERS = [
+            createDefaultLayer(0) 
+        ];
+
+        const GLOBAL_CONFIG = {
+            
             sunElevation: 12,
             sunAzimuth: 180,
             sunIntensity: 1.0,
-            cloudColorTop: '#ffffff',
-            cloudColorBottom: '#5c6e8c',
+            ambientIntensity: 0.2,
+            silverLining: 0.7, 
+            silverSpread: 0.5, 
+            powder: 1.0,
+            cloudAbsorption: 1.2,
+            sunDiskIntensity: 50.0,
+            exposure: 1.0,
+            skySaturation: 1.0,
+            shadowTint: '#0a1a2b',
+            // automatic quality scaling to reduce steps at high altitudes
+            autoQuality: true,
+            minSteps: 32,
+            enableClouds: true,
+            
+            
             skyColorZenith: '#3a76c4',
             skyColorHorizon: '#e8f4f8',
             skySunsetZenith: '#2a3b55',
             skySunsetHorizon: '#ff8800',
             groundColor: '#050508',
-            cloudCover: 0.6,
-            cloudDensity: 1.0,
-            cloudAbsorption: 1.2,
-            cloudBottom: 1500, 
-            cloudTop: 4500,    
-            noiseScale: 2.2,
-            erosion: 0.5,
-            densityProfile: 0.6, 
-            fadeBottom: 0.15,
-            fadeTop: 0.15,
-            macroScale1: 4.0,       
-            macroScale2: 10.0, 
-            macroStrength2: 0.5,
-            macroScale3: 20.0,
-            macroStrength3: 0.25, 
-            macroCoverage: 0.3,    
-            macroDensity: 0.5,     
-            windSpeed: 0.15,
-            windAngle: 0.0,
-            silverLining: 0.7, 
-            silverSpread: 0.5, 
-            ambientIntensity: 0.2,
-            powder: 1.0,
+            rayleigh: 1.2, 
+            mieCoefficient: 0.005,
+            mieDirectionalG: 0.8,
+            fogDensity: 0.000015,
+            
+            
             resolution: 0.5,    
             steps: 96,          
             lightSteps: 12, 
@@ -366,19 +223,16 @@
             lodDistance: 20000.0,
             maxDist: 100000.0, 
             enableDenoise: true,
-            enableTAA: true,
-            taaBlend: 0.9,
-            rayleigh: 1.2, 
-            mieCoefficient: 0.005,
-            mieDirectionalG: 0.8,
-            fogDensity: 0.000015,
-            godRays: true,
+
+            
             rayIntensity: 1.0,
             rayDensity: 1.2,
             rayWeight: 0.58,
             rayDecay: 0.985,
             rayExposure: 0.55,
             raySamples: 60,
+
+            
             masterVolume: 0.5,
             volSynths: 0.6,
             volBass: 0.7,
@@ -386,23 +240,10 @@
             volReverb: 0.7,
             volCabin: 0.4,
             volArp: 0.5,
-            volAtmos: 0.5,
-            volSFX: 0.6,
-            textureSize: 128
+            volAtmos: 0.5
         };
 
-        const CONFIG = { ...DEFAULT_CONFIG };
-
-        const AUTOMATION = {
-            sun: { enabled: false, speed: 0.1, minElev: -5, maxElev: 45 },
-            weather: { enabled: false, speed: 0.05, minCover: 0.3, maxCover: 0.8 },
-            density: { enabled: false, speed: 0.03, minDensity: 0.5, maxDensity: 2.0 },
-            erosion: { enabled: false, speed: 0.1, minErosion: 0.2, maxErosion: 0.8 },
-            wind: { enabled: false, speed: 0.05, minSpeed: 0.0, maxSpeed: 2.0 },
-            detail: { enabled: false, speed: 0.05, minScale: 1.5, maxScale: 4.0 }
-        };
-
-        // --- Generative Music Theory ---
+        
         const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const SCALES = {
             AEOLIAN: [0, 2, 3, 5, 7, 8, 10], 
@@ -411,7 +252,6 @@
             LYDIAN:  [0, 2, 4, 6, 7, 9, 11]  
         };
         const mtof = (note) => 440 * Math.pow(2, (note - 69) / 12);
-
         const HARMONIC_PROGRESSION = [
             { scale: 'AEOLIAN', rootOff: 0, bars: 8 },  
             { scale: 'DORIAN',  rootOff: 5, bars: 4 },  
@@ -420,142 +260,6 @@
             { scale: 'PHRYGIAN',rootOff: 2, bars: 2 },  
             { scale: 'AEOLIAN', rootOff: 0, bars: 4 }   
         ];
-
-        // --- Spatial Audio System ---
-        class SpatialSoundSystem {
-            constructor(ctx, destination) {
-                this.ctx = ctx;
-                this.destination = destination;
-                this.emitters = [];
-                this.nextThunderTime = 0;
-            }
-
-            update(dt, playerPos, camQuat) {
-                // Random Thunder Spawning
-                if (Math.random() < 0.002) {
-                    this.spawnThunder(playerPos);
-                }
-
-                // Update emitters
-                this.emitters = this.emitters.filter(e => e.active);
-                this.emitters.forEach(e => e.update(dt, playerPos, camQuat));
-            }
-
-            spawnThunder(playerPos) {
-                const angle = Math.random() * Math.PI * 2;
-                const dist = 5000 + Math.random() * 15000;
-                const pos = new THREE.Vector3(
-                    playerPos.x + Math.sin(angle) * dist,
-                    playerPos.y + (Math.random() * 2000),
-                    playerPos.z + Math.cos(angle) * dist
-                );
-
-                const emitter = new ThunderEmitter(this.ctx, this.destination, pos);
-                this.emitters.push(emitter);
-
-                // Visual Flash
-                if (cloudMat) {
-                    const originalIntensity = CONFIG.sunIntensity;
-                    cloudMat.uniforms.uSunIntensity.value = originalIntensity * 8.0;
-                    setTimeout(() => {
-                        cloudMat.uniforms.uSunIntensity.value = originalIntensity;
-                    }, 100);
-                }
-            }
-        }
-
-        class ThunderEmitter {
-            constructor(ctx, dest, position) {
-                this.ctx = ctx;
-                this.pos = position;
-                this.active = true;
-                this.life = 5.0; // Seconds
-
-                // Setup Panner
-                this.panner = ctx.createPanner();
-                this.panner.panningModel = 'HRTF';
-                this.panner.distanceModel = 'exponential';
-                this.panner.refDistance = 2000;
-                this.panner.maxDistance = 50000;
-                this.panner.rolloffFactor = 0.5;
-                this.panner.connect(dest);
-                
-                // Synthesis
-                const t = ctx.currentTime;
-                
-                // Crack
-                const osc = ctx.createOscillator();
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(50, t);
-                osc.frequency.exponentialRampToValueAtTime(10, t + 1.5);
-                
-                // Rumble
-                const noise = ctx.createBufferSource();
-                const bSize = ctx.sampleRate * 2;
-                const buff = ctx.createBuffer(1, bSize, ctx.sampleRate);
-                const data = buff.getChannelData(0);
-                for(let i=0; i<bSize; i++) data[i] = Math.random() * 2 - 1;
-                noise.buffer = buff;
-
-                const gain = ctx.createGain();
-                gain.gain.setValueAtTime(0, t);
-                gain.gain.linearRampToValueAtTime(CONFIG.volSFX, t + 0.1);
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 2.5);
-
-                const filter = ctx.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(800, t);
-                filter.frequency.exponentialRampToValueAtTime(100, t + 1.0);
-
-                osc.connect(filter);
-                noise.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.panner);
-                
-                osc.start(t);
-                osc.stop(t + 2.5);
-                noise.start(t);
-                noise.stop(t + 2.5);
-            }
-
-            update(dt, playerPos, camQuat) {
-                this.life -= dt;
-                if (this.life <= 0) {
-                    this.active = false;
-                    try { this.panner.disconnect(); } catch(e){}
-                    return;
-                }
-                
-                // Calculate relative position for wrapping world
-                let relX = this.pos.x - playerPos.x;
-                let relZ = this.pos.z - playerPos.z;
-                
-                // Wrap logic
-                const WRAP = 200000;
-                if (Math.abs(relX) > WRAP/2) relX -= Math.sign(relX) * WRAP;
-                if (Math.abs(relZ) > WRAP/2) relZ -= Math.sign(relZ) * WRAP;
-
-                // Safety check for NaNs
-                if (!isFinite(relX) || !isFinite(relZ) || !isFinite(this.pos.y) || !isFinite(playerPos.y)) return;
-
-                this.panner.positionX.value = relX;
-                this.panner.positionY.value = this.pos.y - playerPos.y;
-                this.panner.positionZ.value = relZ;
-                
-                // Update listener orientation (usually done globally, but safe to refresh)
-                const orient = new THREE.Vector3(0, 0, -1).applyQuaternion(camQuat);
-                const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camQuat);
-                
-                if (this.ctx.listener.forwardX) {
-                    this.ctx.listener.forwardX.value = orient.x;
-                    this.ctx.listener.forwardY.value = orient.y;
-                    this.ctx.listener.forwardZ.value = orient.z;
-                    this.ctx.listener.upX.value = up.x;
-                    this.ctx.listener.upY.value = up.y;
-                    this.ctx.listener.upZ.value = up.z;
-                }
-            }
-        }
 
         class AtmosphereAudio {
             constructor() {
@@ -570,7 +274,6 @@
                 this.cabinNodes = {};
                 this.initialized = false;
                 
-                // Sequencer
                 this.tempo = 90; 
                 this.nextNoteTime = 0;
                 this.scheduleAheadTime = 0.1;
@@ -578,14 +281,12 @@
                 this.barCount = 0;
                 this.cycleCount = 0; 
                 
-                // Harmony
-                this.rootNoteBase = 58; // Bb
+                this.rootNoteBase = 58; 
                 this.progressionIndex = 0;
                 this.barsInCurrentStage = 0;
                 this.currentScaleType = 'AEOLIAN';
                 this.currentRoot = 58;
 
-                // Input State
                 this.currentPadType = 'IDLE'; 
                 this.activePad = null; 
                 this.speedFactor = 0.0;
@@ -603,9 +304,8 @@
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     this.ctx = new AudioContext();
                     
-                    // --- Routing ---
                     this.masterGain = this.ctx.createGain();
-                    this.masterGain.gain.value = CONFIG.masterVolume;
+                    this.masterGain.gain.value = GLOBAL_CONFIG.masterVolume;
                     
                     const compressor = this.ctx.createDynamicsCompressor();
                     compressor.threshold.value = -18;
@@ -619,11 +319,23 @@
                     compressor.connect(this.masterFilter);
                     this.masterFilter.connect(this.ctx.destination);
 
-                    // --- Busses ---
-                    ['synth', 'bass', 'wind', 'cabin', 'arp', 'atmos', 'sfx'].forEach(busName => {
-                        this.busses[busName] = this.ctx.createGain();
-                        this.busses[busName].connect(this.masterGain);
-                    });
+                    this.busses.synth = this.ctx.createGain();
+                    this.busses.synth.connect(this.masterGain);
+
+                    this.busses.bass = this.ctx.createGain();
+                    this.busses.bass.connect(this.masterGain);
+
+                    this.busses.wind = this.ctx.createGain();
+                    this.busses.wind.connect(this.masterGain);
+                    
+                    this.busses.cabin = this.ctx.createGain();
+                    this.busses.cabin.connect(this.masterGain);
+
+                    this.busses.arp = this.ctx.createGain();
+                    this.busses.arp.connect(this.masterGain);
+
+                    this.busses.atmos = this.ctx.createGain();
+                    this.busses.atmos.connect(this.masterGain);
 
                     this.setupReverb();
                     this.setupDelay();
@@ -632,9 +344,6 @@
                     this.setupDrone();
                     this.setupBass();
 
-                    // Initialize Spatial Audio
-                    spatialSoundSystem = new SpatialSoundSystem(this.ctx, this.busses.sfx);
-
                     this.initialized = true;
                     this.nextNoteTime = this.ctx.currentTime + 0.1;
                     this.updateStatus(true);
@@ -642,17 +351,6 @@
                 } catch (e) { 
                     console.warn("Audio Init Failed", e);
                     this.updateStatus(false);
-                }
-            }
-
-            // Wrapper to prevent Non-Finite errors in AudioParams
-            safeSetParam(param, value, time, timeConstant = 0.1) {
-                if (param && isFinite(value) && isFinite(time)) {
-                    try {
-                        param.setTargetAtTime(value, time, timeConstant);
-                    } catch (e) {
-                        // Ignore sporadic audio timing errors
-                    }
                 }
             }
 
@@ -669,22 +367,20 @@
             updateVolumes() {
                 if(!this.initialized) return;
                 
-                const now = this.ctx.currentTime;
-                // Calculate dynamic fade based on speed (Stationary = Silence for Music)
                 const movementFade = THREE.MathUtils.smoothstep(this.speedFactor, 0.0, 0.15);
                 
-                this.safeSetParam(this.masterGain.gain, CONFIG.masterVolume, now, 0.1);
+                this.masterGain.gain.setTargetAtTime(GLOBAL_CONFIG.masterVolume, this.ctx.currentTime, 0.1);
                 
                 const droneVol = 0.04 * (0.2 + 0.8 * movementFade);
-                this.droneNodes.osc.forEach(d => this.safeSetParam(d.gain.gain, droneVol, now, 0.5));
+                this.droneNodes.osc.forEach(d => d.gain.gain.setTargetAtTime(droneVol, this.ctx.currentTime, 0.5));
 
-                this.safeSetParam(this.busses.synth.gain, CONFIG.volSynths * movementFade, now, 0.1);
-                this.safeSetParam(this.busses.bass.gain, CONFIG.volBass * movementFade, now, 0.1);
-                this.safeSetParam(this.busses.arp.gain, CONFIG.volArp * movementFade, now, 0.1);
-                this.safeSetParam(this.busses.atmos.gain, CONFIG.volAtmos * movementFade, now, 0.1);
-                this.safeSetParam(this.busses.cabin.gain, CONFIG.volCabin, now, 0.1);
-                this.safeSetParam(this.busses.sfx.gain, CONFIG.volSFX, now, 0.1);
-                this.safeSetParam(this.reverbNodes.input.gain, CONFIG.volReverb, now, 0.1);
+                this.busses.synth.gain.setTargetAtTime(GLOBAL_CONFIG.volSynths * movementFade, this.ctx.currentTime, 0.1);
+                this.busses.bass.gain.setTargetAtTime(GLOBAL_CONFIG.volBass * movementFade, this.ctx.currentTime, 0.1);
+                this.busses.arp.gain.setTargetAtTime(GLOBAL_CONFIG.volArp * movementFade, this.ctx.currentTime, 0.1);
+                this.busses.atmos.gain.setTargetAtTime(GLOBAL_CONFIG.volAtmos * movementFade, this.ctx.currentTime, 0.1);
+                
+                this.busses.cabin.gain.setTargetAtTime(GLOBAL_CONFIG.volCabin, this.ctx.currentTime, 0.1);
+                this.reverbNodes.input.gain.setTargetAtTime(GLOBAL_CONFIG.volReverb, this.ctx.currentTime, 0.1);
             }
 
             setupReverb() {
@@ -831,12 +527,11 @@
                 while(this.currentRoot > 65) this.currentRoot -= 12;
                 while(this.currentRoot < 45) this.currentRoot += 12;
 
-                const now = this.ctx.currentTime;
                 this.droneNodes.osc.forEach(node => {
                     const targetFreq = mtof(this.currentRoot - 24) * node.mult;
-                    this.safeSetParam(node.osc.frequency, targetFreq, now, 4.0);
+                    node.osc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 4.0);
                     const cutoff = 100 + (this.timeOfDay * 200);
-                    this.safeSetParam(node.filter.frequency, cutoff, now, 2.0);
+                    node.filter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, 2.0);
                 });
 
                 document.getElementById('chord-display').innerText = `Key: ${this.getKeyName()} | Stage: ${this.progressionIndex + 1}/${HARMONIC_PROGRESSION.length} | Cycle: ${this.cycleCount}`;
@@ -844,7 +539,6 @@
 
             getNotesForType(type) {
                 const s = this.getScaleNotes(this.currentRoot, this.currentScaleType);
-                
                 if (type === 'IDLE') return [s[0], s[4]]; 
                 if (type === 'RISE') return [s[0], s[4], s[0]+12, s[2]+12];
                 if (type === 'FALL') return [s[0], s[2], s[4], s[0]-12]; 
@@ -933,7 +627,8 @@
                     const config = this.getConfigForType(newType);
                     this.activePad = this.startPad(notes, config, time);
                     try {
-                        this.safeSetParam(this.activePad.gain.gain, config.vol * this.synthVolumeMult * 0.6, time + 1.5, 1.0);
+                        const g = this.activePad.gain.gain;
+                        g.setTargetAtTime(config.vol * this.synthVolumeMult * 0.6, time + 1.5, 1.0);
                     } catch(e) {}
                 } else {
                     this.activePad = null;
@@ -944,7 +639,7 @@
                 const notes = this.getNotesForType(type).slice(0, 4); 
                 let speed = 0.06;
 
-                // Deterministic Shuffle based on beat
+                
                 const shuffleType = Math.floor(time) % 2; 
                 if (shuffleType === 1) notes.reverse();
                 
@@ -1015,7 +710,7 @@
                 gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
                 
                 const panner = this.ctx.createStereoPanner();
-                panner.pan.value = Math.sin(time * 2) * 0.5; // Deterministic panning
+                panner.pan.value = Math.sin(time * 2) * 0.5; 
                 
                 osc.connect(gain);
                 gain.connect(panner);
@@ -1027,11 +722,9 @@
             }
 
             playSpacePluck(time) {
-                // Deterministic high note based on chord
                 const scale = this.getScaleNotes(this.currentRoot, this.currentScaleType);
-                // Cycle through chord tones in high register
                 const noteIndex = Math.floor(time) % 4;
-                const midi = scale[noteIndex * 2 % 7] + 36; // High register chord tones
+                const midi = scale[noteIndex * 2 % 7] + 36; 
                 
                 const osc = this.ctx.createOscillator();
                 osc.type = 'sine';
@@ -1056,9 +749,7 @@
             }
 
             playEarthyDrone(time) {
-                // Deterministic note choice
                 const scale = this.getScaleNotes(this.currentRoot, this.currentScaleType);
-                // Alternate Root/5th every bar
                 const noteIndex = (Math.floor(this.barCount) % 2 === 0) ? 0 : 4; 
                 const note = scale[noteIndex] - 12;
                 
@@ -1074,8 +765,8 @@
                 const vol = 0.15 * (1.0 - this.altitudeFactor) * this.synthVolumeMult;
                 
                 gain.gain.setValueAtTime(0, time);
-                gain.gain.linearRampToValueAtTime(vol, time + 0.5); // Slow attack
-                gain.gain.exponentialRampToValueAtTime(0.001, time + 3.0); // Long decay
+                gain.gain.linearRampToValueAtTime(vol, time + 0.5); 
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 3.0); 
 
                 const panner = this.ctx.createStereoPanner();
                 panner.pan.value = 0; 
@@ -1115,7 +806,6 @@
             }
 
             shouldPlayAtmosphere(beatNumber) {
-                // Deterministic pattern: Every 4 beats, offset by cycle
                 const offset = this.cycleCount % 4;
                 return (beatNumber % 16) === (offset * 4);
             }
@@ -1158,10 +848,9 @@
                     this.playHighArp(arpNote, time, step);
                 }
 
-                // ATMOSPHERIC LAYERS - Deterministic
                 if (this.shouldPlayAtmosphere(beatNumber)) {
                     if (this.altitudeFactor > 0.6) {
-                        this.playSpacePluck(time); // Removed random offset
+                        this.playSpacePluck(time); 
                     }
                     if (this.altitudeFactor < 0.4) {
                         this.playEarthyDrone(time);
@@ -1177,15 +866,12 @@
                 }
             }
 
-            update(keys, speed, altitude, density, sunElevation, pos, quat) {
+            update(keys, speed, altitude, density, sunElevation) {
                 if (!this.initialized) return;
 
                 const now = this.ctx.currentTime;
                 this.speedFactor = THREE.MathUtils.clamp(speed / 4000.0, 0.0, 1.0); 
-                
-                // If density is NaN/invalid, default to 0 to prevent audio glitches
-                this.cloudDensity = isFinite(density) ? density : 0.0; 
-
+                this.cloudDensity = density; 
                 this.timeOfDay = Math.max(0, Math.sin(THREE.MathUtils.degToRad(sunElevation))); 
                 this.altitudeFactor = THREE.MathUtils.clamp(altitude / 20000, 0.0, 1.0); 
 
@@ -1194,22 +880,22 @@
                 const cloudMuffle = 20000 - (this.cloudDensity * 19000); 
                 const nightMuffle = 2000 + (this.timeOfDay * 18000); 
                 const targetCutoff = Math.min(cloudMuffle, nightMuffle);
-                this.safeSetParam(this.masterFilter.frequency, Math.max(200, targetCutoff), now, 0.2);
+                this.masterFilter.frequency.setTargetAtTime(Math.max(200, targetCutoff), now, 0.2);
 
-                const targetReverb = CONFIG.volReverb + (this.altitudeFactor * 0.4);
-                this.safeSetParam(this.reverbNodes.input.gain, targetReverb, now, 0.5);
+                const targetReverb = GLOBAL_CONFIG.volReverb + (this.altitudeFactor * 0.4);
+                this.reverbNodes.input.gain.setTargetAtTime(targetReverb, now, 0.5);
 
                 this.tempo = 60 + (this.speedFactor * 80); 
                 
                 this.synthVolumeMult = 1.0 + (this.speedFactor * 0.5);
 
                 const windFreq = (100 + this.speedFactor * 2000);
-                this.safeSetParam(this.windNodes.filter.frequency, windFreq, now, 0.1);
-                this.safeSetParam(this.windNodes.gain.gain, this.speedFactor * 0.8 * CONFIG.volWind, now, 0.1);
+                this.windNodes.filter.frequency.setTargetAtTime(windFreq, now, 0.1);
+                this.windNodes.gain.gain.setTargetAtTime(this.speedFactor * 0.8 * GLOBAL_CONFIG.volWind, now, 0.1);
 
                 const cabinRumbleFreq = 100 + (this.speedFactor * 50);
-                this.safeSetParam(this.cabinNodes.filter.frequency, cabinRumbleFreq, now, 0.1);
-                this.safeSetParam(this.cabinNodes.gain.gain, CONFIG.volCabin * (0.5 + 0.5*this.speedFactor), now, 0.1);
+                this.cabinNodes.filter.frequency.setTargetAtTime(cabinRumbleFreq, now, 0.1);
+                this.cabinNodes.gain.gain.setTargetAtTime(GLOBAL_CONFIG.volCabin * (0.5 + 0.5*this.speedFactor), now, 0.1);
 
                 let type = 'IDLE';
                 if (keys.yawLeft) type = 'YAW_L';
@@ -1224,11 +910,6 @@
                 if (this.speedFactor < 0.05) type = 'IDLE';
 
                 this.transitionPad(type, now);
-
-                // Update Spatial Audio
-                if (spatialSoundSystem) {
-                    spatialSoundSystem.update(0.016, pos, quat);
-                }
             }
         }
 
@@ -1257,43 +938,39 @@
             uniform float uSunIntensity;
             uniform vec3 uWorldOffset;
 
-            uniform vec3 uCloudColorTop;
-            uniform vec3 uCloudColorBottom;
             uniform vec3 uSkyColorZenith;
             uniform vec3 uSkyColorHorizon;
             uniform vec3 uSkySunsetZenith;
             uniform vec3 uSkySunsetHorizon;
             uniform vec3 uGroundColor;
             
-            uniform float uCloudCover;
-            uniform float uCloudDensity;
+            
             uniform float uCloudAbsorption;
-            uniform float uCloudBottom;
-            uniform float uCloudTop;
-            uniform float uDetailScale;
-            uniform float uWindSpeed;
-            uniform vec2 uWindDir;
-            uniform float uErosion;
-            uniform float uFadeBottom;
-            uniform float uFadeTop;
-            uniform float uDensityProfile;
-            
-            uniform float uMacroScale1;
-            uniform float uMacroScale2;
-            uniform float uMacroStrength2;
-            uniform float uMacroScale3;
-            uniform float uMacroStrength3;
-            uniform float uMacroCoverage;
-            uniform float uMacroDensity;
-            
             uniform float uSilverLining;
             uniform float uSilverSpread;
             uniform float uAmbientIntensity;
             uniform float uPowder;
+            uniform float uMultiScatter;
+            uniform float uRimBoost;
+            uniform float uAOIntensity;
+            uniform float uLFScale;
+
             
+            uniform float uShadowStrength;
+            uniform float uShadowSoftness;
+            uniform float uScatteringStrength;
+            uniform float uAOStrength;
+            // Global dark-edge controls (intensity and falloff)
+            uniform float uDarkEdgeIntensity;
+            uniform float uDarkEdgeFalloff;
+            // Additional scattering control to boost internal scattering behavior
+            uniform float uScatteringBoost;
+            uniform vec3 uShadowTint;
+            uniform float uSunDisk;
+            uniform float uSkySaturation;
+
             uniform float uSteps;
             uniform int uLightSteps;
-            uniform int uNoiseOctaves;
             uniform bool uDithering;
             uniform float uLodDistance;
             uniform float uMaxDist;
@@ -1304,6 +981,42 @@
             uniform float uFogDensity;
 
             uniform sampler3D uNoiseTexture;
+
+            
+            #define MAX_LAYERS 4
+            uniform int uLayerCount;
+            uniform float uLayerBottom[MAX_LAYERS];
+            uniform float uLayerTop[MAX_LAYERS];
+            uniform float uLayerDensity[MAX_LAYERS];
+            uniform float uLayerCover[MAX_LAYERS];
+            uniform vec3 uLayerColorTop[MAX_LAYERS];
+            uniform vec3 uLayerColorBottom[MAX_LAYERS];
+            
+            
+            uniform float uLayerScaleMacro[MAX_LAYERS];
+            uniform float uLayerScaleMicro[MAX_LAYERS];
+            
+            
+            uniform float uLayerMacroOctaves[MAX_LAYERS];
+            uniform float uLayerMicroOctaves[MAX_LAYERS];
+            uniform float uLayerTurbulence[MAX_LAYERS];
+            uniform float uLayerDetailMix[MAX_LAYERS];
+            uniform float uLayerCoverageExp[MAX_LAYERS];
+            uniform float uLayerAbsorption[MAX_LAYERS];
+            uniform float uLayerSilver[MAX_LAYERS];
+            uniform float uLayerDarkEdge[MAX_LAYERS];
+            uniform float uLayerScattering[MAX_LAYERS];
+            uniform float uLayerMicroContrast[MAX_LAYERS];
+            
+            uniform float uLayerMacroDensity[MAX_LAYERS];
+            uniform float uLayerMacroFalloff[MAX_LAYERS];
+            uniform float uLayerMacroCoreBias[MAX_LAYERS];
+            uniform float uLayerMacroEdgeSoftness[MAX_LAYERS];
+
+            uniform float uLayerWindSpeed[MAX_LAYERS];
+            uniform vec2 uLayerWindDir[MAX_LAYERS];
+            uniform float uLayerErosion[MAX_LAYERS];
+            uniform float uLayerType[MAX_LAYERS];
 
             float getIGNoise(vec2 uv) {
                 vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
@@ -1321,104 +1034,245 @@
                 return mix(forward, backward, 1.0 - uSilverLining);
             }
 
-            float sampleDetailNoise(vec3 pAbsolute, int octaves, float dist) {
-                vec3 wind = vec3(uWindDir.x, 0.0, uWindDir.y) * uTime * uWindSpeed * 0.05;
-                vec3 uv = (pAbsolute * 0.0001 * uDetailScale) + wind;
+            const int MAX_OCTAVES = 6;
+            float sampleNoise(vec3 p, float scale, vec2 windDir, float windSpeed, int octaves, float dist, float turbulence) {
                 
+                vec3 base = p * 0.0001;
+                
+                vec3 windWorld = vec3(windDir.x, 0.0, windDir.y) * uTime * windSpeed * 0.05;
+                vec3 uv = (base + windWorld) * scale;
+
+                if (turbulence > 0.001) {
+                    
+                    vec3 turbBase = vec3(
+                        sin(base.y * 12.9898 + uTime) * 0.02,
+                        cos(base.z * 78.233 + uTime) * 0.02,
+                        sin(base.x * 37.719 + uTime) * 0.02
+                    ) * turbulence;
+                    
+                    uv += turbBase * scale;
+                }
+
                 float lod = smoothstep(0.0, uLodDistance, dist);
-                
-                float n = texture(uNoiseTexture, uv).r;
-                float total = n * 0.5;
-                float norm = 0.5;
-                
-                if (octaves > 1 && lod < 0.9) {
-                    float n2 = texture(uNoiseTexture, uv * 2.03 + 0.1).r;
-                    float w2 = 0.35 * (1.0 - lod * 0.5); 
-                    total += n2 * w2;
-                    norm += w2;
+                float total = 0.0;
+                float norm = 0.0;
+                float freq = 1.0;
+                float amp = 0.5;
+
+                for (int i = 0; i < MAX_OCTAVES; i++) {
+                    if (i >= octaves) break;
+                    if (lod > 0.9 && i >= 3) break;
+                    float n = texture(uNoiseTexture, uv * freq + float(i) * 0.123).r;
+                    float w = amp * (1.0 - lod * float(i) / float(MAX_OCTAVES));
+                    total += n * w;
+                    norm += w;
+                    freq *= 2.0;
+                    amp *= 0.5;
                 }
-                
-                if (octaves > 2 && lod < 0.5) {
-                    float n3 = texture(uNoiseTexture, uv * 4.01 + 0.2).r;
-                    float w3 = 0.15 * (1.0 - lod * 2.0); 
-                    total += n3 * w3;
-                    norm += w3;
-                }
-                return total / norm;
+                if (norm > 0.0) return total / norm;
+                return texture(uNoiseTexture, uv).r;
             }
 
-            float getDensity(vec3 pAbsolute, int octaves, float dist) {
-                float thickness = uCloudTop - uCloudBottom;
-                float h = (pAbsolute.y - uCloudBottom) / thickness; 
+            
+            float getDensityAndColor(vec3 pAbsolute, float dist, out vec3 outColor, out float outAbsorption, out float outSilver, out float outDarkEdge, out float outScattering, out float outContrast, out vec3 outLFNormal) {
+                float totalDensity = 0.0;
+                vec3 colorAccum = vec3(0.0);
+                float weightAccum = 0.0;
+                float absAccum = 0.0;
+                float silverAccum = 0.0;
+                float darkAccum = 0.0;
+                float scatAccum = 0.0;
                 
-                if (h < 0.0 || h > 1.0) return 0.0;
+                vec3 lfGradAccum = vec3(0.0);
+                float lfWeight = 0.0;
+                
+                for(int i = 0; i < MAX_LAYERS; i++) {
+                    if (i >= uLayerCount) break;
+                    
+                    float bottom = uLayerBottom[i];
+                    float top = uLayerTop[i];
+                    
+                    
+                    if(pAbsolute.y < bottom || pAbsolute.y > top) continue;
 
-                vec3 wind = vec3(uWindDir.x, 0.0, uWindDir.y) * uTime * uWindSpeed * 0.01;
-                
-                vec3 uv1 = (pAbsolute * 0.00001 * uMacroScale1) + wind;
-                float m1 = texture(uNoiseTexture, uv1).r;
-                
-                // --- LOD Implementation for Macro Noise ---
-                float macro = m1;
-                float macroLod = smoothstep(uLodDistance * 0.5, uLodDistance * 2.0, dist);
+                    float thickness = top - bottom;
+                    float h = (pAbsolute.y - bottom) / thickness;
+                    
+                    
+                    float type = uLayerType[i]; 
+                    float biasedH = pow(h, 0.5 + (1.0 - type));
+                    
+                    
+                    float fadeBot = smoothstep(0.0, 0.15, h);
+                    float fadeTop = smoothstep(1.0, 0.85, h);
+                    float layerFade = fadeBot * fadeTop;
+                    
+                    layerFade *= mix(1.0, biasedH, 0.8 + 0.2 * type);
+                    
+                    if (layerFade < 0.001) continue; 
+                    
+                    
+                    
+                    
+                    float macro = sampleNoise(pAbsolute, uLayerScaleMacro[i], uLayerWindDir[i], uLayerWindSpeed[i], int(uLayerMacroOctaves[i]), dist, uLayerTurbulence[i]);
+                    
 
-                if (macroLod < 0.9) {
-                    vec3 uv2 = (pAbsolute * 0.00001 * uMacroScale2) + wind * 0.5 + vec3(0.4);
-                    float m2 = texture(uNoiseTexture, uv2).r;
-                    macro = mix(macro, m2, uMacroStrength2 * (1.0 - macroLod));
+                    float cov = uLayerCover[i];
+                    
+                    float edge = uLayerMacroEdgeSoftness[i] * (1.0 + type * 0.8);
+                    float structureMask = smoothstep(1.0 - cov, 1.0 - cov + edge, macro);
+                    structureMask = pow(structureMask, uLayerCoverageExp[i]);
+                    
+                    
+                    float sm = pow(structureMask, uLayerMacroFalloff[i]);
+                    float core = pow(sm, uLayerMacroCoreBias[i]);
+
+                    
+                    if (sm < 0.02) continue;
+                    
+                    
+                    float micro = sampleNoise(pAbsolute, uLayerScaleMicro[i], uLayerWindDir[i], uLayerWindSpeed[i], int(uLayerMicroOctaves[i]), dist, uLayerTurbulence[i]);
+                    
+                    
+                    float dm = uLayerDetailMix[i]; 
+
+                    
+                    float microC = pow(micro, max(0.001, uLayerMicroContrast[i]));
+                    float microAtten = (dm < 0.0) ? clamp(1.0 + dm, 0.0, 1.0) : 1.0;
+
+                    
+                    float macroCenter = pow(structureMask, 2.0 + 2.5 * type);
+
+                    
+                    float detailStrength = mix(0.6, 1.4, clamp(dm, 0.0, 1.0));
+                    float microDensity = microC * microAtten * detailStrength * uLayerDensity[i];
+
+                    
+                    float extra = max(0.0, dm - 1.0);
+                    float seed = smoothstep(0.5 - 0.15 * extra, 0.6 + 0.15 * extra, microC) * extra * (1.0 - structureMask);
+                    float microMask = clamp(macroCenter * (0.5 + 0.5 * microC) + seed, 0.0, 1.0);
+
+                    
+                    float macroContribution = sm * uLayerMacroDensity[i] * (0.3 + 0.7 * core);
+
+                    
+                    float pos = clamp(dm / 2.0, 0.0, 1.0);
+                    float combined = mix(macroContribution, microDensity * microMask, pos);
+
+                    
+                    float neg = clamp(-dm, 0.0, 1.0);
+                    combined *= (1.0 - 0.6 * neg);
+
+                    // (dark-edge accumulation moved to after layerD is computed)
+
+                    
+                    float erosion = mix(combined, combined * microC, uLayerErosion[i]);
+                    
+                    
+                    float layerD = erosion * layerFade * uLayerDensity[i];
+                    
+                    if (layerD > 0.001) {
+                        
+                        float hf = abs(micro - macro);
+
+                        totalDensity += layerD;
+                        vec3 layerCol = mix(uLayerColorBottom[i], uLayerColorTop[i], h);
+                        colorAccum += layerCol * layerD;
+                        weightAccum += layerD;
+
+                        
+                        absAccum += uLayerAbsorption[i] * layerD;
+                        silverAccum += uLayerSilver[i] * layerD;
+                        
+                        // dark accumulation is now shaped and globally scaled
+                        float darkTerm = pow(uLayerDarkEdge[i] * hf, 1.0 + uDarkEdgeFalloff);
+                        darkAccum += darkTerm * layerD * uDarkEdgeIntensity;
+
+                        scatAccum += uLayerScattering[i] * layerD;
+
+                        
+                        float delta = max(12.0, (top - bottom) * 0.05);
+                        float sx1 = sampleNoise(pAbsolute + vec3(delta,0,0), uLayerScaleMacro[i], uLayerWindDir[i], uLayerWindSpeed[i], int(uLayerMacroOctaves[i]), dist, uLayerTurbulence[i]);
+                        float sx2 = sampleNoise(pAbsolute - vec3(delta,0,0), uLayerScaleMacro[i], uLayerWindDir[i], uLayerWindSpeed[i], int(uLayerMacroOctaves[i]), dist, uLayerTurbulence[i]);
+                        float sy1 = sampleNoise(pAbsolute + vec3(0,delta,0), uLayerScaleMacro[i], uLayerWindDir[i], uLayerWindSpeed[i], int(uLayerMacroOctaves[i]), dist, uLayerTurbulence[i]);
+                        float sy2 = sampleNoise(pAbsolute - vec3(0,delta,0), uLayerScaleMacro[i], uLayerWindDir[i], uLayerWindSpeed[i], int(uLayerMacroOctaves[i]), dist, uLayerTurbulence[i]);
+                        float sz1 = sampleNoise(pAbsolute + vec3(0,0,delta), uLayerScaleMacro[i], uLayerWindDir[i], uLayerWindSpeed[i], int(uLayerMacroOctaves[i]), dist, uLayerTurbulence[i]);
+                        float sz2 = sampleNoise(pAbsolute - vec3(0,0,delta), uLayerScaleMacro[i], uLayerWindDir[i], uLayerWindSpeed[i], int(uLayerMacroOctaves[i]), dist, uLayerTurbulence[i]);
+                        vec3 grad = vec3(sx1 - sx2, sy1 - sy2, sz1 - sz2) / max(1.0, delta * 2.0);
+                        lfGradAccum += grad * layerD;
+                        lfWeight += layerD;
+                    }
                 }
                 
-                if (macroLod < 0.5) {
-                    vec3 uv3 = (pAbsolute * 0.00001 * uMacroScale3) + wind * 0.25 + vec3(0.8);
-                    float m3 = texture(uNoiseTexture, uv3).r;
-                    macro = mix(macro, m3, uMacroStrength3 * (1.0 - macroLod * 2.0)); 
+                if (weightAccum > 0.0) {
+                    outColor = colorAccum / weightAccum;
+                    outAbsorption = absAccum / weightAccum;
+                    outSilver = silverAccum / weightAccum;
+                    outDarkEdge = darkAccum / weightAccum;
+                    outScattering = scatAccum / weightAccum;
+                    outContrast = darkAccum / weightAccum; 
+                    if (lfWeight > 0.0) {
+                        outLFNormal = normalize(lfGradAccum / lfWeight);
+                    } else {
+                        outLFNormal = vec3(0.0, 1.0, 0.0);
+                    }
+                } else {
+                    outColor = vec3(1.0);
+                    outAbsorption = 0.0;
+                    outSilver = 0.0;
+                    outDarkEdge = 0.0;
+                    outScattering = 0.0;
+                    outContrast = 0.0;
+                    outLFNormal = vec3(0.0, 1.0, 0.0);
                 }
                 
-                float biasedH = pow(h, 0.5 + (1.0 - uDensityProfile)); 
-                float botLimit = (1.0 - macro) * uFadeBottom * 0.8;
-                float gradBot = smoothstep(botLimit, uFadeBottom + 0.01, biasedH);
-                float topLimit = (1.0 - macro) * uFadeTop * 0.8;
-                float gradTop = 1.0 - smoothstep(1.0 - uFadeTop - 0.01, 1.0 - topLimit, biasedH);
-                float grad = gradBot * gradTop;
-                
-                if (grad < 0.001) return 0.0;
-                
-                float localCover = uCloudCover + (macro - 0.5) * uMacroCoverage;
-                localCover = clamp(localCover, 0.0, 1.0);
-                
-                float densityMult = 1.0 + (macro - 0.5) * uMacroDensity;
-                densityMult = max(0.0, densityMult);
-
-                float noise = sampleDetailNoise(pAbsolute, octaves, dist);
-                float erosion = mix(noise, pow(noise, 2.5), uErosion);
-                float d = smoothstep(1.0 - localCover, 1.0, erosion);
                 float distFade = 1.0 - smoothstep(uMaxDist * 0.8, uMaxDist, dist);
-                
-                return d * grad * uCloudDensity * densityMult * distFade;
+                return totalDensity * distFade;
             }
 
             float getLight(vec3 pAbsolute, vec3 sunDir, float ph, float jitter) {
-                float thickness = uCloudTop - uCloudBottom;
-                float step = 25.0; 
+                float step = 25.0;
                 float dist = 0.0;
+                float accAbsLen = 0.0;
+                float accSilver = 0.0;
+                float accScat = 0.0;
+                float accInScat = 0.0;
                 vec3 pos = pAbsolute + sunDir * step * jitter;
-                
-                for(int i = 0; i < 24; i++) { 
+                vec3 dummyCol;
+
+                for(int i = 0; i < 16; i++) {
                     if (i >= uLightSteps) break;
-                    if(pos.y > uCloudTop || pos.y < uCloudBottom) break;
-                    
-                    float d = getDensity(pos, 2, 10000.0);
+
+                    float sampleAbs, sampleSilver, sampleDark, sampleScat, sampleContrast;
+                    vec3 dummyLF;
+                    float d = getDensityAndColor(pos, 0.0, dummyCol, sampleAbs, sampleSilver, sampleDark, sampleScat, sampleContrast, dummyLF);
                     dist += d * step;
-                    
-                    if (dist > 8.0) break;
-                    step *= 1.4; 
+                    accAbsLen += sampleAbs * d * step;
+                    accSilver += sampleSilver * d * step;
+                    accScat += sampleScat * d * step;
+                    accInScat += sampleScat * d * step * (0.2126 * dummyCol.r + 0.7152 * dummyCol.g + 0.0722 * dummyCol.b);
+
+                    if (dist > 4.0) break;
+                    step *= 1.4;
                     pos += sunDir * step;
                 }
-                
-                float T = exp(-dist * uCloudAbsorption);
+
+                float tau = accAbsLen + dist * uCloudAbsorption;
+                float T = exp(-tau);
+
+                float inScat = (dist > 0.0) ? (accInScat / (dist)) : 0.0;
+                // allow global boost control over internal scattering
+                inScat *= uScatteringStrength * uScatteringBoost;
+
                 float powder = 1.0 - exp(-dist * uCloudAbsorption * 2.0);
-                float finalPowder = mix(1.0, powder, uPowder); 
-                return T * (0.3 + 0.7 * finalPowder) * ph;
+                float avgSilver = (dist > 0.0) ? accSilver / (dist) : 0.0;
+                
+                float silverInfluence = clamp(uSilverLining * 1.5 * avgSilver + uPowder * 0.25, 0.0, 1.0);
+                float finalPowder = mix(1.0, powder, silverInfluence);
+
+                
+                float lighting = T * (0.18 + 0.62 * finalPowder) + inScat * (1.0 - T) * 1.2;
+                return lighting * ph;
             }
 
             vec3 computeSky(vec3 rd, vec3 sunDir) {
@@ -1440,7 +1294,10 @@
                 vec3 sunHaloColor = mix(vec3(1.0, 0.5, 0.2), uSunColor, hazeMix);
                 sky += sunHaloColor * sunScat * uMieCoeff * 10.0;
                 float sunDisk = smoothstep(0.9995, 0.9999, mu);
-                sky += sunDisk * uSunColor * 50.0 * uSunIntensity; 
+                sky += sunDisk * uSunColor * uSunDisk * uSunIntensity;
+                
+                float skyGray = dot(sky, vec3(0.3333));
+                sky = mix(vec3(skyGray), sky, uSkySaturation); 
                 if (rd.y < 0.0) {
                      float groundFog = 1.0 - exp(-20000.0 * uFogDensity); 
                      sky = mix(uGroundColor, sky, groundFog * 0.5); 
@@ -1461,9 +1318,25 @@
                 float rdy = rd.y;
                 if (abs(rdy) < 1e-5) rdy = sign(rdy) * 1e-5;
 
+                
+                float globalMinBot = 1000000.0;
+                float globalMaxTop = -1000000.0;
+                
+                for(int i=0; i<MAX_LAYERS; i++) {
+                    if(i >= uLayerCount) break;
+                    if(uLayerBottom[i] < globalMinBot) globalMinBot = uLayerBottom[i];
+                    if(uLayerTop[i] > globalMaxTop) globalMaxTop = uLayerTop[i];
+                }
+                
+                if (uLayerCount == 0) {
+                     
+                     gl_FragColor = vec4(col, 0.0);
+                     return;
+                }
+
                 float absCamY = ro.y + uCameraY;
-                float tBot = (uCloudBottom - absCamY) / rdy;
-                float tTop = (uCloudTop - absCamY) / rdy;
+                float tBot = (globalMinBot - absCamY) / rdy;
+                float tTop = (globalMaxTop - absCamY) / rdy;
                 
                 float tNear = min(tBot, tTop);
                 float tFar = max(tBot, tTop);
@@ -1474,9 +1347,7 @@
                 float marchDist = tFar - tNear;
                 
                 if (marchDist > 0.0) {
-                    float baseStep = 150.0; 
-                    float layerThickness = uCloudTop - uCloudBottom;
-                    float maxStepAllowed = layerThickness * 0.25; 
+                    float baseStep = 200.0; 
                     
                     float dither = 0.0;
                     if (uDithering) dither = getIGNoise(gl_FragCoord.xy);
@@ -1489,33 +1360,102 @@
                     for(int i = 0; i < 512; i++) {
                         if (sum.a >= 0.99) break;
                         if (t > tFar) break;
-                        if (float(i) > uSteps * 1.5) break; 
+                        if (float(i) > uSteps) break; 
 
                         vec3 currP = ro + rd * t;
                         vec3 absP = currP + vec3(uWorldOffset.x, uCameraY, uWorldOffset.z);
                         
                         float currentStep = baseStep * (1.0 + t * 0.0001);
-                        currentStep = min(currentStep, maxStepAllowed);
                         
-                        if (absP.y >= uCloudBottom - 100.0 && absP.y <= uCloudTop + 100.0) {
-                            float d = getDensity(absP, uNoiseOctaves, t);
+                        
+                        if (absP.y >= globalMinBot - 100.0 && absP.y <= globalMaxTop + 100.0) {
+                            vec3 cloudColor;
+                            float sampleAbs, sampleSilver, sampleDark, sampleScat, sampleContrast;
+                            vec3 sampleLF;
+                            float d = getDensityAndColor(absP, t, cloudColor, sampleAbs, sampleSilver, sampleDark, sampleScat, sampleContrast, sampleLF);
+
                             if (d > 0.001) {
                                 float lit = getLight(absP, uSunDir, ph, dither);
-                                float relH = clamp((absP.y - uCloudBottom) / layerThickness, 0.0, 1.0);
-                                vec3 cloudBase = mix(uCloudColorBottom, uCloudColorTop, relH);
-                                vec3 ambient = mix(cloudBase, uSunColor * 0.1, 0.2) * uAmbientIntensity;
-                                vec3 radiance = uSunColor * lit * 2.5 + ambient;
-                                float alpha = 1.0 - exp(-d * currentStep * uCloudAbsorption);
+
+                                
+                                float scatterBoost = clamp(sampleScat, 0.0, 1.0) * uScatteringStrength;
+                                float scatterFactor = 1.0 - scatterBoost * 0.6;
+
+                                vec3 ambient = mix(cloudColor, uSunColor * 0.1, 0.2) * uAmbientIntensity;
+                                vec3 radiance = uSunColor * lit * 2.5 * scatterFactor + ambient;
+
+                                
+                                vec3 n = normalize(sampleLF + vec3(1e-6));
+
+                                
+                                float rimN = pow(max(0.0, dot(n, uSunDir)), 1.6);
+                                float limb = pow(clamp(1.0 - abs(sunDot), 0.0, 1.0), 0.75);
+                                float silverHalo = pow(clamp(sampleSilver * (0.6 + uSilverLining * 0.8), 0.0, 1.0), 0.6) * rimN * limb * uRimBoost;
+                                radiance += uSunColor * silverHalo * 6.0 * uSunIntensity;
+
+                                
+                                float dirScatter = sampleScat * (0.2 + 0.8 * max(0.0, dot(rd, uSunDir)));
+                                radiance += uSunColor * dirScatter * 0.6;
+
+                                
+                                float edgeMask = clamp(sampleDark * uDarkEdgeIntensity + sampleContrast * 0.7, 0.0, 1.0);
+                                float edgeDark = clamp(edgeMask, 0.0, 1.0);
+                                // darken color more aggressively at edges, compute additional absorption and reduce local radiance
+                                cloudColor *= (1.0 - edgeDark * (0.65 + 0.45 * uDarkEdgeIntensity));
+                                float edgeLocalAbs = edgeMask * 0.6 * uDarkEdgeIntensity;
+                                radiance *= (1.0 - edgeMask * 0.4 * uDarkEdgeIntensity);
+
+                                
+                                float aoSample = 0.0;
+                                aoSample += texture(uNoiseTexture, absP * uLFScale).r;
+                                aoSample += texture(uNoiseTexture, (absP + vec3(120.0,0.0,0.0)) * uLFScale).r;
+                                aoSample += texture(uNoiseTexture, (absP + vec3(0.0,120.0,0.0)) * uLFScale).r;
+                                aoSample += texture(uNoiseTexture, (absP + vec3(0.0,0.0,120.0)) * uLFScale).r;
+                                aoSample *= 0.25;
+                                float ao = clamp(pow(1.0 - aoSample, max(0.0001, uAOIntensity)), 0.0, 1.0);
+
+                                
+                                vec3 lfN = normalize(sampleLF + vec3(1e-6));
+                                float nDotSun = clamp(dot(lfN, uSunDir), 0.0, 1.0);
+
+                                
+                                float occl = ao * (1.0 - nDotSun) * uAOStrength;
+                                float underside = clamp(1.0 - rd.y, 0.0, 1.0);
+                                float aoDark = 0.7 * occl * (0.6 + 0.4 * underside);
+                                cloudColor *= 1.0 - aoDark;
+
+                                
+                                radiance *= 1.0 - 0.5 * occl;
+
+                                
+                                float localAbs = uCloudAbsorption + sampleAbs + edgeMask * 0.8 * edgeDark + edgeLocalAbs;
+                                float alpha = 1.0 - exp(-d * currentStep * localAbs);
+
+                                
+                                radiance += uSunColor * silverHalo * 0.5;
+
                                 sum.rgb += radiance * alpha * (1.0 - sum.a);
                                 sum.a += alpha * (1.0 - sum.a);
                             }
                         }
                         t += currentStep;
                     }
+                    
+                    float ms = 1.0 - exp(-uMultiScatter * sum.a * 2.0);
+                    sum.rgb *= (1.0 + ms * 0.6);
+
+                    
+                    float shadowMask = clamp(sum.a * uShadowStrength, 0.0, 1.0);
+                    
+                    float shadowSoft = pow(shadowMask, max(0.01, 1.0 - uShadowSoftness));
+                    vec3 tint = uShadowTint;
+                    vec3 shadowBlend = mix(vec3(1.0), tint, 0.6 * shadowSoft);
+                    vec3 shadowedSky = col * shadowBlend;
+
                     float fogAmount = 1.0 - exp(-tNear * uFogDensity);
                     vec3 fogColor = computeSky(rd, uSunDir); 
                     sum.rgb = mix(sum.rgb, fogColor, fogAmount);
-                    col = mix(col, sum.rgb, sum.a);
+                    col = mix(shadowedSky, sum.rgb, sum.a);
                 }
                 gl_FragColor = vec4(col, 1.0);
             }
@@ -1530,74 +1470,23 @@
             void main() {
                 if (!uEnable) { gl_FragColor = texture2D(tDiffuse, vUv); return; }
                 vec2 texel = 1.0 / uResolution;
-                vec3 center = texture2D(tDiffuse, vUv).rgb;
-                vec3 sum = center * 0.25;
+                vec4 center = texture2D(tDiffuse, vUv);
+                vec3 sum = center.rgb * 0.25;
+                float alphaSum = center.a * 0.25;
                 float total = 0.25;
-                vec3 n1 = texture2D(tDiffuse, vUv + vec2(1, 0) * texel).rgb;
-                vec3 n2 = texture2D(tDiffuse, vUv + vec2(-1, 0) * texel).rgb;
-                vec3 n3 = texture2D(tDiffuse, vUv + vec2(0, 1) * texel).rgb;
-                vec3 n4 = texture2D(tDiffuse, vUv + vec2(0, -1) * texel).rgb;
-                sum += (n1 + n2 + n3 + n4) * 0.125; total += 0.5;
-                vec3 d1 = texture2D(tDiffuse, vUv + vec2(1, 1) * texel).rgb;
-                vec3 d2 = texture2D(tDiffuse, vUv + vec2(-1, 1) * texel).rgb;
-                vec3 d3 = texture2D(tDiffuse, vUv + vec2(1, -1) * texel).rgb;
-                vec3 d4 = texture2D(tDiffuse, vUv + vec2(-1, -1) * texel).rgb;
-                sum += (d1 + d2 + d3 + d4) * 0.0625; total += 0.25;
-                gl_FragColor = vec4(sum / total, 1.0);
+                vec4 n1 = texture2D(tDiffuse, vUv + vec2(1, 0) * texel);
+                vec4 n2 = texture2D(tDiffuse, vUv + vec2(-1, 0) * texel);
+                vec4 n3 = texture2D(tDiffuse, vUv + vec2(0, 1) * texel);
+                vec4 n4 = texture2D(tDiffuse, vUv + vec2(0, -1) * texel);
+                sum += (n1.rgb + n2.rgb + n3.rgb + n4.rgb) * 0.125; alphaSum += (n1.a + n2.a + n3.a + n4.a) * 0.125; total += 0.5;
+                vec4 d1 = texture2D(tDiffuse, vUv + vec2(1, 1) * texel);
+                vec4 d2 = texture2D(tDiffuse, vUv + vec2(-1, 1) * texel);
+                vec4 d3 = texture2D(tDiffuse, vUv + vec2(1, -1) * texel);
+                vec4 d4 = texture2D(tDiffuse, vUv + vec2(-1, -1) * texel);
+                sum += (d1.rgb + d2.rgb + d3.rgb + d4.rgb) * 0.0625; alphaSum += (d1.a + d2.a + d3.a + d4.a) * 0.0625; total += 0.25;
+                gl_FragColor = vec4(sum / total, alphaSum / total);
             }
-        `;
-
-        const TAA_FRAGMENT = `
-            precision highp float;
-            varying vec2 vUv;
-            uniform sampler2D tCurrent; 
-            uniform sampler2D tHistory;
-            uniform mat4 uInvViewProj; 
-            uniform mat4 uPrevViewProj;
-            uniform float uBlend; 
-            uniform bool uEnable;
-            uniform vec2 uResolution; // Passed uniform instead of using textureSize()
-            
-            void main() {
-                if (!uEnable) { 
-                    gl_FragColor = texture2D(tCurrent, vUv); 
-                    return; 
-                }
-                
-                // Reprojection by Rotation (Skybox assumption + Cloud Field Distance approx)
-                // Since world is infinite and wrapping, standard world-space reproj is tricky.
-                // We assume cloud sphere is far enough that rotation dominates jitter.
-                vec4 clip = vec4(vUv * 2.0 - 1.0, 1.0, 1.0); // max depth
-                vec4 world = uInvViewProj * clip; 
-                world /= world.w;
-                vec4 prevClip = uPrevViewProj * world; 
-                prevClip /= prevClip.w;
-                vec2 prevUv = prevClip.xy * 0.5 + 0.5;
-
-                vec4 curr = texture2D(tCurrent, vUv);
-                
-                if (prevUv.x < 0.0 || prevUv.x > 1.0 || prevUv.y < 0.0 || prevUv.y > 1.0) {
-                     gl_FragColor = curr; 
-                     return;
-                }
-                
-                vec4 hist = texture2D(tHistory, prevUv);
-                
-                // Neighborhood Clamping (to reduce ghosting)
-                vec2 texel = 1.0 / uResolution;
-                vec3 n1 = texture2D(tCurrent, vUv + vec2(1,0)*texel).rgb;
-                vec3 n2 = texture2D(tCurrent, vUv - vec2(1,0)*texel).rgb;
-                vec3 n3 = texture2D(tCurrent, vUv + vec2(0,1)*texel).rgb;
-                vec3 n4 = texture2D(tCurrent, vUv - vec2(0,1)*texel).rgb;
-                
-                vec3 minC = min(curr.rgb, min(min(n1, n2), min(n3, n4)));
-                vec3 maxC = max(curr.rgb, max(max(n1, n2), max(n3, n4)));
-                
-                hist.rgb = clamp(hist.rgb, minC, maxC);
-
-                gl_FragColor = mix(curr, hist, uBlend);
-            }
-        `;
+        `; 
 
         const GODRAY_FRAGMENT = `
             precision highp float;
@@ -1620,7 +1509,6 @@
                 vec2 delta = (uv - uSunPosScreen) * uDensity / float(uSamples);
                 float dither = getIGNoise(gl_FragCoord.xy);
                 uv -= delta * dither;
-                vec3 color = texture2D(tDiffuse, uv).rgb;
                 float decay = 1.0;
                 vec3 accum = vec3(0.0);
                 for(int i=0; i<200; i++) {
@@ -1643,15 +1531,21 @@
             varying vec2 vUv;
             uniform sampler2D tColor;
             uniform sampler2D tGodRays;
+            uniform sampler2D tTerrain;
             uniform float uRayIntensity;
+            uniform float uExposure;
             vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
             void main() {
-                vec3 col = texture2D(tColor, vUv).rgb;
+                vec3 terrain = texture2D(tTerrain, vUv).rgb;
+                vec4 cloudSample = texture2D(tColor, vUv);
+                vec3 cloudColor = cloudSample.rgb;
+                float cloudAlpha = cloudSample.a;
                 vec3 rays = texture2D(tGodRays, vUv).rgb;
-                vec3 final = col + rays * uRayIntensity;
-                final = aces(final);
-                final = pow(final, vec3(1.0/2.2));
-                gl_FragColor = vec4(final, 1.0);
+                
+                vec3 outColor = mix(terrain, cloudColor, cloudAlpha) + rays * uRayIntensity;
+                outColor = aces(outColor * uExposure);
+                outColor = pow(outColor, vec3(1.0/2.2));
+                gl_FragColor = vec4(outColor, 1.0);
             }
         `;
 
@@ -1693,29 +1587,28 @@
             }
 
             handleKey(e, isDown) {
-                // UI Visuals
                 const setKeyActive = (id, active) => {
                     const el = document.getElementById(id);
-                    if(el) active ? el.classList.add('active') : el.classList.remove('active');
+                    if (el) active ? el.classList.add('active') : el.classList.remove('active');
                 };
 
-                switch (e.code) {
-                    case 'KeyW': this.keys.pitchDown = isDown; setKeyActive('k-w', isDown); break;
-                    case 'KeyS': this.keys.pitchUp = isDown; setKeyActive('k-s', isDown); break;
-                    case 'KeyA': this.keys.rollLeft = isDown; setKeyActive('k-a', isDown); break;
-                    case 'KeyD': this.keys.rollRight = isDown; setKeyActive('k-d', isDown); break;
-                    case 'ArrowLeft': this.keys.yawLeft = isDown; setKeyActive('k-l', isDown); break;
-                    case 'ArrowRight': this.keys.yawRight = isDown; setKeyActive('k-r', isDown); break;
-                    case 'ArrowUp': this.keys.throttleUp = isDown; setKeyActive('k-u', isDown); break;
-                    case 'ArrowDown': this.keys.throttleDown = isDown; setKeyActive('k-dn', isDown); break;
-                    case 'KeyH':
-                        if (isDown) {
-                            const ui = document.querySelector('.lil-gui');
-                            const over = document.getElementById('overlay');
-                            if (ui) ui.style.display = ui.style.display === 'none' ? 'block' : 'none';
-                            if (over) over.classList.toggle('hidden');
-                        }
-                        break;
+                const keyMap = {
+                    KeyW: ['pitchDown','k-w'], KeyS: ['pitchUp','k-s'], KeyA: ['rollLeft','k-a'], KeyD: ['rollRight','k-d'],
+                    ArrowLeft: ['yawLeft','k-l'], ArrowRight: ['yawRight','k-r'], ArrowUp: ['throttleUp','k-u'], ArrowDown: ['throttleDown','k-dn']
+                };
+
+                if (keyMap[e.code]) {
+                    const [prop, id] = keyMap[e.code];
+                    this.keys[prop] = isDown;
+                    setKeyActive(id, isDown);
+                    return;
+                }
+
+                if (e.code === 'KeyH' && isDown) {
+                    const ui = document.querySelector('.lil-gui');
+                    const over = document.getElementById('overlay');
+                    if (ui) ui.style.display = ui.style.display === 'none' ? 'block' : 'none';
+                    if (over) over.classList.toggle('hidden');
                 }
             }
 
@@ -1767,184 +1660,119 @@
             }
         }
 
-        // --- CPU Noise Sampling for Audio Density ---
-        function sampleNoiseData(x, y, z) {
-            if (!globalNoiseData) return 0.0;
-            
-            // Detect actual data size to avoid out-of-bounds access when config changes
-            // but data hasn't finished regenerating yet.
-            const dataSize = Math.round(Math.pow(globalNoiseData.length, 1.0/3.0));
-            
-            let ix = Math.floor(x); let fx = x - ix;
-            let iy = Math.floor(y); let fy = y - iy;
-            let iz = Math.floor(z); let fz = z - iz;
-
-            const idx = (x, y, z) => {
-                return ((x % dataSize + dataSize) % dataSize) + 
-                       ((y % dataSize + dataSize) % dataSize) * dataSize + 
-                       ((z % dataSize + dataSize) % dataSize) * dataSize * dataSize;
+        function createNoiseTexture() {
+            const size = 64;
+            const data = new Float32Array(size * size * size);
+            const p = new Uint8Array(512), perm = new Uint8Array(256);
+            for(let i=0; i<256; i++) perm[i] = i;
+            for(let i=255; i>0; i--) { const r = Math.floor(Math.random() * (i+1)); [perm[i], perm[r]] = [perm[r], perm[i]]; }
+            for(let i=0; i<512; i++) p[i] = perm[i & 255];
+            const fade = t => t*t*t*(t*(t*6-15)+10);
+            const lerp = (a, b, t) => a+t*(b-a);
+            const grad = (hash, x, y, z) => { const h = hash & 15; const u = h<8?x:y; const v = h<4?y:h==12||h==14?x:z; return ((h&1)==0?u:-u)+((h&2)==0?v:-v); };
+            const pnoise = (x, y, z, period) => {
+                const X = Math.floor(x)%period, Y = Math.floor(y)%period, Z = Math.floor(z)%period;
+                const fx = x-Math.floor(x), fy = y-Math.floor(y), fz = z-Math.floor(z);
+                const u = fade(fx), v = fade(fy), w = fade(fz);
+                const X1 = (X+1)%period, Y1 = (Y+1)%period, Z1 = (Z+1)%period;
+                const g000 = grad(p[p[p[X]+Y]+Z], fx, fy, fz), g100 = grad(p[p[p[X1]+Y]+Z], fx-1, fy, fz);
+                const g010 = grad(p[p[p[X]+Y1]+Z], fx, fy-1, fz), g110 = grad(p[p[p[X1]+Y1]+Z], fx-1, fy-1, fz);
+                const g001 = grad(p[p[p[X]+Y]+Z1], fx, fy, fz-1), g101 = grad(p[p[p[X1]+Y]+Z1], fx-1, fy, fz-1);
+                const g011 = grad(p[p[p[X]+Y1]+Z1], fx, fy-1, fz-1), g111 = grad(p[p[p[X1]+Y1]+Z1], fx-1, fy-1, fz-1);
+                return lerp(lerp(lerp(g000, g100, u), lerp(g010, g110, u), v), lerp(lerp(g001, g101, u), lerp(g011, g111, u), v), w);
             };
-
-            const lerp = (a, b, t) => a + t * (b - a);
-
-            const c000 = globalNoiseData[idx(ix, iy, iz)];
-            const c100 = globalNoiseData[idx(ix+1, iy, iz)];
-            const c010 = globalNoiseData[idx(ix, iy+1, iz)];
-            const c110 = globalNoiseData[idx(ix+1, iy+1, iz)];
-            const c001 = globalNoiseData[idx(ix, iy, iz+1)];
-            const c101 = globalNoiseData[idx(ix+1, iy, iz+1)];
-            const c011 = globalNoiseData[idx(ix, iy+1, iz+1)];
-            const c111 = globalNoiseData[idx(ix+1, iy+1, iz+1)];
-
-            const c00 = lerp(c000, c100, fx);
-            const c10 = lerp(c010, c110, fx);
-            const c01 = lerp(c001, c101, fx);
-            const c11 = lerp(c011, c111, fx);
-
-            const val0 = lerp(c00, c10, fy);
-            const val1 = lerp(c01, c11, fy);
-
-            return lerp(val0, val1, fz);
-        }
-
-        function generateNoiseTexture(size) {
-            return new Promise((resolve) => {
-                if (!noiseWorker) {
-                    const blob = new Blob([NOISE_WORKER_CODE], {type: 'application/javascript'});
-                    noiseWorker = new Worker(URL.createObjectURL(blob));
-                }
-                
-                const progressFill = document.getElementById('progress-fill');
-                
-                noiseWorker.onmessage = function(e) {
-                    if (e.data.progress) {
-                        progressFill.style.width = (e.data.progress * 100) + '%';
-                    } else if (e.data.done) {
-                        globalNoiseData = e.data.data;
-                        
-                        const tex = new THREE.Data3DTexture(e.data.data, size, size, size);
-                        tex.format = THREE.RedFormat; 
-                        tex.type = THREE.FloatType;
-                        tex.minFilter = THREE.LinearFilter; 
-                        tex.magFilter = THREE.LinearFilter;
-                        tex.wrapS = THREE.RepeatWrapping; 
-                        tex.wrapT = THREE.RepeatWrapping; 
-                        tex.wrapR = THREE.RepeatWrapping;
-                        tex.needsUpdate = true;
-                        
-                        resolve(tex);
-                    }
-                };
-                
-                noiseWorker.postMessage({size: size});
-            });
-        }
-
-        function getCPUDensity(pAbsolute, time) {
-            if (!globalNoiseData) return 0.0;
-            
-            // Safety: Ensure we use the actual data size for scale calculation to match sampling
-            const dataSize = Math.round(Math.pow(globalNoiseData.length, 1.0/3.0));
-            const h = (pAbsolute.y - CONFIG.cloudBottom) / (CONFIG.cloudTop - CONFIG.cloudBottom);
-            if (h < 0.0 || h > 1.0) return 0.0;
-
-            const wind = new THREE.Vector3(Math.sin(CONFIG.windAngle), 0, Math.cos(CONFIG.windAngle))
-                         .multiplyScalar(time * CONFIG.windSpeed);
-            
-            // Adjust scale based on texture size
-            const scale = dataSize / 128.0; 
-            
-            let uv1 = pAbsolute.clone().multiplyScalar(0.00001 * CONFIG.macroScale1).add(wind);
-            let m1 = sampleNoiseData(uv1.x * 128 * scale, uv1.y * 128 * scale, uv1.z * 128 * scale);
-
-            let uv2 = pAbsolute.clone().multiplyScalar(0.00001 * CONFIG.macroScale2).add(wind.clone().multiplyScalar(0.5)).addScalar(0.4);
-            let m2 = sampleNoiseData(uv2.x * 128 * scale, uv2.y * 128 * scale, uv2.z * 128 * scale);
-
-            let macro = THREE.MathUtils.lerp(m1, m2, CONFIG.macroStrength2);
-            
-            let biasedH = Math.pow(h, 0.5 + (1.0 - CONFIG.densityProfile));
-            let botLimit = (1.0 - macro) * CONFIG.fadeBottom * 0.8;
-            let gradBot = THREE.MathUtils.smoothstep(botLimit, CONFIG.fadeBottom + 0.01, biasedH);
-            let topLimit = (1.0 - macro) * CONFIG.fadeTop * 0.8;
-            let gradTop = 1.0 - THREE.MathUtils.smoothstep(1.0 - CONFIG.fadeTop - 0.01, 1.0 - topLimit, biasedH);
-            let grad = gradBot * gradTop;
-
-            if (grad < 0.001) return 0.0;
-
-            // Final safety check for NaN
-            const res = 0.5 * grad * CONFIG.cloudDensity;
-            return isFinite(res) ? res : 0.0;
-        }
-
-        const PresetManager = {
-            presets: {
-                "Default": DEFAULT_CONFIG,
-                "Stormy": { ...DEFAULT_CONFIG, cloudColorBottom: '#1a1f26', cloudColorTop: '#55606e', cloudCover: 0.8, cloudDensity: 2.0, cloudAbsorption: 3.5, erosion: 0.2, sunElevation: 5, lightSteps: 12 },
-                "Sunset": { ...DEFAULT_CONFIG, sunElevation: -1.5, cloudColorBottom: '#2d1c30', cloudColorTop: '#ff9d6b', cloudCover: 0.5, godRays: true, rayWeight: 0.8, rayDecay: 0.99, raySamples: 100 },
-                "Performance": { ...DEFAULT_CONFIG, resolution: 0.25, steps: 32, lightSteps: 4, godRays: false, noiseOctaves: 1, enableDenoise: false, enableTAA: false }
-            },
-            savePreset: () => {
-                const blob = new Blob([JSON.stringify(CONFIG, null, 2)], {type: 'application/json'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = 'cloud_preset.json';
-                a.click();
-            },
-            loadFromFile: () => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'application/json';
-                input.onchange = (e) => {
-                    const file = e.target.files[0];
-                    if(!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => {
-                        try {
-                            const data = JSON.parse(ev.target.result);
-                            Object.assign(CONFIG, data);
-                            if(uiGui) {
-                                uiGui.controllersRecursive().forEach(c => c.updateDisplay());
-                                window.dispatchEvent(new Event('resize')); 
-                            }
-                        } catch(err) { console.error("Invalid Preset File"); }
-                    };
-                    reader.readAsText(file);
-                };
-                input.click();
-            },
-            loadPreset: (name) => {
-                let data = PresetManager.presets[name];
-                if (data) {
-                    Object.assign(CONFIG, data);
-                    if (uiGui) {
-                        uiGui.controllersRecursive().forEach(c => c.updateDisplay());
-                        if (data.resolution !== undefined) window.dispatchEvent(new Event('resize')); 
+            let idx = 0; const freq = 8.0; 
+            for(let z=0; z<size; z++) {
+                for(let y=0; y<size; y++) {
+                    for(let x=0; x<size; x++) {
+                        const nx = x/size, ny = y/size, nz = z/size;
+                        let total = 0.0, amplitude = 0.5, f = freq;
+                        for(let k=0; k<3; k++) { total += pnoise(nx*f, ny*f, nz*f, Math.floor(f)) * amplitude; amplitude *= 0.5; f *= 2.0; }
+                        data[idx++] = total * 0.5 + 0.5; 
                     }
                 }
-            },
-            exportClipboard: () => {
-                navigator.clipboard.writeText(JSON.stringify(CONFIG));
-                alert("Preset copied to clipboard!");
-            },
-            regenerateNoise: async () => {
-                const el = document.getElementById('loading');
-                el.classList.remove('hidden');
-                el.style.opacity = '1';
-                document.getElementById('loading-text').innerText = "REGENERATING NOISE...";
-                
-                // Clear existing
-                globalNoiseData = null;
-                
-                const tex = await generateNoiseTexture(CONFIG.textureSize);
-                cloudMat.uniforms.uNoiseTexture.value = tex;
-                
-                el.style.opacity = '0';
-                setTimeout(() => el.classList.add('hidden'), 500);
             }
-        };
+
+            const tex = new THREE.Data3DTexture(data, size, size, size);
+            tex.format = THREE.RedFormat; tex.type = THREE.HalfFloatType;
+            tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.wrapR = THREE.RepeatWrapping;
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        
+        function hash2(x, y) {
+            const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+            return v - Math.floor(v);
+        }
+        function noise2D(x, y) {
+            const xi = Math.floor(x), yi = Math.floor(y);
+            const xf = x - xi, yf = y - yi;
+            const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+            const u = xf * xf * (3.0 - 2.0 * xf), v = yf * yf * (3.0 - 2.0 * yf);
+            const lerp = (s, t, u) => s + u * (t - s);
+            return lerp(lerp(a, b, u), lerp(c, d, u), v);
+        }
+        function fbm(x, y, octaves = 5) {
+            let sum = 0.0, amp = 1.0, freq = 1.0;
+            for (let i = 0; i < octaves; i++) {
+                sum += noise2D(x * freq, y * freq) * amp;
+                freq *= 2.0; amp *= 0.5;
+            }
+            return sum;
+        }
+
+        
+        function createTerrainMesh() {
+            const size = 200000.0;
+            const segments = 128;
+            const geom = new THREE.PlaneGeometry(size, size, segments, segments);
+            geom.rotateX(-Math.PI * 0.5);
+            const pos = geom.attributes.position;
+            
+            for (let i = 0; i < pos.count; i++) {
+                pos.setY(i, 0);
+            }
+            geom.computeVertexNormals();
+            const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(GLOBAL_CONFIG.groundColor), roughness: 1.0, metalness: 0.0 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.frustumCulled = false;
+            return mesh;
+        }
+
+        
+        function updateTerrain(offsetX, offsetZ) {
+            if (!terrainMesh) return;
+            const geom = terrainMesh.geometry;
+            const pos = geom.attributes.position;
+            
+            const scale = 1.0 / 8000.0;
+            const heightScale = 3000.0;
+            
+            const worldOffsetX = offsetX;
+            const worldOffsetZ = offsetZ;
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const z = pos.getZ(i);
+                const wx = x + worldOffsetX;
+                const wz = z + worldOffsetZ;
+                const h = (fbm(wx * scale, wz * scale, 6) - 0.5) * heightScale;
+                pos.setY(i, h);
+            }
+            geom.computeVertexNormals();
+            pos.needsUpdate = true;
+            geom.attributes.normal.needsUpdate = true;
+        }
+
+        function getSunLightColor(elevation) {
+            const t = Math.max(0, Math.min(1, (elevation + 5) / 25));
+            const r = 1.0, g = 0.3 + 0.7 * t, b = 0.1 + 0.9 * t;
+            const intensity = Math.max(0.0, Math.sin(THREE.MathUtils.degToRad(Math.max(0, elevation + 5))));
+            return new THREE.Color(r, g, b).multiplyScalar(intensity + 0.1);
+        }
 
         async function init() {
-            // Audio Manager init
             audioManager = new AtmosphereAudio();
 
             renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
@@ -1955,20 +1783,18 @@
             const rtParams = { type: THREE.HalfFloatType, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
             cloudTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
             denoiseTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
-            historyTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
-            taaTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
             rayTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
+            
+            terrainTarget = new THREE.WebGLRenderTarget(1, 1, rtParams);
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200000);
             
             flightControls = new FlightControls(camera);
 
-            // Async load assets
-            const noiseTex = await generateNoiseTexture(CONFIG.textureSize);
-            const el = document.getElementById('loading');
-            el.style.opacity = '0';
-            setTimeout(() => el.classList.add('hidden'), 500);
+            await new Promise(r => setTimeout(r, 50));
+            const noiseTex = createNoiseTexture();
+            document.getElementById('loading').classList.add('hidden');
 
             cloudMat = new THREE.ShaderMaterial({
                 vertexShader: VERTEX_SHADER,
@@ -1981,55 +1807,80 @@
                     uInverseProj: { value: new THREE.Matrix4() },
                     uSunDir: { value: new THREE.Vector3() },
                     uSunColor: { value: new THREE.Color(1.0, 1.0, 1.0) },
-                    uSunIntensity: { value: CONFIG.sunIntensity },
+                    uSunIntensity: { value: GLOBAL_CONFIG.sunIntensity },
                     uWorldOffset: { value: new THREE.Vector3() },
                     
-                    uCloudColorTop: { value: new THREE.Color(CONFIG.cloudColorTop) },
-                    uCloudColorBottom: { value: new THREE.Color(CONFIG.cloudColorBottom) },
-                    uSkyColorZenith: { value: new THREE.Color(CONFIG.skyColorZenith) },
-                    uSkyColorHorizon: { value: new THREE.Color(CONFIG.skyColorHorizon) },
-                    uSkySunsetZenith: { value: new THREE.Color(CONFIG.skySunsetZenith) },
-                    uSkySunsetHorizon: { value: new THREE.Color(CONFIG.skySunsetHorizon) },
-                    uGroundColor: { value: new THREE.Color(CONFIG.groundColor) },
+                    uSkyColorZenith: { value: new THREE.Color(GLOBAL_CONFIG.skyColorZenith) },
+                    uSkyColorHorizon: { value: new THREE.Color(GLOBAL_CONFIG.skyColorHorizon) },
+                    uSkySunsetZenith: { value: new THREE.Color(GLOBAL_CONFIG.skySunsetZenith) },
+                    uSkySunsetHorizon: { value: new THREE.Color(GLOBAL_CONFIG.skySunsetHorizon) },
+                    uGroundColor: { value: new THREE.Color(GLOBAL_CONFIG.groundColor) },
                     
-                    uCloudCover: { value: CONFIG.cloudCover },
-                    uCloudDensity: { value: CONFIG.cloudDensity },
-                    uCloudAbsorption: { value: CONFIG.cloudAbsorption },
-                    uCloudBottom: { value: CONFIG.cloudBottom },
-                    uCloudTop: { value: CONFIG.cloudTop },
-                    uDetailScale: { value: CONFIG.noiseScale },
-                    uWindSpeed: { value: CONFIG.windSpeed },
-                    uWindDir: { value: new THREE.Vector2(Math.sin(CONFIG.windAngle), Math.cos(CONFIG.windAngle)) },
-                    uErosion: { value: CONFIG.erosion },
-                    uDensityProfile: { value: CONFIG.densityProfile },
-                    uFadeBottom: { value: CONFIG.fadeBottom },
-                    uFadeTop: { value: CONFIG.fadeTop },
+                    uCloudAbsorption: { value: GLOBAL_CONFIG.cloudAbsorption },
+                    uSilverLining: { value: GLOBAL_CONFIG.silverLining },
+                    uSilverSpread: { value: GLOBAL_CONFIG.silverSpread },
+                    uAmbientIntensity: { value: GLOBAL_CONFIG.ambientIntensity },
+                    uPowder: { value: GLOBAL_CONFIG.powder },
                     
-                    uMacroScale1: { value: CONFIG.macroScale1 },
-                    uMacroScale2: { value: CONFIG.macroScale2 },
-                    uMacroStrength2: { value: CONFIG.macroStrength2 },
-                    uMacroScale3: { value: CONFIG.macroScale3 },
-                    uMacroStrength3: { value: CONFIG.macroStrength3 },
-                    uMacroCoverage: { value: CONFIG.macroCoverage },
-                    uMacroDensity: { value: CONFIG.macroDensity },
+                    uMultiScatter: { value: 0.8 },
+                    uRimBoost: { value: 1.0 },
+                    uAOIntensity: { value: 0.6 },
+                    uLFScale: { value: 0.00005 },
+
                     
-                    uSilverLining: { value: CONFIG.silverLining },
-                    uSilverSpread: { value: CONFIG.silverSpread },
-                    uAmbientIntensity: { value: CONFIG.ambientIntensity },
-                    uPowder: { value: CONFIG.powder },
+                    uShadowStrength: { value: 0.6 },
+                    uShadowSoftness: { value: 0.25 },
+                    uScatteringStrength: { value: 0.9 },
+                    uScatteringBoost: { value: 1.0 },
+                    uAOStrength: { value: 1.0 },
+                    uDarkEdgeIntensity: { value: 1.0 },
+                    uDarkEdgeFalloff: { value: 0.5 },
+                    uShadowTint: { value: new THREE.Color(GLOBAL_CONFIG.shadowTint) },
+                    uSunDisk: { value: GLOBAL_CONFIG.sunDiskIntensity },
+                    uSkySaturation: { value: GLOBAL_CONFIG.skySaturation },
+
+                    uSteps: { value: GLOBAL_CONFIG.steps },
+                    uLightSteps: { value: GLOBAL_CONFIG.lightSteps },
+                    uDithering: { value: GLOBAL_CONFIG.dithering },
+                    uLodDistance: { value: GLOBAL_CONFIG.lodDistance },
+                    uMaxDist: { value: GLOBAL_CONFIG.maxDist },
                     
-                    uSteps: { value: CONFIG.steps },
-                    uLightSteps: { value: CONFIG.lightSteps },
-                    uNoiseOctaves: { value: CONFIG.noiseOctaves },
-                    uDithering: { value: CONFIG.dithering },
-                    uLodDistance: { value: CONFIG.lodDistance },
-                    uMaxDist: { value: CONFIG.maxDist },
+                    uRayleigh: { value: GLOBAL_CONFIG.rayleigh },
+                    uMieCoeff: { value: GLOBAL_CONFIG.mieCoefficient },
+                    uMieG: { value: GLOBAL_CONFIG.mieDirectionalG },
+                    uFogDensity: { value: GLOBAL_CONFIG.fogDensity },
                     
-                    uRayleigh: { value: CONFIG.rayleigh },
-                    uMieCoeff: { value: CONFIG.mieCoefficient },
-                    uMieG: { value: CONFIG.mieDirectionalG },
-                    uFogDensity: { value: CONFIG.fogDensity },
                     
+                    uLayerCount: { value: 0 },
+                    uLayerBottom: { value: allocFloat(MAX_LAYERS) },
+                    uLayerTop: { value: allocFloat(MAX_LAYERS) },
+                    uLayerDensity: { value: allocFloat(MAX_LAYERS) },
+                    uLayerCover: { value: allocFloat(MAX_LAYERS) },
+                    uLayerColorTop: { value: allocVec3Array(MAX_LAYERS) },
+                    uLayerColorBottom: { value: allocVec3Array(MAX_LAYERS) },
+                    uLayerScaleMacro: { value: allocFloat(MAX_LAYERS) },
+                    uLayerScaleMicro: { value: allocFloat(MAX_LAYERS) },
+                    uLayerMacroOctaves: { value: allocFloat(MAX_LAYERS) },
+                    uLayerMicroOctaves: { value: allocFloat(MAX_LAYERS) },
+                    uLayerTurbulence: { value: allocFloat(MAX_LAYERS) },
+                    uLayerDetailMix: { value: allocFloat(MAX_LAYERS) },
+                    uLayerCoverageExp: { value: allocFloat(MAX_LAYERS) },
+                    uLayerAbsorption: { value: allocFloat(MAX_LAYERS) },
+                    uLayerSilver: { value: allocFloat(MAX_LAYERS) },
+                    uLayerDarkEdge: { value: allocFloat(MAX_LAYERS) },
+                    uLayerScattering: { value: allocFloat(MAX_LAYERS) },
+                    uLayerMicroContrast: { value: allocFloat(MAX_LAYERS) },
+                    
+                    uLayerMacroDensity: { value: allocFloat(MAX_LAYERS) },
+                    
+                    uLayerMacroFalloff: { value: allocFloat(MAX_LAYERS) },
+                    uLayerMacroCoreBias: { value: allocFloat(MAX_LAYERS) },
+                    uLayerMacroEdgeSoftness: { value: allocFloat(MAX_LAYERS) },
+                    uLayerWindSpeed: { value: allocFloat(MAX_LAYERS) },
+                    uLayerWindDir: { value: allocVec2Array(MAX_LAYERS) },
+                    uLayerErosion: { value: allocFloat(MAX_LAYERS) },
+                    uLayerType: { value: allocFloat(MAX_LAYERS) },
+
                     uNoiseTexture: { value: noiseTex }
                 },
                 depthWrite: false, depthTest: false
@@ -2038,24 +1889,81 @@
             denoiseMat = new THREE.ShaderMaterial({
                 vertexShader: VERTEX_SHADER,
                 fragmentShader: DENOISE_FRAGMENT,
-                uniforms: { tDiffuse: { value: null }, uResolution: { value: new THREE.Vector2() }, uEnable: { value: CONFIG.enableDenoise } },
+                uniforms: { tDiffuse: { value: null }, uResolution: { value: new THREE.Vector2() }, uEnable: { value: GLOBAL_CONFIG.enableDenoise } },
                 depthWrite: false, depthTest: false
             });
 
-            taaMat = new THREE.ShaderMaterial({
-                vertexShader: VERTEX_SHADER,
-                fragmentShader: TAA_FRAGMENT,
-                uniforms: { 
-                    tCurrent: { value: null },
-                    tHistory: { value: null },
-                    uInvViewProj: { value: new THREE.Matrix4() },
-                    uPrevViewProj: { value: new THREE.Matrix4() },
-                    uBlend: { value: CONFIG.taaBlend },
-                    uEnable: { value: CONFIG.enableTAA },
-                    uResolution: { value: new THREE.Vector2() }
-                },
-                depthWrite: false, depthTest: false
-            });
+            
+            function updateLayerUniforms() {
+                const activeLayers = LAYERS.filter(l => l.active);
+                const count = Math.min(activeLayers.length, MAX_LAYERS);
+                cloudMat.uniforms.uLayerCount.value = count;
+                const tmpColorRef = new THREE.Color();
+
+                const genericMap = [
+                    ['bottom','uLayerBottom'], ['top','uLayerTop'], ['density','uLayerDensity'], ['coverage','uLayerCover'],
+                    ['scaleMacro','uLayerScaleMacro'], ['scaleMicro','uLayerScaleMicro'], ['macroOctaves','uLayerMacroOctaves'], ['microOctaves','uLayerMicroOctaves'],
+                    ['turbulence','uLayerTurbulence'], ['detailMix','uLayerDetailMix'], ['coverageExponent','uLayerCoverageExp'], ['windSpeed','uLayerWindSpeed'],
+                    ['erosion','uLayerErosion'], ['type','uLayerType']
+                ];
+
+                for (let i = 0; i < MAX_LAYERS; i++) {
+                    if (i < count) {
+                        const l = activeLayers[i];
+                        genericMap.forEach(([prop, u]) => cloudMat.uniforms[u].value[i] = l[prop]);
+
+                        // explicit assignments for uniforms without direct property name mapping
+                        cloudMat.uniforms.uLayerAbsorption.value[i] = l.absorption;
+                        cloudMat.uniforms.uLayerSilver.value[i] = l.silver;
+                        cloudMat.uniforms.uLayerDarkEdge.value[i] = l.darkEdge;
+                        cloudMat.uniforms.uLayerScattering.value[i] = l.scattering;
+                        cloudMat.uniforms.uLayerMicroContrast.value[i] = l.microContrast;
+
+                        // clamp macro parameters to safe ranges
+                        cloudMat.uniforms.uLayerMacroDensity.value[i] = Math.max(0.0, Math.min(1.0, l.macroDensity));
+                        cloudMat.uniforms.uLayerMacroFalloff.value[i] = Math.max(0.01, l.macroFalloff);
+                        cloudMat.uniforms.uLayerMacroCoreBias.value[i] = Math.max(0.0, l.macroCoreBias);
+                        cloudMat.uniforms.uLayerMacroEdgeSoftness.value[i] = Math.max(0.0, l.macroEdgeSoftness);
+
+                        // reuse a temporary color object to avoid allocations per-frame
+                        const tmpColor = tmpColorRef || (tmpColorRef = new THREE.Color());
+                        tmpColor.set(l.colorTop);
+                        cloudMat.uniforms.uLayerColorTop.value[i].set(tmpColor.r, tmpColor.g, tmpColor.b);
+                        tmpColor.set(l.colorBottom);
+                        cloudMat.uniforms.uLayerColorBottom.value[i].set(tmpColor.r, tmpColor.g, tmpColor.b);
+
+                        cloudMat.uniforms.uLayerWindDir.value[i].set(Math.sin(l.windAngle), Math.cos(l.windAngle));
+                    } else {
+                        // clear unused slots
+                        cloudMat.uniforms.uLayerBottom.value[i] = 0;
+                        cloudMat.uniforms.uLayerTop.value[i] = 0;
+                        cloudMat.uniforms.uLayerDensity.value[i] = 0;
+                        cloudMat.uniforms.uLayerCover.value[i] = 0;
+                        cloudMat.uniforms.uLayerScaleMacro.value[i] = 0;
+                        cloudMat.uniforms.uLayerScaleMicro.value[i] = 0;
+                        cloudMat.uniforms.uLayerMacroDensity.value[i] = 0;
+                        cloudMat.uniforms.uLayerMacroFalloff.value[i] = 1.0;
+                        cloudMat.uniforms.uLayerMacroCoreBias.value[i] = 1.0;
+                        cloudMat.uniforms.uLayerMacroEdgeSoftness.value[i] = 0;
+                        cloudMat.uniforms.uLayerTurbulence.value[i] = 0;
+                        cloudMat.uniforms.uLayerDetailMix.value[i] = 0;
+                        cloudMat.uniforms.uLayerCoverageExp.value[i] = 1.0;
+                        cloudMat.uniforms.uLayerAbsorption.value[i] = 0;
+                        cloudMat.uniforms.uLayerSilver.value[i] = 0;
+                        cloudMat.uniforms.uLayerDarkEdge.value[i] = 0;
+                        cloudMat.uniforms.uLayerScattering.value[i] = 0;
+                        cloudMat.uniforms.uLayerMicroContrast.value[i] = 1.0;
+                        cloudMat.uniforms.uLayerWindSpeed.value[i] = 0;
+                        cloudMat.uniforms.uLayerWindDir.value[i].set(0,0);
+                        cloudMat.uniforms.uLayerErosion.value[i] = 0;
+                        cloudMat.uniforms.uLayerType.value[i] = 0;
+                        cloudMat.uniforms.uLayerColorTop.value[i].set(1,1,1);
+                        cloudMat.uniforms.uLayerColorBottom.value[i].set(1,1,1);
+                    }
+                }
+
+                cloudMat.needsUpdate = true;
+            }
 
             rayMat = new THREE.ShaderMaterial({
                 vertexShader: VERTEX_SHADER,
@@ -2064,11 +1972,11 @@
                     tDiffuse: { value: null },
                     uSunPosScreen: { value: new THREE.Vector2() },
                     uSunVisible: { value: true },
-                    uDensity: { value: CONFIG.rayDensity },
-                    uDecay: { value: CONFIG.rayDecay },
-                    uWeight: { value: CONFIG.rayWeight },
-                    uExposure: { value: CONFIG.rayExposure },
-                    uSamples: { value: CONFIG.raySamples }
+                    uDensity: { value: GLOBAL_CONFIG.rayDensity },
+                    uDecay: { value: GLOBAL_CONFIG.rayDecay },
+                    uWeight: { value: GLOBAL_CONFIG.rayWeight },
+                    uExposure: { value: GLOBAL_CONFIG.rayExposure },
+                    uSamples: { value: GLOBAL_CONFIG.raySamples }
                 },
                 depthWrite: false, depthTest: false
             });
@@ -2076,7 +1984,7 @@
             compositeMat = new THREE.ShaderMaterial({
                 vertexShader: VERTEX_SHADER,
                 fragmentShader: COMPOSITE_FRAGMENT,
-                uniforms: { tColor: { value: null }, tGodRays: { value: null }, uRayIntensity: { value: CONFIG.rayIntensity } },
+                uniforms: { tColor: { value: null }, tGodRays: { value: null }, tTerrain: { value: null }, uRayIntensity: { value: GLOBAL_CONFIG.rayIntensity }, uExposure: { value: GLOBAL_CONFIG.exposure } },
                 depthWrite: false, depthTest: false
             });
 
@@ -2089,234 +1997,211 @@
             postQuad = new THREE.Mesh(quadGeo, rayMat);
             postScene.add(postQuad);
 
-            uiGui = new GUI({ title: 'Cloud Engine v2' });
             
-            const presetF = uiGui.addFolder('Presets');
-            const presetNames = Object.keys(PresetManager.presets);
-            const presetParams = { load: 'Default' };
-            presetF.add(presetParams, 'load', presetNames).name('Load Preset').onChange(v => PresetManager.loadPreset(v));
-            presetF.add(PresetManager, 'savePreset').name('Save to File');
-            presetF.add(PresetManager, 'loadFromFile').name('Load from File');
-            presetF.add(PresetManager, 'exportClipboard').name('Copy to Clipboard');
+            worldScene = new THREE.Scene();
+            terrainMesh = createTerrainMesh();
+            worldScene.add(terrainMesh);
+            dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            worldScene.add(dirLight);
+            worldScene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
-            const genF = uiGui.addFolder('Texture Gen (Asset Pre-Gen)');
-            genF.add(CONFIG, 'textureSize', [64, 128, 256]).name('Noise Size');
-            genF.add(PresetManager, 'regenerateNoise').name('Regenerate Now');
+            uiGui = new GUI({ title: 'Multi-Layer Engine' });
 
-            const autoF = uiGui.addFolder('Automation');
-            autoF.add(CONFIG, 'autoSun').name('Cycle Sun');
-            const autoSunF = autoF.addFolder('Sun Cycle');
-            autoSunF.add(AUTOMATION.sun, 'enabled').name('Enabled');
-            autoSunF.add(AUTOMATION.sun, 'speed', 0.01, 1.0).name('Speed');
-            autoSunF.add(AUTOMATION.sun, 'minElev', -10, 20).name('Min Elev');
-            autoSunF.add(AUTOMATION.sun, 'maxElev', 20, 90).name('Max Elev');
-            const autoWeatherF = autoF.addFolder('Weather Cycle');
-            autoWeatherF.add(AUTOMATION.weather, 'enabled').name('Cover Enabled');
-            autoWeatherF.add(AUTOMATION.weather, 'speed', 0.01, 0.5).name('Cover Speed');
-            autoWeatherF.add(AUTOMATION.weather, 'minCover', 0.0, 1.0).name('Min Cover');
-            autoWeatherF.add(AUTOMATION.weather, 'maxCover', 0.0, 1.0).name('Max Cover');
-            autoWeatherF.add(AUTOMATION.density, 'enabled').name('Density Enabled');
-            autoWeatherF.add(AUTOMATION.density, 'speed', 0.01, 0.5).name('Density Speed');
-            autoWeatherF.add(AUTOMATION.density, 'minDensity', 0.1, 3.0).name('Min Density');
-            autoWeatherF.add(AUTOMATION.density, 'maxDensity', 0.1, 3.0).name('Max Density');
-            const autoErosionF = autoF.addFolder('Erosion Cycle');
-            autoErosionF.add(AUTOMATION.erosion, 'enabled').name('Enabled');
-            autoErosionF.add(AUTOMATION.erosion, 'speed', 0.01, 0.5).name('Speed');
-            autoErosionF.add(AUTOMATION.erosion, 'minErosion', 0.0, 1.0).name('Min');
-            autoErosionF.add(AUTOMATION.erosion, 'maxErosion', 0.0, 1.0).name('Max');
-            const autoWindF = autoF.addFolder('Wind Cycle');
-            autoWindF.add(AUTOMATION.wind, 'enabled').name('Enabled');
-            autoWindF.add(AUTOMATION.wind, 'speed', 0.01, 0.5).name('Cycle Speed');
-            autoWindF.add(AUTOMATION.wind, 'minSpeed', 0.0, 5.0).name('Min Wind');
-            autoWindF.add(AUTOMATION.wind, 'maxSpeed', 0.0, 5.0).name('Max Wind');
-            const autoDetailF = autoF.addFolder('Detail Cycle');
-            autoDetailF.add(AUTOMATION.detail, 'enabled').name('Enabled');
-            autoDetailF.add(AUTOMATION.detail, 'speed', 0.01, 0.5).name('Speed');
-            autoDetailF.add(AUTOMATION.detail, 'minScale', 0.1, 5.0).name('Min Scale');
-            autoDetailF.add(AUTOMATION.detail, 'maxScale', 0.1, 5.0).name('Max Scale');
+            const rebuildLayersGUI = () => {
+                if (layersFolder) layersFolder.destroy();
+                layersFolder = uiGui.addFolder('Cloud Layers');
+                
+                const controls = {
+                    add: () => {
+                        if (LAYERS.length >= MAX_LAYERS) { alert("Max layers reached"); return; }
+                        LAYERS.push(createDefaultLayer(LAYERS.length));
+                        updateLayerUniforms();
+                        rebuildLayersGUI();
+                    }
+                };
+                layersFolder.add(controls, 'add').name('+ Add Layer');
 
-            const envF = uiGui.addFolder('Environment');
-            envF.add(CONFIG, 'sunElevation', -10, 90).name('Sun Elevation').step(0.1);
-            envF.add(CONFIG, 'sunAzimuth', 0, 360).name('Sun Azimuth');
-            envF.add(CONFIG, 'sunIntensity', 0, 10).name('Sun Intensity').onChange(v => cloudMat.uniforms.uSunIntensity.value = v);
+                LAYERS.forEach((layer, index) => {
+                    const f = layersFolder.addFolder(layer.name);
+                    f.add(layer, 'active').name('Active').onChange(updateLayerUniforms);
+                    f.add(layer, 'bottom', 0, 20000).name('Alt Bottom').onChange(v => {
+                        layer.bottom = Math.max(0, v);
+                        if (layer.top < layer.bottom + 50) layer.top = layer.bottom + 50;
+                        updateLayerUniforms();
+                    });
+                    f.add(layer, 'top', 0, 40000).name('Alt Top').onChange(v => {
+                        layer.top = Math.max(0, v);
+                        if (layer.bottom > layer.top - 50) layer.bottom = Math.max(0, layer.top - 50);
+                        updateLayerUniforms();
+                    });
+
+                    // densityUI exposes a 0..1 slider that maps cubically to the density (gives more precision near 0)
+                    if (typeof layer.densityUI === 'undefined') layer.densityUI = Math.pow(layer.density / 3.0, 1/3);
+                    f.add(layer, 'densityUI', 0, 1).name('Density').onChange(v => {
+                        layer.density = Math.pow(v, 3) * 3.0;
+                        updateLayerUniforms();
+                    });
+                    f.add(layer, 'coverage', 0, 1).name('Coverage').onChange(updateLayerUniforms);
+                    
+                    f.add(layer, 'scaleMacro', 0.01, 1.0).name('Structure Scale').onChange(updateLayerUniforms);
+                    f.add(layer, 'macroOctaves', 1, 8, 1).name('Macro Octaves').onChange(updateLayerUniforms);
+                    f.add(layer, 'scaleMicro', 1.0, 10.0).name('Detail Scale').onChange(updateLayerUniforms);
+                    f.add(layer, 'microOctaves', 1, 6, 1).name('Micro Octaves').onChange(updateLayerUniforms);
+                    f.add(layer, 'detailMix', -1.0, 2.0).name('Detail Mix').onChange(updateLayerUniforms);
+                    f.add(layer, 'turbulence', 0, 1).name('Turbulence').onChange(updateLayerUniforms);
+                    f.add(layer, 'microContrast', 0.5, 3.0).name('Detail Contrast').onChange(updateLayerUniforms);
+                    f.add(layer, 'coverageExponent', 0.1, 4).name('Coverage Exp').onChange(updateLayerUniforms);
+
+                    const macroF = f.addFolder('Macro'); // Macro controls (density 0..1, bias 0..6)
+                    // Macro density now ranges 0..1 for clearer control
+                    macroF.add(layer, 'macroDensity', 0.0, 1.0).name('Macro Density').onChange(updateLayerUniforms);
+                    macroF.add(layer, 'macroFalloff', 0.1, 6.0).name('Macro Falloff').onChange(updateLayerUniforms);
+                    // widen core bias range to allow subtle to very sharp cores
+                    macroF.add(layer, 'macroCoreBias', 0.0, 6.0).name('Core Bias').onChange(updateLayerUniforms);
+                    macroF.add(layer, 'macroEdgeSoftness', 0.0, 0.5).name('Edge Softness').onChange(updateLayerUniforms);
+                    
+                    const vis = f.addFolder('Visuals');
+                    vis.add(layer, 'absorption', 0.0, 2.0).name('Absorption').onChange(updateLayerUniforms);
+                    vis.add(layer, 'silver', 0, 1).name('Silver Lining').onChange(updateLayerUniforms);
+                    vis.add(layer, 'darkEdge', 0, 1).name('Dark Edges').onChange(updateLayerUniforms);
+                    vis.add(layer, 'scattering', 0, 1).name('Scattering').onChange(updateLayerUniforms);
+                    
+                    f.add(layer, 'erosion', 0, 1).name('Erosion').onChange(updateLayerUniforms);
+                    f.add(layer, 'type', 0, 1).name('Type (Shape)').onChange(updateLayerUniforms);
+                    f.addColor(layer, 'colorTop').name('Color Top').onChange(updateLayerUniforms);
+                    f.addColor(layer, 'colorBottom').name('Color Bottom').onChange(updateLayerUniforms);
+                    f.add(layer, 'windSpeed', 0, 2.0).name('Wind Speed').onChange(updateLayerUniforms);
+                    f.add(layer, 'windAngle', 0, Math.PI * 2).name('Wind Angle').onChange(updateLayerUniforms);
+                    
+                    const ops = { remove: () => {
+                        LAYERS.splice(index, 1);
+                        updateLayerUniforms();
+                        rebuildLayersGUI();
+                    }, reset: () => {
+                        const def = createDefaultLayer(layer.id);
+                        Object.assign(layer, def);
+                        updateLayerUniforms();
+                        rebuildLayersGUI();
+                    }};
+                    f.add(ops, 'remove').name('Remove Layer');
+                    f.add(ops, 'reset').name('Reset to Default');
+                });
+            };
+            rebuildLayersGUI();
+            updateLayerUniforms();
+
+            const globalF = uiGui.addFolder('Global: Sun & Atmosphere');
+            globalF.add(GLOBAL_CONFIG, 'sunElevation', -10, 90).name('Sun Elev').onChange(v => updateLayerUniforms());
+            globalF.add(GLOBAL_CONFIG, 'sunAzimuth', 0, 360).name('Sun Azi');
+            globalF.add(GLOBAL_CONFIG, 'sunIntensity', 0, 10).name('Sun Int').onChange(v => cloudMat.uniforms.uSunIntensity.value = v);
+            globalF.addColor(GLOBAL_CONFIG, 'skyColorZenith').onChange(v => cloudMat.uniforms.uSkyColorZenith.value.set(v));
+            globalF.addColor(GLOBAL_CONFIG, 'skyColorHorizon').onChange(v => cloudMat.uniforms.uSkyColorHorizon.value.set(v));
+            globalF.addColor(GLOBAL_CONFIG, 'skySunsetZenith').onChange(v => cloudMat.uniforms.uSkySunsetZenith.value.set(v));
+            globalF.addColor(GLOBAL_CONFIG, 'skySunsetHorizon').onChange(v => cloudMat.uniforms.uSkySunsetHorizon.value.set(v));
+            globalF.add(GLOBAL_CONFIG, 'enableClouds').name('Enable Clouds');
+
+            const realismF = uiGui.addFolder('Global: Realism');
+            realismF.add(cloudMat.uniforms.uMultiScatter, 'value', 0.0, 2.0).name('Multi-Scatter').onChange(v => cloudMat.uniforms.uMultiScatter.value = v);
+            realismF.add(cloudMat.uniforms.uRimBoost, 'value', 0.0, 4.0).name('Rim Boost').onChange(v => cloudMat.uniforms.uRimBoost.value = v);
+            realismF.add(cloudMat.uniforms.uAOIntensity, 'value', 0.0, 2.0).name('AO Intensity').onChange(v => cloudMat.uniforms.uAOIntensity.value = v);
+            realismF.add(cloudMat.uniforms.uAOStrength, 'value', 0.0, 3.0).name('AO Strength').onChange(v => cloudMat.uniforms.uAOStrength.value = v);
+
             
-            const colorF = uiGui.addFolder('Colors');
-            colorF.addColor(CONFIG, 'cloudColorTop').name('Cloud Top').onChange(v => cloudMat.uniforms.uCloudColorTop.value.set(v));
-            colorF.addColor(CONFIG, 'cloudColorBottom').name('Cloud Bottom').onChange(v => cloudMat.uniforms.uCloudColorBottom.value.set(v));
-            colorF.addColor(CONFIG, 'skyColorZenith').name('Day Sky Top').onChange(v => cloudMat.uniforms.uSkyColorZenith.value.set(v));
-            colorF.addColor(CONFIG, 'skyColorHorizon').name('Day Sky Bot').onChange(v => cloudMat.uniforms.uSkyColorHorizon.value.set(v));
-            colorF.addColor(CONFIG, 'skySunsetZenith').name('Sunset Sky Top').onChange(v => cloudMat.uniforms.uSkySunsetZenith.value.set(v));
-            colorF.addColor(CONFIG, 'skySunsetHorizon').name('Sunset Sky Bot').onChange(v => cloudMat.uniforms.uSkySunsetHorizon.value.set(v));
-            colorF.addColor(CONFIG, 'groundColor').name('Ground Color').onChange(v => cloudMat.uniforms.uGroundColor.value.set(v));
+            realismF.add(cloudMat.uniforms.uScatteringStrength, 'value', 0.0, 2.0).name('Scattering Strength').onChange(v => cloudMat.uniforms.uScatteringStrength.value = v);
+            realismF.add(cloudMat.uniforms.uScatteringBoost, 'value', 0.1, 3.0).name('Scattering Boost').onChange(v => cloudMat.uniforms.uScatteringBoost.value = v);
+            realismF.add(cloudMat.uniforms.uDarkEdgeIntensity, 'value', 0.0, 3.0).name('Dark Edge Intensity').onChange(v => cloudMat.uniforms.uDarkEdgeIntensity.value = v);
+            realismF.add(cloudMat.uniforms.uDarkEdgeFalloff, 'value', 0.0, 3.0).name('Dark Edge Falloff').onChange(v => cloudMat.uniforms.uDarkEdgeFalloff.value = v);
+            realismF.add(GLOBAL_CONFIG, 'silverLining', 0, 1).name('Silver Lining').onChange(v => cloudMat.uniforms.uSilverLining.value = v);
+            realismF.add(GLOBAL_CONFIG, 'silverSpread', 0, 1).name('Silver Spread').onChange(v => cloudMat.uniforms.uSilverSpread.value = v);
+            realismF.add(cloudMat.uniforms.uShadowSoftness, 'value', 0.0, 1.0).name('Shadow Softness').onChange(v => cloudMat.uniforms.uShadowSoftness.value = v);
+            realismF.addColor(GLOBAL_CONFIG, 'shadowTint').name('Shadow Tint').onChange(v => cloudMat.uniforms.uShadowTint.value.set(v));
+            realismF.add(compositeMat.uniforms.uExposure, 'value', 0.1, 3.0).name('Exposure').onChange(v => compositeMat.uniforms.uExposure.value = v);
 
-            const atmosF = uiGui.addFolder('Atmosphere');
-            atmosF.add(CONFIG, 'rayleigh', 0, 5).name('Sky Blue').onChange(v => cloudMat.uniforms.uRayleigh.value = v);
-            atmosF.add(CONFIG, 'mieCoefficient', 0, 0.05).name('Haze').onChange(v => cloudMat.uniforms.uMieCoeff.value = v);
-            atmosF.add(CONFIG, 'mieDirectionalG', 0, 0.99).name('Sun Glow').onChange(v => cloudMat.uniforms.uMieG.value = v);
-            atmosF.add(CONFIG, 'fogDensity', 0.000001, 0.0001).name('Fog Density').onChange(v => cloudMat.uniforms.uFogDensity.value = v);
             
-            const cloudF = uiGui.addFolder('Cloud Properties');
-            cloudF.add(CONFIG, 'cloudCover', 0, 1).name('Coverage').onChange(v => cloudMat.uniforms.uCloudCover.value = v);
-            cloudF.add(CONFIG, 'cloudDensity', 0, 3).name('Density').onChange(v => cloudMat.uniforms.uCloudDensity.value = v);
-            cloudF.add(CONFIG, 'cloudAbsorption', 0, 5).name('Absorption').onChange(v => cloudMat.uniforms.uCloudAbsorption.value = v);
-            cloudF.add(CONFIG, 'noiseScale', 1, 5).name('Detail Scale').onChange(v => cloudMat.uniforms.uDetailScale.value = v);
-            cloudF.add(CONFIG, 'erosion', 0, 1).name('Erosion').onChange(v => cloudMat.uniforms.uErosion.value = v);
-            cloudF.add(CONFIG, 'densityProfile', 0, 1).name('Shape Profile').onChange(v => cloudMat.uniforms.uDensityProfile.value = v);
-            cloudF.add(CONFIG, 'windSpeed', 0, 2.0).name('Wind Speed').onChange(v => cloudMat.uniforms.uWindSpeed.value = v);
-            cloudF.add(CONFIG, 'windAngle', 0, Math.PI*2).name('Wind Angle').onChange(v => cloudMat.uniforms.uWindDir.value.set(Math.sin(v), Math.cos(v)));
-            
-            const styleF = uiGui.addFolder('Lighting Style');
-            styleF.add(CONFIG, 'silverLining', 0, 1).name('Silver Lining').onChange(v => cloudMat.uniforms.uSilverLining.value = v);
-            styleF.add(CONFIG, 'silverSpread', 0.1, 2).name('Scatter Spread').onChange(v => cloudMat.uniforms.uSilverSpread.value = v);
-            styleF.add(CONFIG, 'ambientIntensity', 0, 1).name('Ambient Str').onChange(v => cloudMat.uniforms.uAmbientIntensity.value = v);
-            styleF.add(CONFIG, 'powder', 0, 1).name('Dark Edges').onChange(v => cloudMat.uniforms.uPowder.value = v);
+            globalF.add(GLOBAL_CONFIG, 'sunDiskIntensity', 0, 200).name('Sun Disk').onChange(v => cloudMat.uniforms.uSunDisk.value = v);
+            globalF.add(GLOBAL_CONFIG, 'skySaturation', 0, 2).name('Sky Saturation').onChange(v => cloudMat.uniforms.uSkySaturation.value = v);
+            globalF.addColor(GLOBAL_CONFIG, 'skyColorHorizon').onChange(v => cloudMat.uniforms.uSkyColorHorizon.value.set(v));
+            globalF.addColor(GLOBAL_CONFIG, 'skySunsetZenith').onChange(v => cloudMat.uniforms.uSkySunsetZenith.value.set(v));
+            globalF.addColor(GLOBAL_CONFIG, 'skySunsetHorizon').onChange(v => cloudMat.uniforms.uSkySunsetHorizon.value.set(v));
 
-            const macroF = uiGui.addFolder('Large Scale Variation');
-            macroF.add(CONFIG, 'macroScale1', 1.0, 10.0).name('Macro Scale 1').onChange(v => cloudMat.uniforms.uMacroScale1.value = v);
-            macroF.add(CONFIG, 'macroScale2', 1.0, 20.0).name('Macro Scale 2').onChange(v => cloudMat.uniforms.uMacroScale2.value = v);
-            macroF.add(CONFIG, 'macroStrength2', 0.0, 2.0).name('Mix Layer 2').onChange(v => cloudMat.uniforms.uMacroStrength2.value = v);
-            macroF.add(CONFIG, 'macroScale3', 10.0, 40.0).name('Macro Scale 3').onChange(v => cloudMat.uniforms.uMacroScale3.value = v);
-            macroF.add(CONFIG, 'macroStrength3', 0.0, 2.0).name('Mix Layer 3').onChange(v => cloudMat.uniforms.uMacroStrength3.value = v);
-            macroF.add(CONFIG, 'macroCoverage', 0.0, 2.0).name('Coverage Infl.').onChange(v => cloudMat.uniforms.uMacroCoverage.value = v);
-            macroF.add(CONFIG, 'macroDensity', 0.0, 2.0).name('Density Infl.').onChange(v => cloudMat.uniforms.uMacroDensity.value = v);
-
-            const geomF = uiGui.addFolder('Cloud Geometry');
-            geomF.add(CONFIG, 'cloudBottom', 1000, 3000).name('Altitude Bottom').onChange(v => cloudMat.uniforms.uCloudBottom.value = v);
-            geomF.add(CONFIG, 'cloudTop', 3000, 8000).name('Altitude Top').onChange(v => cloudMat.uniforms.uCloudTop.value = v);
-            geomF.add(CONFIG, 'fadeBottom', 0.0, 1.0).name('Bottom Fade').onChange(v => cloudMat.uniforms.uFadeBottom.value = v);
-            geomF.add(CONFIG, 'fadeTop', 0.0, 1.0).name('Top Fade').onChange(v => cloudMat.uniforms.uFadeTop.value = v);
             
-            const renderF = uiGui.addFolder('Performance / Quality');
+            
+            const renderF = uiGui.addFolder('Global: Render Quality');
             const onResChange = () => {
                 const w = window.innerWidth, h = window.innerHeight;
-                cloudTarget.setSize(w * CONFIG.resolution, h * CONFIG.resolution);
-                denoiseTarget.setSize(w * CONFIG.resolution, h * CONFIG.resolution);
-                historyTarget.setSize(w * CONFIG.resolution, h * CONFIG.resolution);
-                taaTarget.setSize(w * CONFIG.resolution, h * CONFIG.resolution);
+                cloudTarget.setSize(w * GLOBAL_CONFIG.resolution, h * GLOBAL_CONFIG.resolution);
+                denoiseTarget.setSize(w * GLOBAL_CONFIG.resolution, h * GLOBAL_CONFIG.resolution);
                 rayTarget.setSize(w/2, h/2);
-                denoiseMat.uniforms.uResolution.value.set(w * CONFIG.resolution, h * CONFIG.resolution);
-                taaMat.uniforms.uResolution.value.set(w * CONFIG.resolution, h * CONFIG.resolution);
+                terrainTarget.setSize(w, h);
+                denoiseMat.uniforms.uResolution.value.set(w * GLOBAL_CONFIG.resolution, h * GLOBAL_CONFIG.resolution);
             };
-            renderF.add(CONFIG, 'resolution', 0.1, 1.0).name('Res Scale').onChange(onResChange);
-            renderF.add(CONFIG, 'steps', 16, 256).step(1).name('Ray Steps').onChange(v => cloudMat.uniforms.uSteps.value = v);
-            renderF.add(CONFIG, 'lightSteps', 4, 16).step(1).name('Shadow Steps').onChange(v => cloudMat.uniforms.uLightSteps.value = v);
-            renderF.add(CONFIG, 'noiseOctaves', 1, 3).step(1).name('Noise Octaves').onChange(v => cloudMat.uniforms.uNoiseOctaves.value = v);
-            renderF.add(CONFIG, 'dithering').name('Dithering').onChange(v => cloudMat.uniforms.uDithering.value = v);
-            renderF.add(CONFIG, 'lodDistance', 1000, 50000).name('LOD Distance').onChange(v => cloudMat.uniforms.uLodDistance.value = v);
-            renderF.add(CONFIG, 'maxDist', 50000, 300000).name('Render Distance').onChange(v => cloudMat.uniforms.uMaxDist.value = v);
-            renderF.add(CONFIG, 'enableDenoise').name('Smart Denoise').onChange(v => denoiseMat.uniforms.uEnable.value = v);
-            renderF.add(CONFIG, 'enableTAA').name('Temporal Upsampling').onChange(v => taaMat.uniforms.uEnable.value = v);
-            renderF.add(CONFIG, 'taaBlend', 0.5, 0.99).name('TAA Blend').onChange(v => taaMat.uniforms.uBlend.value = v);
+            renderF.add(GLOBAL_CONFIG, 'resolution', 0.1, 1.0).name('Resolution').onChange(onResChange);
+            renderF.add(GLOBAL_CONFIG, 'steps', 32, 256).name('Ray Steps').onChange(v => cloudMat.uniforms.uSteps.value = v);
+            renderF.add(GLOBAL_CONFIG, 'autoQuality').name('Auto Quality');
+            renderF.add(GLOBAL_CONFIG, 'minSteps', 8, 64, 1).name('Min Steps');
+            
+            const rayF = uiGui.addFolder('Global: God Rays');
+            rayF.add(GLOBAL_CONFIG, 'rayIntensity', 0, 2).onChange(v => compositeMat.uniforms.uRayIntensity.value = v);
+            rayF.add(GLOBAL_CONFIG, 'rayDensity', 0, 4).name('Density').onChange(v => rayMat.uniforms.uDensity.value = v);
+            rayF.add(GLOBAL_CONFIG, 'rayDecay', 0.9, 1.0).name('Decay').onChange(v => rayMat.uniforms.uDecay.value = v);
+            rayF.add(GLOBAL_CONFIG, 'rayWeight', 0, 1).name('Weight').onChange(v => rayMat.uniforms.uWeight.value = v);
+            rayF.add(GLOBAL_CONFIG, 'rayExposure', 0, 2).name('Exposure').onChange(v => rayMat.uniforms.uExposure.value = v);
+            rayF.add(GLOBAL_CONFIG, 'raySamples', 4, 200, 1).name('Samples').onChange(v => rayMat.uniforms.uSamples.value = v);
 
-            const rayF = uiGui.addFolder('God Rays');
-            rayF.add(CONFIG, 'raySamples', 20, 200).step(10).name('Quality (Samples)').onChange(v => rayMat.uniforms.uSamples.value = v);
-            rayF.add(CONFIG, 'rayIntensity', 0, 2).name('Mix Intensity').onChange(v => compositeMat.uniforms.uRayIntensity.value = v);
-            rayF.add(CONFIG, 'rayWeight', 0, 1).name('Ray Weight').onChange(v => rayMat.uniforms.uWeight.value = v);
-            rayF.add(CONFIG, 'rayDensity', 0, 2).name('Ray Density').onChange(v => rayMat.uniforms.uDensity.value = v);
-            rayF.add(CONFIG, 'rayDecay', 0.8, 1.0).name('Ray Decay').onChange(v => rayMat.uniforms.uDecay.value = v);
-            rayF.add(CONFIG, 'rayExposure', 0, 1).name('Ray Exposure').onChange(v => rayMat.uniforms.uExposure.value = v);
-
-            const audioF = uiGui.addFolder('Audio Mixer');
-            audioF.add(CONFIG, 'masterVolume', 0, 1).name('Master').onChange(() => audioManager.updateVolumes());
-            audioF.add(CONFIG, 'volSynths', 0, 1).name('Synths').onChange(() => audioManager.updateVolumes());
-            audioF.add(CONFIG, 'volBass', 0, 1).name('Bass').onChange(() => audioManager.updateVolumes());
-            audioF.add(CONFIG, 'volWind', 0, 1).name('Wind').onChange(() => audioManager.updateVolumes());
-            audioF.add(CONFIG, 'volReverb', 0, 1).name('Reverb').onChange(() => audioManager.updateVolumes());
-            audioF.add(CONFIG, 'volCabin', 0, 1).name('Cabin').onChange(() => audioManager.updateVolumes());
-            audioF.add(CONFIG, 'volArp', 0, 1).name('Arps').onChange(() => audioManager.updateVolumes());
-            audioF.add(CONFIG, 'volAtmos', 0, 1).name('Atmos').onChange(() => audioManager.updateVolumes());
-            audioF.add(CONFIG, 'volSFX', 0, 1).name('Spatial SFX').onChange(() => audioManager.updateVolumes());
-
-            // Helper to recursively update GUI display
-            const updateGuiDisplay = (gui) => {
-                if(gui.controllers) gui.controllers.forEach(c => c.updateDisplay());
-                if(gui.folders) gui.folders.forEach(f => updateGuiDisplay(f));
-            };
+            const audioF = uiGui.addFolder('Global: Audio');
+            audioF.add(GLOBAL_CONFIG, 'masterVolume', 0, 1).onChange(() => audioManager.updateVolumes());
 
             const onResize = () => {
                 const w = window.innerWidth, h = window.innerHeight;
                 renderer.setSize(w, h);
+                cloudTarget.setSize(w * GLOBAL_CONFIG.resolution, h * GLOBAL_CONFIG.resolution);
+                denoiseTarget.setSize(w * GLOBAL_CONFIG.resolution, h * GLOBAL_CONFIG.resolution);
+                rayTarget.setSize(w/2, h/2);
+                terrainTarget.setSize(w, h);
+                denoiseMat.uniforms.uResolution.value.set(w * GLOBAL_CONFIG.resolution, h * GLOBAL_CONFIG.resolution);
                 camera.aspect = w / h;
                 camera.updateProjectionMatrix();
-                onResChange();
             };
             window.addEventListener('resize', onResize);
             onResize(); 
 
             const dummyCam = new THREE.Camera();
-            const prevViewProj = new THREE.Matrix4();
-            const currentViewProj = new THREE.Matrix4();
-            let frameCount = 0;
+
+            function runPostPass(mat, target, uniforms) {
+                postQuad.material = mat;
+                if (uniforms) {
+                    for (const k in uniforms) if (mat.uniforms[k]) mat.uniforms[k].value = uniforms[k];
+                }
+                renderer.setRenderTarget(target);
+                renderer.render(postScene, dummyCam);
+            }
 
             function render() {
                 requestAnimationFrame(render);
                 
                 const dt = clock.getDelta();
-                const elapsed = clock.getElapsedTime();
                 
-                if (CONFIG.autoSun || AUTOMATION.sun.enabled) {
-                    const s = AUTOMATION.sun;
-                    const range = s.maxElev - s.minElev;
-                    const midpoint = s.minElev + range / 2;
-                    CONFIG.sunElevation = midpoint + (range / 2) * Math.sin(elapsed * s.speed);
-                }
-                
-                if (CONFIG.autoWeather || AUTOMATION.weather.enabled) {
-                    const w = AUTOMATION.weather;
-                    const range = w.maxCover - w.minCover;
-                    const mid = w.minCover + range / 2;
-                    cloudMat.uniforms.uCloudCover.value = mid + (range / 2) * Math.sin(elapsed * w.speed);
-                }
-
-                if (AUTOMATION.density.enabled) {
-                    const d = AUTOMATION.density;
-                    const range = d.maxDensity - d.minDensity;
-                    const mid = d.minDensity + range / 2;
-                    cloudMat.uniforms.uCloudDensity.value = mid + (range / 2) * Math.cos(elapsed * d.speed);
-                }
-
-                if (AUTOMATION.erosion.enabled) {
-                    const e = AUTOMATION.erosion;
-                    const range = e.maxErosion - e.minErosion;
-                    const mid = e.minErosion + range / 2;
-                    cloudMat.uniforms.uErosion.value = mid + (range / 2) * Math.sin(elapsed * e.speed);
-                }
-
-                if (AUTOMATION.wind.enabled) {
-                    const w = AUTOMATION.wind;
-                    const range = w.maxSpeed - w.minSpeed;
-                    const mid = w.minSpeed + range / 2;
-                    cloudMat.uniforms.uWindSpeed.value = mid + (range / 2) * Math.sin(elapsed * w.speed);
-                    // Slowly rotate wind direction
-                    const angle = elapsed * w.speed * 0.5;
-                    cloudMat.uniforms.uWindDir.value.set(Math.sin(angle), Math.cos(angle));
-                }
-
-                if (AUTOMATION.detail.enabled) {
-                    const d = AUTOMATION.detail;
-                    const range = d.maxScale - d.minScale;
-                    const mid = d.minScale + range / 2;
-                    cloudMat.uniforms.uDetailScale.value = mid + (range / 2) * Math.sin(elapsed * d.speed);
-                }
-
-                // Recursive GUI Update (if automation changes values)
-                if (frameCount % 10 === 0) updateGuiDisplay(uiGui);
-
                 cloudMat.uniforms.uTime.value += dt;
                 flightControls.update(dt);
                 
-                // Calculate density at player position for Audio
-                const localDensity = getCPUDensity(flightControls.worldPos, cloudMat.uniforms.uTime.value);
-                document.getElementById('val-dens').innerText = Math.round(localDensity * 100) + '%';
+                
+                let currentDensity = 0;
+                const camY = flightControls.worldPos.y;
+                LAYERS.forEach(l => {
+                    if (l.active && camY > l.bottom && camY < l.top) {
+                        currentDensity += l.density;
+                    }
+                });
+                currentDensity = Math.min(currentDensity, 2.0); 
+                
+                document.getElementById('val-dens').innerText = Math.round(currentDensity * 100) + '%';
                 
                 audioManager.update(
                     flightControls.keys,
                     flightControls.currentSpeed, 
                     flightControls.worldPos.y,
-                    localDensity,
-                    CONFIG.sunElevation,
-                    flightControls.worldPos,
-                    camera.quaternion
+                    currentDensity,
+                    GLOBAL_CONFIG.sunElevation
                 );
 
                 const WRAP_PERIOD = 200000.0;
@@ -2326,19 +2211,15 @@
                 cloudMat.uniforms.uWorldOffset.value.set(offsetX, 0, offsetZ);
                 cloudMat.uniforms.uCameraY.value = flightControls.worldPos.y;
 
-                const phi = THREE.MathUtils.degToRad(90 - CONFIG.sunElevation);
-                const theta = THREE.MathUtils.degToRad(CONFIG.sunAzimuth);
+                const phi = THREE.MathUtils.degToRad(90 - GLOBAL_CONFIG.sunElevation);
+                const theta = THREE.MathUtils.degToRad(GLOBAL_CONFIG.sunAzimuth);
                 const sunDir = new THREE.Vector3(
                     Math.sin(phi) * Math.cos(theta),
                     Math.cos(phi),
                     Math.sin(phi) * Math.sin(theta)
                 ).normalize();
                 
-                const sunLightColor = new THREE.Color(
-                    1.0, 
-                    0.3 + 0.7 * Math.max(0, (CONFIG.sunElevation+5)/25), 
-                    0.1 + 0.9 * Math.max(0, (CONFIG.sunElevation+5)/25)
-                ).multiplyScalar(Math.sin(THREE.MathUtils.degToRad(Math.max(0, CONFIG.sunElevation+5))) + 0.1);
+                const sunLightColor = getSunLightColor(GLOBAL_CONFIG.sunElevation);
                 
                 cloudMat.uniforms.uSunDir.value.copy(sunDir);
                 cloudMat.uniforms.uSunColor.value.copy(sunLightColor);
@@ -2346,71 +2227,56 @@
                 cloudMat.uniforms.uInverseView.value.copy(camera.matrixWorld);
                 cloudMat.uniforms.uInverseProj.value.copy(camera.projectionMatrixInverse);
 
-                // --- TAA Camera Jitter ---
-                if (CONFIG.enableTAA) {
-                    const jitterX = (Math.random() - 0.5) / (window.innerWidth * CONFIG.resolution);
-                    const jitterY = (Math.random() - 0.5) / (window.innerHeight * CONFIG.resolution);
-                    camera.setViewOffset(window.innerWidth, window.innerHeight, jitterX * window.innerWidth, jitterY * window.innerHeight, window.innerWidth, window.innerHeight);
+                // auto-adjust marching steps for performance based on altitude
+                if (GLOBAL_CONFIG.autoQuality) {
+                    const altFactor = THREE.MathUtils.clamp(flightControls.worldPos.y / 15000, 0.0, 1.0);
+                    const steps = Math.round(THREE.MathUtils.lerp(GLOBAL_CONFIG.minSteps, GLOBAL_CONFIG.steps, 1.0 - altFactor));
+                    cloudMat.uniforms.uSteps.value = steps;
                 } else {
-                    camera.clearViewOffset();
+                    cloudMat.uniforms.uSteps.value = GLOBAL_CONFIG.steps;
                 }
 
-                // Update Camera Matrices after Jitter
-                camera.updateMatrixWorld();
-                camera.updateProjectionMatrix();
-                
                 const camDir = new THREE.Vector3();
                 camera.getWorldDirection(camDir);
                 const isSunVisible = camDir.dot(sunDir) > 0.0;
-                rayMat.uniforms.uSunVisible.value = isSunVisible;
 
                 if (isSunVisible) {
                     const sunWorld = camera.position.clone().add(sunDir.clone().multiplyScalar(10000));
                     sunWorld.project(camera);
-                    rayMat.uniforms.uSunPosScreen.value.set(sunWorld.x * 0.5 + 0.5, sunWorld.y * 0.5 + 0.5);
+                    const sx = sunWorld.x * 0.5 + 0.5;
+                    const sy = sunWorld.y * 0.5 + 0.5;
+                    const sz = sunWorld.z;
+                    const visibleOnScreen = sz > 0 && sx >= 0 && sx <= 1 && sy >= 0 && sy <= 1;
+                    rayMat.uniforms.uSunVisible.value = visibleOnScreen;
+                    if (visibleOnScreen) rayMat.uniforms.uSunPosScreen.value.set(sx, sy);
+                } else {
+                    rayMat.uniforms.uSunVisible.value = false;
                 }
 
-                // 1. Render Clouds
+                
+                if (terrainMesh) {
+                    updateTerrain(flightControls.worldPos.x, flightControls.worldPos.z);
+                    dirLight.position.copy(sunDir.clone().multiplyScalar(10000));
+                    dirLight.color.copy(sunLightColor);
+                    renderer.setRenderTarget(terrainTarget);
+                    renderer.render(worldScene, camera);
+                    compositeMat.uniforms.tTerrain.value = terrainTarget.texture;
+                }
+
+                // if clouds are disabled, render the world scene and skip cloud/post passes
+                if (!GLOBAL_CONFIG.enableClouds) {
+                    renderer.setRenderTarget(null);
+                    renderer.render(worldScene, camera);
+                    return;
+                }
+
+                // main cloud render
                 renderer.setRenderTarget(cloudTarget);
                 renderer.render(scene, dummyCam);
 
-                // 2. Denoise
-                postQuad.material = denoiseMat;
-                denoiseMat.uniforms.tDiffuse.value = cloudTarget.texture;
-                renderer.setRenderTarget(denoiseTarget);
-                renderer.render(postScene, dummyCam);
-
-                // 3. TAA / Temporal Upsampling
-                currentViewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-                
-                postQuad.material = taaMat;
-                taaMat.uniforms.tCurrent.value = denoiseTarget.texture;
-                taaMat.uniforms.tHistory.value = historyTarget.texture;
-                taaMat.uniforms.uInvViewProj.value.copy(currentViewProj).invert();
-                taaMat.uniforms.uPrevViewProj.value.copy(prevViewProj);
-                renderer.setRenderTarget(taaTarget);
-                renderer.render(postScene, dummyCam);
-
-                // 4. God Rays
-                postQuad.material = rayMat;
-                rayMat.uniforms.tDiffuse.value = taaTarget.texture;
-                renderer.setRenderTarget(rayTarget);
-                renderer.render(postScene, dummyCam);
-
-                // 5. Composite to Screen
-                postQuad.material = compositeMat;
-                compositeMat.uniforms.tColor.value = taaTarget.texture;
-                compositeMat.uniforms.tGodRays.value = rayTarget.texture;
-                renderer.setRenderTarget(null);
-                renderer.render(postScene, dummyCam);
-
-                // Swap History Buffers
-                const temp = historyTarget;
-                historyTarget = taaTarget;
-                taaTarget = temp;
-                
-                prevViewProj.copy(currentViewProj);
-                frameCount++;
+                runPostPass(denoiseMat, denoiseTarget, { tDiffuse: cloudTarget.texture });
+                runPostPass(rayMat, rayTarget, { tDiffuse: denoiseTarget.texture });
+                runPostPass(compositeMat, null, { tColor: denoiseTarget.texture, tGodRays: rayTarget.texture });
             }
 
             render();
