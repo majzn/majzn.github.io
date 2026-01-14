@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C89 Canvas Live Environment</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --panel-bg: #252526;
+            --text-color: #d4d4d4;
+            --accent: #007acc;
+            --error: #f48771;
+            --success: #89d185;
+            --border: #3e3e42;
+            --btn-hover: #4e4e52;
+            --header-height: 44px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: #333;
+            padding: 0 1rem;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            gap: 15px;
+        }
+
+        .header-group { display: flex; align-items: center; gap: 8px; }
+        .divider { width: 1px; height: 20px; background: var(--border); margin: 0 5px; }
+
+        button.btn {
+            background: #444;
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        button.btn:hover { background: var(--btn-hover); }
+        button.btn:active { transform: translateY(1px); }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .input-group input {
+            background: #252526;
+            border: 1px solid var(--border);
+            color: #fff;
+            width: 40px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            text-align: center;
+        }
+
+        .zoom-control { display: flex; align-items: center; gap: 5px; }
+        .zoom-val { font-family: monospace; min-width: 40px; text-align: center; font-size: 0.8rem;}
+
+        h1 { font-size: 1rem; margin: 0; font-weight: 600; color: #fff; letter-spacing: 0.5px; }
+        
+        .status { font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; font-weight: 500; min-width: 80px; text-align: center;}
+        .status.ok { color: var(--success); border: 1px solid rgba(137, 209, 133, 0.2); }
+        .status.err { color: var(--error); border: 1px solid rgba(244, 135, 113, 0.3); background: rgba(244, 135, 113, 0.1); }
+
+        .workspace {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - var(--header-height));
+            overflow: hidden;
+        }
+
+        .editor-container {
+            width: 50%; /* Initial width */
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+        }
+
+        .resizer {
+            width: 6px;
+            background: #2d2d2d;
+            border-left: 1px solid #000;
+            border-right: 1px solid #000;
+            cursor: col-resize;
+            transition: background 0.2s;
+            z-index: 10;
+        }
+        .resizer:hover { background: var(--accent); }
+
+        .preview-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #111;
+            position: relative;
+            min-width: 200px;
+        }
+
+        .CodeMirror {
+            flex: 1;
+            height: 100%;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image: 
+                linear-gradient(45deg, #1a1a1a 25%, transparent 25%), 
+                linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1a1a1a 75%), 
+                linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            overflow: auto; /* Enable scrolling if zoomed in large */
+            position: relative;
+            padding: 20px;
+        }
+
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            image-rendering: pixelated; 
+            outline: none;
+            background: #000;
+            transform-origin: center;
+        }
+
+        .overlay-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            pointer-events: none;
+            color: #ddd;
+            border: 1px solid #444;
+        }
+
+        .console-output {
+            height: 150px;
+            background: #111;
+            border-top: 1px solid var(--border);
+            padding: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            overflow-y: auto;
+            color: #ccc;
+        }
+        
+        .console-line { margin-bottom: 2px; border-bottom: 1px solid #222; word-wrap: break-word;}
+        .console-line.log { color: #ccc; }
+        .console-line.error { color: var(--error); background: rgba(255,0,0,0.1); }
+        .console-line.system { color: var(--accent); font-style: italic; }
+
+        /* Icon SVG styling */
+        .icon { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-group">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            <h1>C89 Canvas</h1>
+        </div>
+
+        <div class="header-group">
+            <button class="btn" onclick="saveCode()" title="Download .c file">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save
+            </button>
+            <button class="btn" onclick="document.getElementById('file-upload').click()" title="Open .c file">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                Open
+            </button>
+            <input type="file" id="file-upload" style="display: none" accept=".c,.txt,.cpp" onchange="loadCode(this)">
+            <div class="divider"></div>
+            <button class="btn" onclick="resetEnv()" title="Reset Time & State">
+                <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Reset
+            </button>
+        </div>
+
+        <div class="header-group">
+            <div class="input-group" title="Internal Resolution">
+                <span>Res:</span>
+                <input type="text" id="res-w" value="320">
+                <span>x</span>
+                <input type="text" id="res-h" value="240">
+                <button class="btn" onclick="applyResolution()">Set</button>
+            </div>
+            <div class="divider"></div>
+            <div class="zoom-control">
+                <span>Zoom:</span>
+                <button class="btn" onclick="changeZoom(-0.5)">-</button>
+                <span class="zoom-val" id="zoom-val">100%</span>
+                <button class="btn" onclick="changeZoom(0.5)">+</button>
+                <button class="btn" onclick="changeZoom(0)" title="Fit to container">Fit</button>
+            </div>
+        </div>
+        
+        <div id="status" class="status ok">Ready</div>
+    </header>
+
+    <div class="workspace" id="workspace">
+        <div class="editor-container" id="editor-pane">
+            <textarea id="code-editor"></textarea>
+        </div>
+        <div class="resizer" id="resizer"></div>
+        <div class="preview-container" id="preview-pane">
+            <div class="canvas-wrapper">
+                <canvas id="screen" width="320" height="240" tabindex="0"></canvas>
+                <div class="overlay-info">
+                    <span id="fps">0 FPS</span> | 
+                    <span id="res-disp">320x240</span>
+                </div>
+            </div>
+            <div class="console-output" id="console"></div>
+        </div>
+    </div>
+
+<script>
+const DEFAULT_CODE = `/* C89 Live Canvas - Enhanced
+  -------------------------
+  Controls:
+  - Header: Set resolution (internal) and Zoom (visual)
+  - Drag the bar between Code and Canvas to resize.
+  - Changes are auto-saved to your browser.
+  
+  Features:
+  - triangle(), hsv(), get_pixel(), key_pressed()
+  - Full Math lib (sin, cos, atan2...)
+*/
+
+float t = 0;
+// Global Arrays
+float star_x[100];
+float star_y[100];
+float star_s[100];
+
+void init() {
+    printf("Init Res: %dx%d", WIDTH, HEIGHT);
+    
+    // Initialize stars
+    for(int i=0; i<100; i++) {
+        star_x[i] = rand(0, WIDTH);
+        star_y[i] = rand(0, HEIGHT);
+        star_s[i] = rand(0.5, 3.0);
+    }
+}
+
+void update() {
+    // 1. Clear with deep space fade
+    rect(0, 0, WIDTH, HEIGHT, rgb(10, 10, 20));
+
+    // 2. Starfield
+    for(int i=0; i<100; i++) {
+        star_x[i] = star_x[i] - star_s[i];
+        if (star_x[i] < 0) {
+            star_x[i] = WIDTH;
+            star_y[i] = rand(0, HEIGHT);
+        }
+        
+        int b = (int)(star_s[i] * 80);
+        pixel((int)star_x[i], (int)star_y[i], rgb(b, b, b));
+    }
+
+    // 3. Interactive Shape
+    float cx = WIDTH / 2;
+    float cy = HEIGHT / 2;
+    
+    if (mouse_btn(MOUSE_LEFT)) {
+        cx = MOUSE_X;
+        cy = MOUSE_Y;
+    }
+
+    float r = 50 + sin(TIME * 5) * 10;
+    
+    // Rotating Triangle
+    float a1 = TIME; 
+    float a2 = TIME + 2.094;
+    float a3 = TIME + 4.188;
+    
+    int x1 = cx + cos(a1) * r; int y1 = cy + sin(a1) * r;
+    int x2 = cx + cos(a2) * r; int y2 = cy + sin(a2) * r;
+    int x3 = cx + cos(a3) * r; int y3 = cy + sin(a3) * r;
+
+    triangle(x1, y1, x2, y2, x3, y3, hsv(TIME * 40, 0.7, 1.0));
+    
+    // HUD
+    text(10, 10, "Drag center with Mouse!", rgb(255, 255, 0));
+    
+    if (key_pressed(KEY_SPACE)) {
+        printf("Spacebar Event at %.2f", TIME);
+    }
+}
+`;
+
+const State = {
+    canvas: null,
+    ctx: null,
+    imageData: null,
+    pixels: null,
+    width: 320,
+    height: 240,
+    zoom: 1.0,
+    mouse: { x: 0, y: 0, left: 0, right: 0, mid: 0, wheel: 0 },
+    prevMouse: { left: 0, right: 0, mid: 0 },
+    keys: new Uint8Array(256), 
+    prevKeys: new Uint8Array(256),
+    time: 0,
+    frame: 0,
+    startTime: Date.now(),
+    userInit: null,
+    userUpdate: null,
+    editor: null,
+    textQueue: [],
+    running: true
+};
+
+const USER_CONSTANTS = `
+    const KEY_BACKSPACE = 8; const KEY_TAB = 9; const KEY_ENTER = 13;
+    const KEY_SHIFT = 16; const KEY_CTRL = 17; const KEY_ALT = 18;
+    const KEY_PAUSE = 19; const KEY_CAPS = 20; const KEY_ESCAPE = 27;
+    const KEY_SPACE = 32; const KEY_PAGEUP = 33; const KEY_PAGEDOWN = 34;
+    const KEY_END = 35; const KEY_HOME = 36; const KEY_LEFT = 37;
+    const KEY_UP = 38; const KEY_RIGHT = 39; const KEY_DOWN = 40;
+    const KEY_INSERT = 45; const KEY_DELETE = 46;
+    const KEY_0 = 48; const KEY_1 = 49; const KEY_2 = 50; const KEY_3 = 51;
+    const KEY_4 = 52; const KEY_5 = 53; const KEY_6 = 54; const KEY_7 = 55;
+    const KEY_8 = 56; const KEY_9 = 57;
+    const KEY_A = 65; const KEY_B = 66; const KEY_C = 67; const KEY_D = 68;
+    const KEY_E = 69; const KEY_F = 70; const KEY_G = 71; const KEY_H = 72;
+    const KEY_I = 73; const KEY_J = 74; const KEY_K = 75; const KEY_L = 76;
+    const KEY_M = 77; const KEY_N = 78; const KEY_O = 79; const KEY_P = 80;
+    const KEY_Q = 81; const KEY_R = 82; const KEY_S = 83; const KEY_T = 84;
+    const KEY_U = 85; const KEY_V = 86; const KEY_W = 87; const KEY_X = 88;
+    const KEY_Y = 89; const KEY_Z = 90;
+    const MOUSE_LEFT = 0; const MOUSE_MIDDLE = 1; const MOUSE_RIGHT = 2;
+`;
+
+window.onload = function() {
+    State.editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+        mode: 'text/x-csrc',
+        theme: 'monokai',
+        lineNumbers: true,
+        autoCloseBrackets: true,
+        indentUnit: 4,
+        matchBrackets: true
+    });
+    
+    const savedCode = localStorage.getItem('c89_code');
+    State.editor.setValue(savedCode || DEFAULT_CODE);
+
+    State.canvas = document.getElementById('screen');
+    applyResolution();
+
+    setupInputListeners();
+    setupResizer();
+
+    State.editor.on('change', debounce(() => {
+        localStorage.setItem('c89_code', State.editor.getValue());
+        compileAndRun();
+    }, 800));
+    
+    compileAndRun();
+    requestAnimationFrame(renderLoop);
+};
+
+// --- CORE SYSTEM FUNCTIONS ---
+
+function applyResolution() {
+    const w = parseInt(document.getElementById('res-w').value) || 320;
+    const h = parseInt(document.getElementById('res-h').value) || 240;
+    State.width = w;
+    State.height = h;
+    State.canvas.width = w;
+    State.canvas.height = h;
+    
+    State.ctx = State.canvas.getContext('2d', { alpha: false });
+    State.imageData = State.ctx.createImageData(w, h);
+    State.pixels = new Uint32Array(State.imageData.data.buffer);
+    
+    document.getElementById('res-disp').innerText = `${w}x${h}`;
+    updateCanvasZoom();
+    resetEnv(); 
+    compileAndRun();
+}
+
+function changeZoom(delta) {
+    if (delta === 0) {
+        State.zoom = 1.0;
+    } else {
+        State.zoom += delta;
+        if (State.zoom < 0.5) State.zoom = 0.5;
+        if (State.zoom > 10.0) State.zoom = 10.0;
+    }
+    updateCanvasZoom();
+}
+
+function updateCanvasZoom() {
+    State.canvas.style.width = (State.width * State.zoom) + "px";
+    State.canvas.style.height = (State.height * State.zoom) + "px";
+    document.getElementById('zoom-val').innerText = Math.round(State.zoom * 100) + "%";
+}
+
+function resetEnv() {
+    State.startTime = Date.now();
+    State.frame = 0;
+    State.time = 0;
+    document.getElementById('console').innerHTML = "";
+    logSystem("System Reset.");
+    if(State.userInit) {
+        try { State.userInit(); } catch(e) { logError(e.message); }
+    }
+}
+
+function saveCode() {
+    const blob = new Blob([State.editor.getValue()], {type: "text/plain;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "c89_sketch.c";
+    a.click();
+}
+
+function loadCode(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        State.editor.setValue(e.target.result);
+        compileAndRun();
+    };
+    reader.readAsText(file);
+}
+
+// --- TRANSPILER & RUNTIME ---
+
+function transpileCToJS(cCode) {
+    let js = cCode;
+    js = js.replace(/^#include.*$/gm, '// included lib');
+    js = js.replace(/^#define\s+(\w+)\s+(.+)$/gm, 'const $1 = $2;');
+    
+    // 1. Array Declarations Fix: type name[size]; -> let name = new Array(size).fill(0);
+    js = js.replace(/\b(int|float|double|char|long|short|uint|unsigned int)\s+(\w+)\s*\[\s*([^\]]+)\s*\]\s*;/g, 'let $2 = new Array($3).fill(0);');
+
+    // 2. Function Declarations: void/int func(...) -> function func(...)
+    js = js.replace(/(void|int|float|double|char\*|char)\s+(\w+)\s*\(([^)]*)\)/g, 'function $2($3)');
+
+    // 3. Clean function parameters (remove types from args)
+    js = js.replace(/function\s+\w+\s*\(([^)]*)\)/g, (match, args) => {
+        const cleanArgs = args.replace(/\b(int|float|double|char|long|short|uint|unsigned int)\s+/g, '')
+                              .replace(/\bchar\*\s+/g, ''); 
+        return match.replace(args, cleanArgs);
+    });
+
+    // 4. Standard Variable Declarations
+    js = js.replace(/\buint\s+/g, 'let ');
+    js = js.replace(/\bunsigned int\s+/g, 'let ');
+    js = js.replace(/\b(int|float|double|char|long|short)\s+(?=\w)/g, 'let ');
+    js = js.replace(/\bchar\*\s+/g, 'let ');
+    
+    // 5. Casts removal
+    js = js.replace(/\((int|float|double|uint)\)/g, '');
+
+    const env = 'window._C89_ENV';
+    js = js.replace(/\bMOUSE_X\b/g, `${env}.MOUSE_X`);
+    js = js.replace(/\bMOUSE_Y\b/g, `${env}.MOUSE_Y`);
+    js = js.replace(/\bMOUSE_WHEEL\b/g, `${env}.MOUSE_WHEEL`);
+    js = js.replace(/\bTIME\b/g, `${env}.TIME`);
+    js = js.replace(/\bFRAME\b/g, `${env}.FRAME`);
+
+    return js;
+}
+
+function compileAndRun() {
+    const code = State.editor.getValue();
+    const statusEl = document.getElementById('status');
+
+    try {
+        const transpiled = transpileCToJS(code);
+        
+        const runtimeHeader = `
+            "use strict";
+            const { 
+                sin, cos, tan, asin, acos, atan, atan2, 
+                min, max, abs, sqrt, floor, ceil, round, 
+                random, PI, E, pow, log, exp 
+            } = Math;
+            ${USER_CONSTANTS}
+            function _format(fmt, ...args) {
+                if(!fmt) return "";
+                let i = 0;
+                try {
+                    return fmt.replace(/%[dfs.0-9]*[a-z]/g, (match) => {
+                        const val = args[i++];
+                        if(val===undefined) return match;
+                        if (match.includes('f') && typeof val === 'number') {
+                            const precision = match.match(/\.(\d+)f/);
+                            return precision ? val.toFixed(parseInt(precision[1])) : val;
+                        }
+                        return val;
+                    });
+                } catch(e) { return fmt; }
+            }
+        `;
+        
+        const finalScript = `
+            ${runtimeHeader}
+            ${transpiled}
+            return { 
+                init: (typeof init === 'function' ? init : null), 
+                update: (typeof update === 'function' ? update : null) 
+            };
+        `;
+
+        const createProgram = new Function(
+            'WIDTH', 'HEIGHT', 'pixels', 'printf', 'clear', 
+            'pixel', 'get_pixel', 'line', 'rect', 'stroke_rect', 'triangle',
+            'circle', 'fill_circle', 'text', 'text_width', 
+            'rgb', 'hsv', 'rand', 'key', 'key_pressed', 'mouse_btn', 'mouse_clicked',
+            finalScript
+        );
+
+        const api_printf = (fmt, ...args) => logToConsole(fmt, args);
+        
+        const program = createProgram(
+            State.width, State.height, State.pixels, api_printf, 
+            API.clear, API.pixel, API.get_pixel, API.line, API.rect, API.stroke_rect, API.triangle,
+            API.circle, API.fill_circle, API.text, API.text_width,
+            API.rgb, API.hsv, API.rand, API.key, API.key_pressed, API.mouse_btn, API.mouse_clicked
+        );
+
+        State.userInit = program.init;
+        State.userUpdate = program.update;
+
+        if (State.userInit) {
+            try { State.userInit(); } catch(e) { logError("Init: " + e.message); }
+        }
+
+        statusEl.textContent = "Compiled";
+        statusEl.className = "status ok";
+
+    } catch (e) {
+        statusEl.textContent = "Syntax Error";
+        statusEl.className = "status err";
+        logError(e.message);
+    }
+}
+
+const API = {
+    rgb: (r, g, b) => { return (255 << 24) | (b << 16) | (g << 8) | r; },
+    hsv: (h, s, v) => {
+        let r, g, b, i, f, p, q, t;
+        i = Math.floor(h * 6); f = h * 6 - i;
+        p = v * (1 - s); q = v * (1 - f * s); t = v * (1 - (1 - f) * s);
+        switch (i % 6) {
+            case 0: r = v, g = t, b = p; break;
+            case 1: r = q, g = v, b = p; break;
+            case 2: r = p, g = v, b = t; break;
+            case 3: r = p, g = q, b = v; break;
+            case 4: r = t, g = p, b = v; break;
+            case 5: r = v, g = p, b = q; break;
+        }
+        return API.rgb(Math.round(r * 255), Math.round(g * 255), Math.round(b * 255));
+    },
+    rand: (min, max) => { return Math.random() * (max - min) + min; },
+    key: (k) => { return window._C89_ENV.KEYS[k] ? 1 : 0; },
+    key_pressed: (k) => { return (window._C89_ENV.KEYS[k] && !State.prevKeys[k]) ? 1 : 0; },
+    mouse_btn: (b) => {
+        if (b === 0) return window._C89_ENV.MOUSE_L;
+        if (b === 1) return window._C89_ENV.MOUSE_M;
+        if (b === 2) return window._C89_ENV.MOUSE_R;
+        return 0;
+    },
+    mouse_clicked: (b) => {
+        let curr = 0, prev = 0;
+        if (b === 0) { curr = window._C89_ENV.MOUSE_L; prev = State.prevMouse.left; }
+        else if (b === 1) { curr = window._C89_ENV.MOUSE_M; prev = State.prevMouse.mid; }
+        else if (b === 2) { curr = window._C89_ENV.MOUSE_R; prev = State.prevMouse.right; }
+        return (curr && !prev) ? 1 : 0;
+    },
+    clear: (color) => { State.pixels.fill(color); },
+    pixel: (x, y, color) => {
+        x |= 0; y |= 0;
+        if (x < 0 || x >= State.width || y < 0 || y >= State.height) return;
+        State.pixels[y * State.width + x] = color;
+    },
+    get_pixel: (x, y) => {
+        x |= 0; y |= 0;
+        if (x < 0 || x >= State.width || y < 0 || y >= State.height) return 0;
+        return State.pixels[y * State.width + x];
+    },
+    line: (x0, y0, x1, y1, color) => {
+        x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0;
+        let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        let err = dx + dy, e2;
+        while (true) {
+            if (x0 >= 0 && x0 < State.width && y0 >= 0 && y0 < State.height) {
+                State.pixels[y0 * State.width + x0] = color;
+            }
+            if (x0 === x1 && y0 === y1) break;
+            e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+    },
+    rect: (x, y, w, h, color) => {
+        x |= 0; y |= 0; w |= 0; h |= 0;
+        for (let j = 0; j < h; j++) {
+            let py = y + j;
+            if (py < 0 || py >= State.height) continue;
+            for (let i = 0; i < w; i++) {
+                let px = x + i;
+                if (px < 0 || px >= State.width) continue;
+                State.pixels[py * State.width + px] = color;
+            }
+        }
+    },
+    stroke_rect: (x, y, w, h, color) => {
+        API.line(x, y, x + w, y, color); API.line(x, y + h, x + w, y + h, color);
+        API.line(x, y, x, y + h, color); API.line(x + w, y, x + w, y + h, color);
+    },
+    triangle: (x1, y1, x2, y2, x3, y3, color) => {
+        // Enforce integer truncation for coordinates
+        x1 |= 0; y1 |= 0; x2 |= 0; y2 |= 0; x3 |= 0; y3 |= 0;
+        
+        if (y1 > y2) { [x1, x2] = [x2, x1]; [y1, y2] = [y2, y1]; }
+        if (y1 > y3) { [x1, x3] = [x3, x1]; [y1, y3] = [y3, y1]; }
+        if (y2 > y3) { [x2, x3] = [x3, x2]; [y2, y3] = [y3, y2]; }
+        let dx12 = x2 - x1, dy12 = y2 - y1;
+        let dx13 = x3 - x1, dy13 = y3 - y1;
+        let dx23 = x3 - x2, dy23 = y3 - y2;
+        let g_dx12 = dy12 ? dx12 / dy12 : 0;
+        let g_dx13 = dy13 ? dx13 / dy13 : 0;
+        let g_dx23 = dy23 ? dx23 / dy23 : 0;
+        let sx1 = x1, sx2 = x1;
+        for (let y = y1; y < y2; y++) {
+            if (y >= 0 && y < State.height) {
+                let a = Math.min(sx1, sx2)|0, b = Math.max(sx1, sx2)|0;
+                if(a<0) a=0; if(b>=State.width) b=State.width-1;
+                for(let x=a; x<=b; x++) State.pixels[y * State.width + x] = color;
+            }
+            sx1 += g_dx12; sx2 += g_dx13;
+        }
+        sx1 = x2; sx2 = x1 + g_dx13 * (y2 - y1);
+        for (let y = y2; y <= y3; y++) {
+            if (y >= 0 && y < State.height) {
+                let a = Math.min(sx1, sx2)|0, b = Math.max(sx1, sx2)|0;
+                if(a<0) a=0; if(b>=State.width) b=State.width-1;
+                for(let x=a; x<=b; x++) State.pixels[y * State.width + x] = color;
+            }
+            sx1 += g_dx23; sx2 += g_dx13;
+        }
+    },
+    circle: (xc, yc, r, color) => {
+        xc |= 0; yc |= 0; r |= 0;
+        let x = 0, y = r, d = 3 - 2 * r;
+        const put = (x, y) => API.pixel(x, y, color);
+        while (y >= x) {
+            put(xc+x, yc+y); put(xc-x, yc+y); put(xc+x, yc-y); put(xc-x, yc-y);
+            put(xc+y, yc+x); put(xc-y, yc+x); put(xc+y, yc-x); put(xc-y, yc-x);
+            x++; if (d > 0) { y--; d = d + 4 * (x - y) + 10; } else d = d + 4 * x + 6;
+        }
+    },
+    fill_circle: (xc, yc, r, color) => {
+        xc |= 0; yc |= 0; r |= 0;
+        for(let dy = -r; dy <= r; dy++) {
+            for(let dx = -r; dx <= r; dx++) {
+                if(dx*dx + dy*dy <= r*r) API.pixel(xc + dx, yc + dy, color);
+            }
+        }
+    },
+    text: (x, y, str, color) => {
+        if (!State.textQueue) State.textQueue = [];
+        State.textQueue.push({x, y, str, color});
+    },
+    text_width: (str) => { return str.length * 7; }
+};
+
+window._C89_ENV = { TIME: 0, MOUSE_X: 0, MOUSE_Y: 0, MOUSE_WHEEL: 0, MOUSE_L: 0, MOUSE_M: 0, MOUSE_R: 0, FRAME: 0, KEYS: State.keys };
+
+function renderLoop() {
+    const now = Date.now();
+    const dt = (now - State.startTime) / 1000;
+    State.time = dt;
+    State.frame++;
+
+    window._C89_ENV.TIME = State.time;
+    window._C89_ENV.MOUSE_X = State.mouse.x;
+    window._C89_ENV.MOUSE_Y = State.mouse.y;
+    window._C89_ENV.MOUSE_WHEEL = State.mouse.wheel;
+    window._C89_ENV.MOUSE_L = State.mouse.left;
+    window._C89_ENV.MOUSE_M = State.mouse.mid;
+    window._C89_ENV.MOUSE_R = State.mouse.right;
+    window._C89_ENV.FRAME = State.frame;
+
+    if (State.userUpdate) {
+        try {
+            State.textQueue = [];
+            State.userUpdate();
+        } catch(e) { if (State.frame % 60 === 0) logError(e.message); }
+    }
+
+    State.ctx.putImageData(State.imageData, 0, 0);
+
+    if (State.textQueue) {
+        State.ctx.textBaseline = "top";
+        State.ctx.font = "12px monospace";
+        for (let t of State.textQueue) {
+            const r = t.color & 0xFF, g = (t.color >> 8) & 0xFF, b = (t.color >> 16) & 0xFF;
+            State.ctx.fillStyle = `rgb(${r},${g},${b})`;
+            State.ctx.fillText(t.str, t.x, t.y);
+        }
+    }
+    
+    State.mouse.wheel = 0;
+    State.prevKeys.set(State.keys);
+    State.prevMouse.left = State.mouse.left;
+    State.prevMouse.mid = State.mouse.mid;
+    State.prevMouse.right = State.mouse.right;
+
+    if (State.frame % 30 === 0) document.getElementById('fps').innerText = Math.round(1/dt * 1000) + " FPS";
+    requestAnimationFrame(renderLoop);
+}
+
+// --- UTILS & EVENT HANDLERS ---
+
+function setupInputListeners() {
+    const c = State.canvas;
+    c.addEventListener('contextmenu', e => e.preventDefault());
+    c.addEventListener('mousemove', (e) => {
+        const rect = c.getBoundingClientRect();
+        // Calculate scale based on actual displayed size (css size) vs internal resolution
+        const scaleX = State.width / rect.width;
+        const scaleY = State.height / rect.height;
+        State.mouse.x = Math.floor((e.clientX - rect.left) * scaleX);
+        State.mouse.y = Math.floor((e.clientY - rect.top) * scaleY);
+    });
+    c.addEventListener('mousedown', (e) => {
+        c.focus();
+        if (e.button === 0) State.mouse.left = 1;
+        if (e.button === 1) State.mouse.mid = 1;
+        if (e.button === 2) State.mouse.right = 1;
+    });
+    c.addEventListener('mouseup', (e) => {
+        if (e.button === 0) State.mouse.left = 0;
+        if (e.button === 1) State.mouse.mid = 0;
+        if (e.button === 2) State.mouse.right = 0;
+    });
+    c.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        State.mouse.wheel = Math.sign(e.deltaY) * -1;
+    }, { passive: false });
+    c.addEventListener('mouseleave', () => {
+        State.mouse.left = 0; State.mouse.mid = 0; State.mouse.right = 0;
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if(document.activeElement !== State.editor.getInputField()) {
+            State.keys[e.keyCode] = 1;
+            if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) e.preventDefault();
+        }
+    });
+    window.addEventListener('keyup', (e) => { State.keys[e.keyCode] = 0; });
+}
+
+function setupResizer() {
+    const resizer = document.getElementById('resizer');
+    const editorPane = document.getElementById('editor-pane');
+    let isResizing = false;
+
+    resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        document.body.style.cursor = 'col-resize';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const newWidth = (e.clientX / window.innerWidth) * 100;
+        if (newWidth > 10 && newWidth < 90) {
+            editorPane.style.width = newWidth + '%';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+            State.editor.refresh(); // Refresh CodeMirror
+        }
+    });
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
+}
+
+function logSystem(msg) {
+    const el = document.getElementById('console');
+    const line = document.createElement('div');
+    line.className = 'console-line system';
+    line.innerText = "[SYS] " + msg;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+}
+
+function logToConsole(fmt, args) {
+    const el = document.getElementById('console');
+    const line = document.createElement('div');
+    line.className = 'console-line log';
+    let formatted = fmt;
+    let argIndex = 0;
+    try {
+        formatted = formatted.replace(/%[0-9.]*[dfsu]/g, (match) => {
+            let val = args[argIndex++];
+            if (val === undefined) return match;
+            if (typeof val === 'number' && match.includes('f')) {
+                 if (match.includes('.')) {
+                     const p = match.match(/\.(\d+)/)[1];
+                     return val.toFixed(parseInt(p));
+                 }
+                 return val.toFixed(4);
+            }
+            return val;
+        });
+    } catch(e) { formatted = fmt + " [FMT ERR]"; }
+    line.innerText = "> " + formatted;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+}
+
+function logError(msg) {
+    const el = document.getElementById('console');
+    const line = document.createElement('div');
+    line.className = 'console-line error';
+    line.innerText = "ERR: " + msg;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+}
+</script>
+</body>
+</html>
