@@ -23,6 +23,7 @@
     input[type="range"] { width: 100%; background: #333; height: 4px; border-radius: 2px; -webkit-appearance: none; }
     input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #bbb; border-radius: 50%; cursor: pointer; }
     input[type="color"] { width: 100%; height: 25px; border: none; background: none; cursor: pointer; }
+    input[type="number"] { width: 60px; background: #222; border: 1px solid #555; color: #eee; padding: 2px 5px; }
     
     select { background:#333; color:#eee; border:1px solid #555; width:100%; padding: 4px; border-radius: 2px; }
 
@@ -40,6 +41,9 @@
     .grad-stop { display: flex; align-items: center; margin-bottom: 4px; }
     .grad-stop input[type=color] { width: 30px; height: 20px; margin-right: 5px; }
     .grad-stop input[type=range] { flex-grow: 1; }
+    
+    .dim-inputs { display: flex; gap: 10px; }
+    .dim-inputs div { flex: 1; }
 </style>
 </head>
 <body>
@@ -89,13 +93,18 @@
         <h3>Performance & Physics</h3>
         
         <div class="control-group">
-            <label>Base Resolution (Vertical)</label>
-            <select id="sel-res">
-                <option value="128">128 (Ultra Fast)</option>
-                <option value="256">256 (Balanced)</option>
-                <option value="512" selected>512 (High Quality)</option>
-                <option value="1024">1024 (Extreme)</option>
-            </select>
+            <label>Grid Dimensions (Pixels)</label>
+            <div class="dim-inputs">
+                <div>
+                    <label>Width</label>
+                    <input type="number" id="inp-width" value="256" step="32" min="32" max="2048">
+                </div>
+                <div>
+                    <label>Height</label>
+                    <input type="number" id="inp-height" value="256" step="32" min="32" max="2048">
+                </div>
+                <button id="btn-resize" style="margin-top:16px;">Set</button>
+            </div>
         </div>
 
         <div class="control-group">
@@ -447,9 +456,8 @@
 
 <script>
     const CONFIG = {
-        baseRes: 512, // Vertical Resolution
-        simWidth: 512,
-        simHeight: 512,
+        simWidth: 256,
+        simHeight: 256,
         aspectRatio: 1.0,
         substeps: 5,
         timeScale: 1.0,
@@ -607,11 +615,13 @@
     }
     
     function updateObstacles() {
+        // Ensure obstacle canvas matches SIM dimensions, NOT window dimensions
         if(obstacleCanvas.width !== CONFIG.simWidth || obstacleCanvas.height !== CONFIG.simHeight) {
             obstacleCanvas.width = CONFIG.simWidth;
             obstacleCanvas.height = CONFIG.simHeight;
         }
         
+        // Clear with Black (Empty)
         obsCtx.fillStyle = 'black';
         obsCtx.fillRect(0, 0, CONFIG.simWidth, CONFIG.simHeight);
         
@@ -622,39 +632,47 @@
         obsCtx.fillRect(0, 0, 1, CONFIG.simHeight);
         obsCtx.fillRect(CONFIG.simWidth-1, 0, 1, CONFIG.simHeight);
 
+        // Shapes
         obsCtx.strokeStyle = 'white'; obsCtx.lineWidth = 2;
         EDITOR.shapes.forEach(shape => {
             if(shape.points.length < 2) return;
             obsCtx.beginPath();
             
-            // Simplified Mapping: 
-            // World Y=0 (Bottom) -> Canvas Y=0 (Top)
-            // World Y=1 (Top) -> Canvas Y=H (Bottom)
-            // This inversion happens implicitly because canvas 0 is top.
-            // And texture upload without flipY means Canvas 0 -> Texture Bottom (V=0).
-            // So World 0 -> Texture 0. Correct.
+            // Coordinate Mapping Logic:
+            // 1. World Space is 0..1 (Normalized)
+            // 2. Canvas Space is Top-Left (0,0)
+            // 3. WebGL Texture Space is Bottom-Left (0,0) IF flipY is false.
+            // 4. We want visual Top to correspond to Physics Top.
+            // 5. Solution: Invert Y when drawing to canvas (1-y).
+            //    Then upload with flipY=true so Canvas Top becomes Texture Top.
             
             let x0 = (shape.points[0].x / CONFIG.aspectRatio) * CONFIG.simWidth;
-            let y0 = shape.points[0].y * CONFIG.simHeight;
+            let y0 = (1.0 - shape.points[0].y) * CONFIG.simHeight;
             
             obsCtx.moveTo(x0, y0);
             
             for(let i=1; i<shape.points.length; i++) {
                 let xi = (shape.points[i].x / CONFIG.aspectRatio) * CONFIG.simWidth;
-                let yi = shape.points[i].y * CONFIG.simHeight;
+                let yi = (1.0 - shape.points[i].y) * CONFIG.simHeight;
                 obsCtx.lineTo(xi, yi);
             }
             if(shape.closed) { obsCtx.closePath(); obsCtx.fill(); } else { obsCtx.stroke(); }
         });
 
         gl.bindTexture(gl.TEXTURE_2D, obstacleTexture);
-        // FIX: Remove UNPACK_FLIP_Y_WEBGL to match coordinate system and Add CLAMP_TO_EDGE for NPOT textures
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); 
+        
+        // CRITICAL FIX: Enable FlipY so Canvas Top aligns with Texture Top
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
+        
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, obstacleCanvas);
+        
+        // Reset state
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); 
     }
 
     const blitParams = {
@@ -678,11 +696,10 @@
         
         screenToWorld: (x, y) => {
             const rect = canvas.getBoundingClientRect();
-            // Map 0..width to 0..aspectRatio
-            // Map 0..height to 0..1 (Canvas coords)
+            // Map Mouse (0=Top) to World (1=Top)
             return { 
                 x: (x - rect.left) / rect.width * CONFIG.aspectRatio, 
-                y: (y - rect.top) / rect.height 
+                y: 1.0 - (y - rect.top) / rect.height 
             };
         },
         snap: (val) => { return EDITOR.snapping ? Math.round(val / EDITOR.gridSize) * EDITOR.gridSize : val; },
@@ -771,10 +788,10 @@
 
     function worldToScreen(p) {
         // Map 0..aspect to 0..width
-        // Map 0..1 to 0..height
+        // Map 1..0 to 0..height (Canvas Y=0 is top)
         return { 
             x: (p.x / CONFIG.aspectRatio) * uiCanvas.width, 
-            y: p.y * uiCanvas.height 
+            y: (1.0 - p.y) * uiCanvas.height 
         }; 
     }
 
@@ -843,10 +860,9 @@
 
     const pixelBuf = new Float32Array(4); 
     function readTextureValue(fbo, x, y) {
-        // x in 0..aspect, y in 0..1
-        // Normalize to 0..1 for lookup
+        // x in 0..aspect, y in 0..1 (World)
         let u = x / CONFIG.aspectRatio;
-        let v = 1.0 - y; // Invert lookup because canvas Y is opposite to WebGL Y
+        let v = y; // Match world Y to texture V (bottom-left origin)
         if(u < 0 || u > 1 || v < 0 || v > 1) return [0,0,0,0];
         
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.fbo);
@@ -859,7 +875,7 @@
     
     function updateProbe(wx, wy) {
         document.getElementById('data-x').innerText = wx.toFixed(2);
-        document.getElementById('data-y').innerText = (1.0-wy).toFixed(2);
+        document.getElementById('data-y').innerText = wy.toFixed(2);
         let d = readTextureValue(density.read, wx, wy);
         let v = readTextureValue(velocity.read, wx, wy);
         let p = readTextureValue(pressure.read, wx, wy);
@@ -898,7 +914,7 @@
                 
                 // UVs
                 let u = sx / uiCanvas.width;
-                let v = sy / uiCanvas.height; // No invert for read
+                let v = 1.0 - (sy / uiCanvas.height); // Flip for read (Top=1)
                 
                 const ix = Math.floor(u * w);
                 const iy = Math.floor(v * h);
@@ -912,7 +928,7 @@
                     const nx = vx / speed;
                     const ny = vy / speed;
                     const ex = sx + nx * arrowLen;
-                    const ey = sy + ny * arrowLen; // No invert
+                    const ey = sy - ny * arrowLen; // Flip Y for canvas
                     
                     const t = Math.min(speed / 2.0, 1.0);
                     const hue = (1.0 - t) * 240; 
@@ -925,7 +941,7 @@
                     ctx.lineTo(ex, ey);
                     ctx.stroke();
                     
-                    const angle = Math.atan2(ny, nx);
+                    const angle = Math.atan2(-ny, nx);
                     ctx.beginPath();
                     ctx.moveTo(ex, ey);
                     ctx.lineTo(ex - headLen * Math.cos(angle - Math.PI/6), ey - headLen * Math.sin(angle - Math.PI/6));
@@ -1030,12 +1046,7 @@
             EDITOR.emitters.forEach(e => {
                 gl.uniform1i(gl.getUniformLocation(p, "uTarget"), 0);
                 gl.uniform1f(gl.getUniformLocation(p, "aspectRatio"), CONFIG.aspectRatio);
-                // Invert Y because shader expects vUv (0-1) and point is in editor coords (0-1)
-                // But advect moves things based on vUv.
-                // Shader: vUv - point.
-                // If we upload with NO FLIP, texture V=0 is Canvas Top (0).
-                // Editor Y=0 is Canvas Top.
-                // So Editor coords match Texture coords directly.
+                // Normalized coordinate correction handled here
                 gl.uniform2f(gl.getUniformLocation(p, "point"), e.x / CONFIG.aspectRatio, e.y);
                 gl.uniform3f(gl.getUniformLocation(p, "color"), CONFIG.inflow, 0.0, 0.0);
                 gl.uniform1f(gl.getUniformLocation(p, "radius"), 0.0005);
@@ -1110,6 +1121,8 @@
         if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
             canvas.width = window.innerWidth; canvas.height = window.innerHeight;
             uiCanvas.width = window.innerWidth; uiCanvas.height = window.innerHeight;
+            // Update aspect ratio for display scaling, but don't reset grid resolution
+            CONFIG.aspectRatio = canvas.width / canvas.height;
         }
         step(CONFIG.dt);
         drawUI();
@@ -1124,24 +1137,14 @@
         updateGradient();
     }
     
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        uiCanvas.width = window.innerWidth;
-        uiCanvas.height = window.innerHeight;
-        
-        let aspect = canvas.width / canvas.height;
-        CONFIG.aspectRatio = aspect;
-        
-        CONFIG.simHeight = CONFIG.baseRes;
-        CONFIG.simWidth = Math.round(CONFIG.baseRes * aspect);
-        
+    function resizeSimulation() {
         density = createDoubleFBO(CONFIG.simWidth, CONFIG.simHeight);
         velocity = createDoubleFBO(CONFIG.simWidth, CONFIG.simHeight);
         pressure = createDoubleFBO(CONFIG.simWidth, CONFIG.simHeight);
         divergence = createFBO(CONFIG.simWidth, CONFIG.simHeight);
         curl = createFBO(CONFIG.simWidth, CONFIG.simHeight);
         
+        // Recreate texture object for obstacles
         obstacleTexture = gl.createTexture();
         updateObstacles();
     }
@@ -1184,10 +1187,13 @@
         bind('sl-max', 'oninput', (e) => { CONFIG.valMax = parseFloat(e.target.value); if(!CONFIG.autoScale) currentMax = CONFIG.valMax; });
         bind('sl-substeps', 'oninput', (e) => { CONFIG.substeps = parseInt(e.target.value); document.getElementById('val-substeps').innerText = CONFIG.substeps; });
         bind('sl-tscale', 'oninput', (e) => { CONFIG.timeScale = parseFloat(e.target.value); document.getElementById('val-tscale').innerText = CONFIG.timeScale; });
-        bind('sel-res', 'onchange', (e) => {
-            CONFIG.baseRes = parseInt(e.target.value);
-            resize();
+        
+        bind('btn-resize', 'onclick', () => {
+            CONFIG.simWidth = parseInt(document.getElementById('inp-width').value);
+            CONFIG.simHeight = parseInt(document.getElementById('inp-height').value);
+            resizeSimulation();
         });
+
         for(let i=1; i<=5; i++) {
             bind(`g-c${i}`, 'oninput', updateGradient);
             bind(`g-p${i}`, 'oninput', updateGradient);
@@ -1201,8 +1207,14 @@
             });
         });
 
-        window.addEventListener('resize', resize);
-        resize(); // Initial sizing
+        // Setup Initial State
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        uiCanvas.width = window.innerWidth;
+        uiCanvas.height = window.innerHeight;
+        CONFIG.aspectRatio = canvas.width / canvas.height;
+        
+        resizeSimulation(); // Create FBOs with default 256x256
         initScene();
         loop();
     });
