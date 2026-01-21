@@ -9,10 +9,12 @@
     --bg: #121212; --panel: #1a1a1a; --border: #333;
     --text: #e0e0e0; --text-dim: #888;
     --accent: #00bcd4; --accent-hover: #26c6da;
-    --c-wire: #546e7a; --c-head: #00e5ff; --c-tail: #006064;
-    --c-gen: #76ff03; --c-note: #d500f9; --c-diode: #ff9100;
-    --c-delay: #ff4081; --c-logic: #ffff00; --c-if: #ffffff;
-    --c-wall: #616161;
+    /* subtle, readable tints for cell types */
+    --c-wire: #40535a; --c-head: #00e5ff; --c-tail: #66d0d9;
+    --c-gen: #8de55a; --c-note: #c56fff; --c-diode: #ffb76b;
+    --c-delay: #ff79a8; --c-logic: #ffd54f; --c-if: #bec8ff;
+    --c-register: #6fb3b3; --c-split: #a1c97a; --c-cross: #e27a7a;
+    --c-wall: #6b6b6b;
 }
 * { box-sizing: border-box; outline: none; }
 body {
@@ -164,6 +166,8 @@ input[type="text"] { user-select: text; cursor: text; padding: 8px; width: 100%;
         <div style="width:1px; height:20px; background:#333; margin:0 4px"></div>
         <button id="btn-play" class="primary">▶ Play</button>
         <button id="btn-step">Step</button>
+        <button id="btn-record">● Record</button>
+        <button id="btn-stop-record" class="danger" style="display:none">■ Stop & Save</button>
     </div>
 </header>
 
@@ -184,6 +188,9 @@ input[type="text"] { user-select: text; cursor: text; padding: 8px; width: 100%;
                         <button class="tool-btn" data-tool="if"><span class="color-dot" style="color:var(--c-if);background:var(--c-if)"></span>If</button>
                         <button class="tool-btn" data-tool="gen"><span class="color-dot" style="color:var(--c-gen);background:var(--c-gen)"></span>Clock</button>
                         <button class="tool-btn" data-tool="note"><span class="color-dot" style="color:var(--c-note);background:var(--c-note)"></span>Synth</button>
+                        <button class="tool-btn" data-tool="register"><span class="color-dot" style="color:var(--c-gen);background:var(--c-gen)"></span>Register</button>
+                        <button class="tool-btn" data-tool="split"><span class="color-dot" style="color:var(--c-split);background:var(--c-split)"></span>Split</button>
+                        <button class="tool-btn" data-tool="cross"><span class="color-dot" style="color:var(--c-cross);background:var(--c-cross)"></span>Cross</button>
                         <button class="tool-btn" data-tool="wall"><span class="color-dot" style="color:var(--c-wall);background:var(--c-wall)"></span>Wall</button>
                         <button class="tool-btn" data-tool="erase" style="color:#ff5252"><span>✕</span>Erase</button>
                     </div>
@@ -224,9 +231,9 @@ input[type="text"] { user-select: text; cursor: text; padding: 8px; width: 100%;
 
 <script>
 (() => {
-const T = { EMPTY:0, WIRE:1, HEAD:2, TAIL:3, WALL:4, GEN:5, NOTE:6, DIODE:7, DELAY:8, LOGIC:9, IF:10 };
+const T = { EMPTY:0, WIRE:1, HEAD:2, TAIL:3, WALL:4, GEN:5, NOTE:6, DIODE:7, DELAY:8, LOGIC:9, IF:10, REGISTER:11, SPLIT:12, CROSS:13 };
 // Nearly monochrome palette with subtle tints for differentiation
-const C = { [T.EMPTY]:'#0c0c0c', [T.WIRE]:'#141414', [T.HEAD]:'#232323', [T.TAIL]:'#1b1b1b', [T.GEN]:'#191919', [T.NOTE]:'#20161f', [T.DIODE]:'#1a140f', [T.DELAY]:'#161215', [T.LOGIC]:'#141414', [T.IF]:'#101010', [T.WALL]:'#0f0f0f' };
+const C = { [T.EMPTY]:'#0c0c0c', [T.WIRE]:'#40535a', [T.HEAD]:'#00e5ff', [T.TAIL]:'#66d0d9', [T.GEN]:'#8de55a', [T.NOTE]:'#c56fff', [T.DIODE]:'#ffb76b', [T.DELAY]:'#ff79a8', [T.LOGIC]:'#ffd54f', [T.IF]:'#bec8ff', [T.REGISTER]:'#6fb3b3', [T.SPLIT]:'#a1c97a', [T.CROSS]:'#e27a7a', [T.WALL]:'#6b6b6b' };
 const F = {'C2':65.41,'C#2':69.3,'D2':73.4,'D#2':77.7,'E2':82.4,'F2':87.3,'F#2':92.5,'G2':98,'G#2':103.8,'A2':110,'A#2':116.5,'B2':123.4,'C3':130.8,'C#3':138.5,'D3':146.8,'D#3':155.5,'E3':164.8,'F3':174.6,'F#3':185,'G3':196,'G#3':207.6,'A3':220,'A#3':233,'B3':246.9,'C4':261.6,'C#4':277.1,'D4':293.6,'D#4':311.1,'E4':329.6,'F4':349.2,'F#4':369.9,'G4':392,'G#4':415.3,'A4':440,'A#4':466.1,'B4':493.8,'C5':523.2};
 // Helper: convert hex to rgba
 function hexToRgba(hex, a){ if(!hex) return `rgba(255,255,255,${a})`; const h = hex.replace('#',''); const bigint = parseInt(h.length===3? h.split('').map(c=>c+c).join(''):h,16); const r=(bigint>>16)&255,g=(bigint>>8)&255,b=bigint&255; return `rgba(${r},${g},${b},${a})`; }
@@ -237,7 +244,7 @@ const mkSlider = (lbl, val, min, max, step, cb) => {
     r.oninput = () => { n.value = r.value; cb(+r.value); }; n.oninput = () => { r.value = n.value; cb(+n.value); }; return d;
 };
 class AudioSys {
-    constructor() { this.ctx=null;this.out=null;this.verb=null;this.verbGain=null;this.delay=null;this.delayGain=null;this.comp=null;this.samples={};this.rawSamples={};this.waves={}; }
+    constructor() { this.ctx=null;this.out=null;this.verb=null;this.verbGain=null;this.delay=null;this.delayGain=null;this.comp=null;this.samples={};this.rawSamples={};this.waves={}; this.recording=false; this.recordBuffers=[]; this.recordNode=null; this.recChannels=2; }
     async init() {
         if(this.ctx)return; this.ctx=new(window.AudioContext||window.webkitAudioContext)();
         this.comp=this.ctx.createDynamicsCompressor();this.comp.connect(this.ctx.destination);
@@ -248,6 +255,112 @@ class AudioSys {
     }
     mkImpulse() { const sr=this.ctx.sampleRate,b=this.ctx.createBuffer(2,sr*2.5,sr);for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<b.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/b.length,3)} this.verb.buffer=b; }
     mkWaves() { const R=new Float32Array(64),I=new Float32Array(64); for(let n=1;n<64;n+=2)R[n]=1/n;this.waves['organ']=this.ctx.createPeriodicWave(R,I); R.fill(0);I.fill(0);for(let n=1;n<64;n++)I[n]=1/n;this.waves['saw']=this.ctx.createPeriodicWave(R,I); R.fill(0);I.fill(0);for(let n=1;n<64;n+=2)I[n]=1/n;this.waves['square']=this.ctx.createPeriodicWave(R,I); }
+
+    // --- Recording Support (capture PCM and export WAV) ---
+    async startRecording() {
+        if(!this.ctx) await this.init();
+        if(this.recording) return false;
+        this.recordBuffers = [[], []];
+        this.recording = true;
+        const channels = this.recChannels || 2;
+        const bufferSize = 4096;
+        try{
+            this.recordNode = this.ctx.createScriptProcessor(bufferSize, channels, channels);
+            this.recordNode.onaudioprocess = (e) => {
+                if(!this.recording) return;
+                for(let ch=0; ch<channels; ch++){
+                    const input = e.inputBuffer.getChannelData(ch);
+                    // copy chunk
+                    this.recordBuffers[ch].push(new Float32Array(input));
+                }
+            };
+            // Tap the main output gain node
+            this.out.connect(this.recordNode);
+            // Connect to destination to keep node alive
+            this.recordNode.connect(this.ctx.destination);
+        }catch(err){ console.warn('Recording setup failed', err); this.recording=false; return false; }
+        return true;
+    }
+
+    stopRecording() {
+        if(!this.recording) return null;
+        this.recording = false;
+        if(this.recordNode){ try{ this.out.disconnect(this.recordNode); }catch(e){} try{ this.recordNode.disconnect(this.ctx.destination); }catch(e){} this.recordNode.onaudioprocess = null; this.recordNode = null; }
+        // flatten channels
+        const channels = this.recChannels || 2;
+        const chanData = [];
+        let len = 0;
+        for(let ch=0; ch<channels; ch++){
+            chanData[ch] = this._flatten(this.recordBuffers[ch]);
+            if(!len) len = chanData[ch].length;
+        }
+        // ensure all channels same length
+        for(let ch=0; ch<channels; ch++){ if(chanData[ch].length < len){ const tmp = new Float32Array(len); tmp.set(chanData[ch]); chanData[ch] = tmp; } }
+        // interleave
+        const interleaved = new Float32Array(len * channels);
+        for(let i=0;i<len;i++){
+            for(let ch=0; ch<channels; ch++){
+                interleaved[i*channels + ch] = chanData[ch][i] || 0;
+            }
+        }
+        const blob = this._encodeWAV(interleaved, this.ctx.sampleRate, channels);
+        this.recordBuffers = [];
+        return blob;
+    }
+
+    _flatten(chunks){ if(!chunks||chunks.length===0) return new Float32Array(0); let total=0; for(let i=0;i<chunks.length;i++) total += chunks[i].length; const out=new Float32Array(total); let off=0; for(let i=0;i<chunks.length;i++){ out.set(chunks[i], off); off += chunks[i].length; } return out; }
+
+    _encodeWAV(interleaved, sampleRate, numChannels){
+        const bytesPerSample = 2;
+        const blockAlign = numChannels * bytesPerSample;
+        const buffer = new ArrayBuffer(44 + interleaved.length * bytesPerSample);
+        const view = new DataView(buffer);
+        function writeString(v, offset, s){ for(let i=0;i<s.length;i++) v.setUint8(offset+i, s.charCodeAt(i)); }
+        // RIFF identifier
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + interleaved.length * bytesPerSample, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true); // subchunk1 size
+        view.setUint16(20, 1, true); // PCM
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * blockAlign, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, bytesPerSample * 8, true);
+        writeString(view, 36, 'data');
+        view.setUint32(40, interleaved.length * bytesPerSample, true);
+        // write PCM samples
+        let offset = 44;
+        for(let i=0;i<interleaved.length;i++){
+            let s = Math.max(-1, Math.min(1, interleaved[i]));
+            view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            offset += 2;
+        }
+        return new Blob([view], { type: 'audio/wav' });
+    }
+
+    // --- Sample editing helpers ---
+    async exportBufferToWav(buffer){
+        const numChannels = buffer.numberOfChannels; const len = buffer.length; const interleaved = new Float32Array(len * numChannels);
+        for(let i=0;i<len;i++){
+            for(let ch=0; ch<numChannels; ch++) interleaved[i*numChannels + ch] = buffer.getChannelData(ch)[i] || 0;
+        }
+        return this._encodeWAV(interleaved, this.ctx.sampleRate, numChannels);
+    }
+
+    async trimSample(name, startSec, endSec){
+        if(!this.samples[name]) return false; const src = this.samples[name]; const sr = src.sampleRate; const s = Math.max(0, Math.floor(startSec*sr)), e = Math.min(src.length, Math.floor(endSec*sr)); const newLen = Math.max(0, e - s); const nb = this.ctx.createBuffer(src.numberOfChannels, newLen, sr);
+        for(let ch=0; ch<src.numberOfChannels; ch++){ const inD = src.getChannelData(ch); const outD = nb.getChannelData(ch); outD.set(inD.subarray(s,e)); }
+        this.samples[name] = nb; const blob = await this.exportBufferToWav(nb); const fr = await new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob); }); this.rawSamples[name] = fr; try{ document.dispatchEvent(new CustomEvent('samples-updated',{detail:{name}})); }catch(e){}; return true;
+    }
+
+    async normalizeSample(name){
+        if(!this.samples[name]) return false; const src = this.samples[name]; let peak = 0; for(let ch=0; ch<src.numberOfChannels; ch++){ const d=src.getChannelData(ch); for(let i=0;i<d.length;i++) peak = Math.max(peak, Math.abs(d[i])); }
+        if(peak < 1e-6) return false; const gain = 0.99 / peak; const nb = this.ctx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
+        for(let ch=0; ch<src.numberOfChannels; ch++){ const inD = src.getChannelData(ch); const outD = nb.getChannelData(ch); for(let i=0;i<inD.length;i++) outD[i] = Math.max(-1, Math.min(1, inD[i]*gain)); }
+        this.samples[name] = nb; const blob = await this.exportBufferToWav(nb); const fr = await new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob); }); this.rawSamples[name] = fr; try{ document.dispatchEvent(new CustomEvent('samples-updated',{detail:{name}})); }catch(e){}; return true;
+    }
     async loadFile(n,b) {
         if(!this.ctx) await this.init();
         if(this.ctx.state==='suspended') await this.ctx.resume();
@@ -343,7 +456,19 @@ class App {
         this.selRect=null; this.dragState=null; this.clip=null; this.lastMouse={x:0,y:0}; this.library=[]; this.history=[]; this.histIdx=-1;
         // Camera for pan/zoom (world coords in pixels)
         this.cam={x:0,y:0,zoom:1,vx:0,vy:0};
-        this.hover=null;
+        this.hover={x:0,y:0};
+        // keyboard caret & selection anchor for keyboard navigation
+        this.caret = { x: 0, y: 0 };
+        this.selAnchor = null;
+        // redraw throttling flag
+        this._needRedraw = false;
+        this._drawReq = null;
+        // keyboard caret & selection anchor for keyboard navigation
+        this.caret = { x: 0, y: 0 };
+        this.selAnchor = null;
+        // redraw throttling flag
+        this._needRedraw = false;
+        this._drawReq = null;
         this.defs={
             gen:{rate:8,burst:0},diode:{rot:0,ret:T.DIODE},delay:{time:4,ret:T.DELAY},logic:{func:'OR',rot:0,ret:T.LOGIC},
             if:{
@@ -389,7 +514,10 @@ class App {
         // panning state for right-drag camera movement
         on('btn-init','click',async()=>{await this.aud.init();this.aud.out.gain.value=this.global.vol;this.aud.verbGain.gain.value=this.global.verb;this.aud.delayGain.gain.value=this.global.delay;document.getElementById('splash').style.display='none'});
         on('btn-play','click',e=>{this.playing=!this.playing;e.target.innerHTML=this.playing?'⏹ Stop':'▶ Play';e.target.classList.toggle('active');if(this.playing)this.runTick()});
-        on('btn-step','click',()=>{this.step();this.draw()});on('btn-clear','click',()=>{this.grid.d.forEach(c=>{c.t=T.EMPTY;c.p={}});this.selRect=null;this.saveState();this.draw()});on('btn-reset','click',()=>{this.grid.d.forEach(c=>{if(c.t===T.HEAD||c.t===T.TAIL)c.t=c.p.ret||T.WIRE});this.draw()});on('btn-undo','click',()=>this.undo());on('btn-redo','click',()=>this.redo());
+        on('btn-step','click',()=>{this.step();this.draw()});
+        on('btn-record','click',async()=>{ const st=document.getElementById('stat-status'); if(st) st.innerText='Recording...'; document.getElementById('btn-record').style.display='none'; document.getElementById('btn-stop-record').style.display='inline-flex'; try{ await this.aud.startRecording(); }catch(e){ console.error('Start record failed', e); this.showAlert('Recording failed'); document.getElementById('btn-record').style.display='inline-flex'; document.getElementById('btn-stop-record').style.display='none'; if(st) st.innerText='Ready'; } });
+        on('btn-stop-record','click',async()=>{ try{ const blob = this.aud.stopRecording(); if(!blob){ this.showAlert('Not recording'); return; } const now = new Date(); const fn = `automata-${now.toISOString().replace(/[:.]/g,'-')}.wav`; const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fn; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); document.getElementById('btn-record').style.display='inline-flex'; document.getElementById('btn-stop-record').style.display='none'; const st=document.getElementById('stat-status'); if(st) st.innerText=`Saved ${fn}`; }catch(e){ console.error('Stop record failed', e); this.showAlert('Failed to save recording'); } });
+        on('btn-clear','click',()=>{this.grid.d.forEach(c=>{c.t=T.EMPTY;c.p={}});this.selRect=null;this.saveState();this.requestDraw()});on('btn-reset','click',()=>{this.grid.d.forEach(c=>{if(c.t===T.HEAD||c.t===T.TAIL)c.t=c.p.ret||T.WIRE});this.requestDraw()});on('btn-undo','click',()=>this.undo());on('btn-redo','click',()=>this.redo());
         on('btn-save-proj','click',()=>this.exportProject());on('btn-load-proj','click',()=>document.getElementById('proj-file-in').click());on('proj-file-in','change',e=>{if(e.target.files[0])this.loadProject(e.target.files[0])});
         on('btn-lib-save','click',()=>this.saveToLib());on('btn-save-confirm','click',()=>this.finalizeSave());on('btn-save-cancel','click',()=>document.getElementById('save-modal').style.display='none');on('btn-alert-ok','click',()=>document.getElementById('alert-modal').style.display='none');
         on('synth-file-in','change',e=>{
@@ -412,7 +540,7 @@ class App {
                 }
                 // Clear input so same file can be re-selected later
                 e.target.value = '';
-                this.draw();
+                this.requestDraw();
             });
         });
         
@@ -426,7 +554,7 @@ class App {
         cvs.onmousedown=e=>{
             // Right button starts panning
             if(e.button===2){ panning = {sx:e.clientX, sy:e.clientY, ox:this.cam.x, oy:this.cam.y, lastTime:performance.now(), lastX:e.clientX, lastY:e.clientY}; document.body.style.cursor='grabbing'; return; }
-            const p=this.gPos(e);
+            const p=this.gPos(e); this.caret = {x:p.x,y:p.y}; this.hover = {x:p.x,y:p.y};
             if(this.dragState&&this.dragState.mode==='paste'){
                 this.saveState(); this.setRect(this.dragState.current.x,this.dragState.current.y,this.dragState.buffer);
                 this.selRect={x:this.dragState.current.x,y:this.dragState.current.y,w:this.dragState.buffer[0].length,h:this.dragState.buffer.length};
@@ -448,9 +576,9 @@ class App {
                     const x=Math.min(this.dragState.start.x,p.x), y=Math.min(this.dragState.start.y,p.y), w=Math.abs(this.dragState.start.x-p.x)+1, h=Math.abs(this.dragState.start.y-p.y)+1;
                     this.selRect={x,y,w,h};
                 }
-                this.draw();
-            } else if(e.buttons&&this.tool!=='select' && !panning){this.paint(p.x,p.y); if(this.sel||this.selRect){ this.sel=null; this.selRect=null; this.insp(); } this.draw()}
-            else if(this.dragState && this.dragState.mode === 'paste') { this.dragState.current = p; this.draw(); }
+                this.requestDraw();
+            } else if(e.buttons&&this.tool!=='select' && !panning){this.paint(p.x,p.y); if(this.sel||this.selRect){ this.sel=null; this.selRect=null; this.insp(); } this.requestDraw()}
+            else if(this.dragState && this.dragState.mode === 'paste') { this.dragState.current = p; this.requestDraw(); }
         };
         cvs.onmouseup=e=>{
             if(this.dragState){
@@ -509,7 +637,7 @@ class App {
                 const now = performance.now(); const dt = Math.max(1, now - panning.lastTime);
                 this.cam.vx = (e.clientX - panning.lastX)/dt; this.cam.vy = (e.clientY - panning.lastY)/dt;
                 panning.lastTime = now; panning.lastX = e.clientX; panning.lastY = e.clientY;
-                this.draw();
+                this.requestDraw();
             }
         });
         window.addEventListener('mouseup', e=>{ if(panning){ panning=null; document.body.style.cursor=''; } });
@@ -533,7 +661,7 @@ class App {
             this.cam.x = worldX - sx / this.cam.zoom;
             this.cam.y = worldY - sy / this.cam.zoom;
 
-            e.preventDefault(); this.draw();
+            e.preventDefault(); this.requestDraw();
         }, { passive: false });
     }
     
@@ -571,12 +699,17 @@ class App {
         // expand grid as needed
         if(x>=this.grid.w || y>=this.grid.h) this.expandGridToInclude(x,y);
         let t=T.EMPTY, p={};
-        const m={ wire:[T.WIRE,{ret:T.WIRE,instant:false}], head:[T.HEAD,{ret:T.WIRE}], tail:[T.TAIL,{ret:T.WIRE}], wall:[T.WALL], gen:[T.GEN,{...this.defs.gen}], diode:[T.DIODE,{...this.defs.diode}], note:[T.NOTE,{...this.defs.note}], delay:[T.DELAY,{...this.defs.delay}], logic:[T.LOGIC,{...this.defs.logic}], if:[T.IF,JSON.parse(JSON.stringify(this.defs.if))], erase:[T.EMPTY] };
+        const m={ wire:[T.WIRE,{ret:T.WIRE,instant:false}], head:[T.HEAD,{ret:T.WIRE}], tail:[T.TAIL,{ret:T.WIRE}], wall:[T.WALL], gen:[T.GEN,{...this.defs.gen}], diode:[T.DIODE,{...this.defs.diode}], note:[T.NOTE,{...this.defs.note}], delay:[T.DELAY,{...this.defs.delay}], logic:[T.LOGIC,{...this.defs.logic}], if:[T.IF,JSON.parse(JSON.stringify(this.defs.if))], register:[T.REGISTER,{val:0,mode:'counter',max:255,wrap:true}], split:[T.SPLIT,{}], cross:[T.CROSS,{}], erase:[T.EMPTY] };
         if(m[this.tool]) this.put(x,y,m[this.tool][0], m[this.tool][1]||{});
     }
 
     loop() { requestAnimationFrame(()=>this.loop()); }
-    runTick() { if(this.playing){ this.step(); this.draw(); setTimeout(()=>this.runTick(), 60000/this.bpm/4); } }
+
+    requestDraw(){ if(this._needRedraw) return; this._needRedraw = true; this._drawReq = requestAnimationFrame(()=>{ this._needRedraw = false; this._drawReq = null; this.draw(); }); }
+
+    requestDraw(){ if(this._needRedraw) return; this._needRedraw = true; this._drawReq = requestAnimationFrame(()=>{ this._needRedraw = false; this._drawReq = null; this.draw(); }); }
+
+    runTick() { if(this.playing){ this.step(); this.requestDraw(); setTimeout(()=>this.runTick(), 60000/this.bpm/4); } }
     
     // --- INSPECTOR UI ---
     insp(){
@@ -656,6 +789,9 @@ class App {
             });
         }
         else if(t===T.DIODE){const p=mkGrp('Diode'),s=document.createElement('select');['Up','Right','Down','Left'].forEach((l,i)=>{const o=document.createElement('option');o.value=i;o.text=l;if(d.rot==i)o.selected=true;s.append(o)});s.onchange=e=>update('rot',+e.target.value);mkRow(p,'Dir',s)}
+        else if(t===T.REGISTER){ const p=mkGrp('Register'); const m=document.createElement('select'); ['counter','bit'].forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k.toUpperCase(); if(d.mode===k)o.selected=true; m.append(o)}); m.onchange=e=>update('mode',e.target.value); mkRow(p,'Mode',m); p.append(mkSlider('Initial', d.val||0, 0, 255, 1, v=>update('val',v))); p.append(mkSlider('Max', d.max||255, 1, 65535, 1, v=>update('max',v))); const cw=document.createElement('input'); cw.type='checkbox'; cw.checked=!!d.wrap; cw.onchange=e=>update('wrap',e.target.checked); mkRow(p,'Wrap',cw); const info=document.createElement('div'); info.style.color='#aaa'; info.style.fontSize='11px'; info.innerText='Left: INCR, Right: DECR, Up: READ => emits DOWN if nonzero'; p.append(info); }
+        else if(t===T.SPLIT){ const p=mkGrp('Splitter'); const info=document.createElement('div'); info.style.color='#aaa'; info.style.fontSize='11px'; info.innerText='Fans an incoming pulse out to all neighbours (use for fan-out).'; p.append(info); }
+        else if(t===T.CROSS){ const p=mkGrp('Cross'); const info=document.createElement('div'); info.style.color='#aaa'; info.style.fontSize='11px'; info.innerText='Non-interfering crossing: allows E-W and N-S signals to pass independently.'; p.append(info); }
         else if(t===T.NOTE){
             const p1=mkGrp('Source');
             const sSrc=document.createElement('select'); ['osc','sample','custom'].forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k.toUpperCase();if(d.src===k)o.selected=true;sSrc.append(o)});
@@ -663,10 +799,47 @@ class App {
             if(d.src==='sample') {
                 const sFile=document.createElement('select'), keys=Object.keys(this.aud.samples);
                 if(keys.length) keys.forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k;if(d.file===k)o.selected=true;sFile.append(o)}); else sFile.innerHTML='<option>No files</option>';
-                sFile.onchange=e=>update('file',e.target.value); 
+                sFile.onchange=e=>{ update('file',e.target.value); this.inspSig=''; this.insp(); };
                 const btnImp = document.createElement('button'); btnImp.innerText = 'Import Audio'; btnImp.style.width='100%'; btnImp.onclick = () => document.getElementById('synth-file-in').click();
                 const dSamp = document.createElement('div'); dSamp.className='control-item full'; dSamp.style.gap='8px'; dSamp.append(sFile, btnImp); mkRow(p1, 'File', dSamp);
                 const iLoop=document.createElement('input'); iLoop.type='checkbox'; iLoop.checked=d.loop; iLoop.onchange=e=>update('loop',e.target.checked); mkRow(p1,'Loop',iLoop);
+
+                // Sample editing tools
+                const sampleTools = document.createElement('div'); sampleTools.className='control-item';
+                if(d.file && this.aud.samples[d.file]){
+                    const dur = this.aud.samples[d.file].duration || 0;
+                    const durLabel = document.createElement('div'); durLabel.style.color='#aaa'; durLabel.style.fontSize='12px'; durLabel.innerText = `Duration: ${dur.toFixed(2)}s`;
+                    sampleTools.append(durLabel);
+                    const rs = document.createElement('div'); rs.style.display='flex'; rs.style.gap='8px';
+                    const startIn = document.createElement('input'); startIn.type='range'; startIn.min=0; startIn.max=dur; startIn.step=0.01; startIn.value=0; startIn.style.flex='1';
+                    const endIn = document.createElement('input'); endIn.type='range'; endIn.min=0; endIn.max=dur; endIn.step=0.01; endIn.value=dur; endIn.style.flex='1';
+                    const startLabel = document.createElement('div'); startLabel.style.width='48px'; startLabel.style.fontSize='11px'; startLabel.style.color='#ddd'; startLabel.innerText = '0.00s';
+                    const endLabel = document.createElement('div'); endLabel.style.width='48px'; endLabel.style.fontSize='11px'; endLabel.style.color='#ddd'; endLabel.innerText = `${dur.toFixed(2)}s`;
+                    startIn.oninput = (ev)=>{ startLabel.innerText = parseFloat(ev.target.value).toFixed(2)+'s'; if(parseFloat(ev.target.value)>parseFloat(endIn.value)) endIn.value=ev.target.value; };
+                    endIn.oninput = (ev)=>{ endLabel.innerText = parseFloat(ev.target.value).toFixed(2)+'s'; if(parseFloat(ev.target.value)<parseFloat(startIn.value)) startIn.value=ev.target.value; };
+                    rs.append(startLabel, startIn, endIn, endLabel);
+                    sampleTools.append(rs);
+                    const btnRow = document.createElement('div'); btnRow.style.display='flex'; btnRow.style.gap='8px';
+                    const btnTrim = document.createElement('button'); btnTrim.className='primary'; btnTrim.style.flex='1'; btnTrim.innerText='Trim'; btnTrim.onclick = async ()=>{
+                        const s = parseFloat(startIn.value); const e = parseFloat(endIn.value);
+                        const stLbl = document.getElementById('stat-status'); if(stLbl) stLbl.innerText = 'Trimming...';
+                        const ok = await this.aud.trimSample(d.file, s, e);
+                        if(ok){ if(stLbl) stLbl.innerText = 'Trim complete'; this.inspSig=''; this.insp(); } else { if(stLbl) stLbl.innerText = 'Trim failed'; this.showAlert('Trim failed'); }
+                    };
+                    const btnNorm = document.createElement('button'); btnNorm.innerText='Normalize'; btnNorm.onclick = async ()=>{
+                        const stLbl = document.getElementById('stat-status'); if(stLbl) stLbl.innerText = 'Normalizing...';
+                        const ok = await this.aud.normalizeSample(d.file);
+                        if(ok){ if(stLbl) stLbl.innerText = 'Normalized'; this.inspSig=''; this.insp(); } else { if(stLbl) stLbl.innerText = 'Normalize failed'; this.showAlert('Normalize failed'); }
+                    };
+                    const btnExport = document.createElement('button'); btnExport.innerText='Export WAV'; btnExport.onclick = async ()=>{
+                        const buf = this.aud.samples[d.file]; if(!buf){ this.showAlert('No buffer'); return; }
+                        const blob = await this.aud.exportBufferToWav(buf); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${d.file.replace(/\.[^.]+$/,'')||'sample'}.wav`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+                    };
+                    btnRow.append(btnTrim, btnNorm, btnExport); sampleTools.append(btnRow);
+                } else {
+                    const info = document.createElement('div'); info.style.color='#777'; info.style.fontSize='12px'; info.innerText = 'No sample selected'; sampleTools.append(info);
+                }
+                p1.append(sampleTools);
             } else {
                 const sWave=document.createElement('select'), ws=d.src==='custom'?Object.keys(this.aud.waves):['sine','square','sawtooth','triangle'];
                 ws.forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k;if(d.wave===k)o.selected=true;sWave.append(o)});
@@ -819,80 +992,36 @@ class App {
                     }
                 }
             }
-            else if(c.t===T.IF) {
-                // Determine active inputs
-                let inputActive = false;
-                let activeInputs = 0;
-                let validSides = 0;
-
-                if(c.p.sides) {
-                    c.p.sides.forEach((side, idx) => {
-                        if(side.type === 'input') {
-                            validSides++;
-                            const d = dirs[idx];
-                            if (this.at(x+d[0], y+d[1]).t === T.HEAD) activeInputs++;
-                        }
-                    });
+            else if(c.t===T.SPLIT) {
+                // Fan-out: when any adjacent cell is HEAD, emit HEAD to all neighbors (except walls)
+                let incoming=false;
+                for(let d of dirs) if(this.at(x+d[0], y+d[1]).t === T.HEAD) incoming=true;
+                if(incoming){
+                    for(let d of dirs){
+                        const nx=x+d[0], ny=y+d[1], ni=ny*this.grid.w+nx;
+                        if(nx>=0&&nx<this.grid.w&&ny>=0&&ny<this.grid.h){ const nc=this.grid.d[ni]; if(nc.t!==T.WALL) { this.grid.b[ni].t = T.HEAD; if(nc.t===T.NOTE) this.aud.play(nc.p); } }
+                    }
                 }
-                
-                if (c.p.mode === 'countdown') {
-                    let reset = false, decrement = false;
-                    c.p.sides.forEach((s,idx)=>{
-                        if(s.type==='input'){
-                            const d=dirs[idx]; if(this.at(x+d[0],y+d[1]).t===T.HEAD){
-                                if(c.p.inputs[idx].rst) reset=true;
-                                if(c.p.inputs[idx].dec) decrement=true;
-                            }
-                        }
-                    });
-                    if(reset) n.p.val = c.p.limit;
-                    else if(decrement && c.p.val > 0) n.p.val = c.p.val - 1;
-
-                    if(n.p.val === 0 && c.p.val > 0) inputActive = true; 
-                } else {
-                    const logic = c.p.logic || 'OR';
-                    if (logic === 'OR') inputActive = activeInputs > 0;
-                    else if (logic === 'AND') inputActive = activeInputs === validSides && validSides > 0;
-                    else if (logic === 'XOR') inputActive = activeInputs === 1;
-                }
-
-                if(inputActive) {
-                    c.p.sides.forEach((side, idx) => {
-                        if(side.type === 'output') {
-                            let fire = false;
-                            if (c.p.mode === 'countdown') {
-                                fire = true; // Countdown reached 0
-                            }
-                            else if (side.mode === 'toggle') {
-                                n.p.sides[idx].val = (side.val + 1);
-                                if (n.p.sides[idx].val >= side.limit) {
-                                    n.p.sides[idx].val = 0;
-                                    n.p.sides[idx].state = !side.state;
-                                }
-                                if(n.p.sides[idx].state) fire = true;
-                            } 
-                            else if (side.mode === 'random') {
-                                fire = Math.random() < (1/side.limit);
-                            }
-                            else { // Modulo
-                                n.p.sides[idx].val = (side.val + 1) % side.limit;
-                                if (n.p.sides[idx].val === 0) fire = true;
-                            }
-
-                            if (fire) {
-                                const d = dirs[idx];
-                                const ni = (y+d[1])*this.grid.w + (x+d[0]);
-                                if(ni>=0 && ni<this.grid.d.length) {
-                                    const nc = this.grid.d[ni];
-                                    if(nc.t!==T.WALL && nc.t!==T.EMPTY && nc.t!==T.TAIL && nc.t!==T.HEAD) {
-                                        this.grid.b[ni].t = T.HEAD;
-                                        if(nc.t===T.NOTE) this.aud.play(nc.p);
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
+            }
+            else if(c.t===T.CROSS) {
+                // Non-interfering crossing: pass east-west and north-south independently
+                // east-west
+                if(this.at(x-1,y).t===T.HEAD) { const ni=y*this.grid.w+(x+1); if(this.grid.d[ni] && this.grid.d[ni].t!==T.WALL) this.grid.b[ni].t=T.HEAD; }
+                if(this.at(x+1,y).t===T.HEAD) { const ni=y*this.grid.w+(x-1); if(this.grid.d[ni] && this.grid.d[ni].t!==T.WALL) this.grid.b[ni].t=T.HEAD; }
+                // north-south
+                if(this.at(x,y-1).t===T.HEAD) { const ni=(y+1)*this.grid.w+x; if(this.grid.d[ni] && this.grid.d[ni].t!==T.WALL) this.grid.b[ni].t=T.HEAD; }
+                if(this.at(x,y+1).t===T.HEAD) { const ni=(y-1)*this.grid.w+x; if(this.grid.d[ni] && this.grid.d[ni].t!==T.WALL) this.grid.b[ni].t=T.HEAD; }
+            }
+            else if(c.t===T.REGISTER) {
+                // Simple register/counter: left=INCR, right=DECR, up=READ->emit to down if nonzero
+                let inc=false, dec=false, read=false;
+                if(this.at(x-1,y).t===T.HEAD) inc=true;
+                if(this.at(x+1,y).t===T.HEAD) dec=true;
+                if(this.at(x,y-1).t===T.HEAD) read=true;
+                n.p.val = (n.p.val==null? (c.p.val||0) : n.p.val);
+                if(inc){ let nv = (n.p.val||0) + 1; if(c.p.wrap) nv = nv % (c.p.max||256); n.p.val = nv; }
+                if(dec){ let nv = (n.p.val||0) - 1; const mxc = c.p.max||256; if(c.p.wrap) nv = (nv + mxc) % mxc; else nv = Math.max(0,nv); n.p.val = nv; }
+                if(read){ if((n.p.val||0) !== 0){ const ni=(y+1)*this.grid.w + x; if(ni>=0 && ni<this.grid.d.length){ const nc=this.grid.d[ni]; if(nc.t!==T.WALL) { this.grid.b[ni].t = T.HEAD; if(nc.t===T.NOTE) this.aud.play(nc.p); } } } }
             }
             else if(c.t===T.WIRE || c.t===T.NOTE) {
                 let heads=0, blockedHeads=0;
@@ -943,9 +1072,8 @@ class App {
         const g = ctx.createLinearGradient(0,0,0,ch);
         g.addColorStop(0,'#070708'); g.addColorStop(1,'#0b0b0c');
         ctx.fillStyle = g; ctx.fillRect(0,0,cw,ch);
-        // subtle grid texture (screen-space)
-        ctx.fillStyle='rgba(255,255,255,0.01)';
-        for(let gx=10;gx<cw;gx+=20) for(let gy=10;gy<ch;gy+=20) ctx.fillRect(gx-1,gy-1,2,2);
+        // drawing of grid lines is done in world-space below (aligned with cells)
+        
 
         // world transform for cells and selections (include DPR)
         ctx.save();
@@ -958,6 +1086,26 @@ class App {
         const top = Math.floor(this.cam.y / this.sz) - 1;
         const right = Math.ceil((this.cam.x + (cw)/this.cam.zoom) / this.sz) + 1;
         const bottom = Math.ceil((this.cam.y + (ch)/this.cam.zoom) / this.sz) + 1;
+
+        // World-aligned faint grid lines for clarity
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+        ctx.lineWidth = Math.max(1, 1 / this.cam.zoom);
+        ctx.beginPath();
+        const gx0 = Math.max(0, left), gx1 = Math.min(this.grid.w, right);
+        for(let gx=gx0; gx<=gx1; gx++){
+            const xPos = gx * this.sz;
+            ctx.moveTo(xPos, top*this.sz);
+            ctx.lineTo(xPos, bottom*this.sz);
+        }
+        const gy0 = Math.max(0, top), gy1 = Math.min(this.grid.h, bottom);
+        for(let gy=gy0; gy<=gy1; gy++){
+            const yPos = gy * this.sz;
+            ctx.moveTo(left*this.sz, yPos);
+            ctx.lineTo(right*this.sz, yPos);
+        }
+        ctx.stroke();
+        ctx.restore();
 
         for(let y=Math.max(0,top); y<Math.min(this.grid.h,bottom); y++){
             for(let x=Math.max(0,left); x<Math.min(this.grid.w,right); x++){
@@ -988,58 +1136,75 @@ class App {
     drawCell(xx, yy, c, alpha) {
         const ctx=this.ctx; ctx.globalAlpha=alpha;
         const x = xx, y = yy, s = this.sz;
-        const cx = x + 2, cy = y + 2, cw = s-4, ch = s-4, r = Math.max(4, Math.floor(s*0.3));
         const gx = Math.round(x / this.sz), gy = Math.round(y / this.sz);
-        const same = (dx,dy) => { const n = this.at(gx+dx, gy+dy); return n && n.t === c.t; };
+        const pad = Math.max(1, Math.floor(s * 0.08));
+        const innerX = x + pad, innerY = y + pad, innerS = s - pad*2;
         const col = C[c.t] || '#151515';
 
-        // Base shape
+        // luminance helper for text contrast
+        const lum = (hex) => { const h = hex.replace('#',''); const bi = parseInt(h.length===3? h.split('').map(c=>c+c).join(''):h,16); const r=(bi>>16)&255,g=(bi>>8)&255,b=bi&255; return (0.2126*r+0.7152*g+0.0722*b)/255; };
+
         ctx.save();
-        // outer soft shadow for neumorphic lift
-        ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
-        // fill for central rounded rect
-        const path = new Path2D();
-        const drawRounded = (px,py,pw,ph,rad)=>{ path.moveTo(px+rad,py); path.arcTo(px+pw,py,px+pw,py+ph,rad); path.arcTo(px+pw,py+ph,px,py+ph,rad); path.arcTo(px,py+ph,px,py,rad); path.arcTo(px,py,px+pw,py,rad); };
-        drawRounded(cx,cy,cw,ch,r);
-        ctx.fillStyle = col; ctx.fill(path);
-        ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        // HEAD/TAIL show solid colored tile for clarity
+        if(c.t===T.HEAD || c.t===T.TAIL){
+            ctx.fillStyle = hexToRgba(col, 1);
+            ctx.fillRect(innerX, innerY, innerS, innerS);
+            ctx.strokeStyle = hexToRgba(col, 0.95);
+            ctx.lineWidth = Math.max(1, Math.floor(s * 0.06));
+            ctx.strokeRect(innerX + 0.5, innerY + 0.5, innerS - 1, innerS - 1);
+        } else {
+            // subtle tinted fill + colored border
+            ctx.fillStyle = hexToRgba(col, 0.14);
+            ctx.fillRect(innerX, innerY, innerS, innerS);
+            ctx.strokeStyle = hexToRgba(col, 0.9);
+            ctx.lineWidth = Math.max(1, Math.floor(s * 0.06));
+            ctx.strokeRect(innerX + 0.5, innerY + 0.5, innerS - 1, innerS - 1);
+        }
 
-        // connectors for adjacent same-type cells (left,right,up,down)
-        ctx.fillStyle = col;
-        const connW = Math.max(4, Math.round(s*0.3));
-        const connH = s - 4;
-        const connY = y + 2;
-        if(same(-1,0)) ctx.fillRect(x, connY, connW, connH);
-        if(same(1,0)) ctx.fillRect(x + s - connW, connY, connW, connH);
-        if(same(0,-1)) ctx.fillRect(x + 2, y, s - 4, connW);
-        if(same(0,1)) ctx.fillRect(x + 2, y + s - connW, s - 4, connW);
-
-        // subtle top highlight (embossed)
-        const grad = ctx.createLinearGradient(0, y, 0, y+20);
-        grad.addColorStop(0, 'rgba(255,255,255,0.05)'); grad.addColorStop(1, 'rgba(0,0,0,0.12)');
-        ctx.fillStyle = grad; ctx.fill(path);
-
-        // inner shadow / edge for embossed look
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; ctx.stroke(path);
-
-        // pulse glow
-        const cxC = x + s/2, cyC = y + s/2;
+        // pulse glow (simplified)
         if(c.p && c.p._pulse && c.p._pulse>0){
             const v = c.p._pulse/6; const colr = c.p._pulseCol || '#ffffff';
-            const pr = Math.max(12, Math.round(s * 1.2));
+            const pr = Math.max(8, Math.round(s * (1 + v)));
+            const cxC = innerX + innerS/2, cyC = innerY + innerS/2;
             const rg = ctx.createRadialGradient(cxC,cyC,0,cxC,cyC,pr);
             rg.addColorStop(0, hexToRgba(colr, 0.18 * v)); rg.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(cxC,cyC,pr,0,Math.PI*2); ctx.fill();
         }
-        // active indicator for HEAD/TAIL (subtle)
-        if(c.t===T.HEAD){ ctx.fillStyle='rgba(255,255,255,0.03)'; ctx.beginPath(); ctx.arc(cxC,cyC,Math.max(3,Math.round(s*0.25)),0,Math.PI*2); ctx.fill(); }
 
-        // small label for NOTE
-        if(c.t===T.NOTE){ ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font=Math.max(8,Math.round(s*0.35))+'px sans-serif'; ctx.textAlign='center'; ctx.fillText(c.p.pitch || '', cxC, cyC+Math.round(s*0.12)); }
+        // symbol for quick identification
+        let sym = '';
+        switch(c.t){
+            case T.WIRE: sym = ''; break;
+            case T.HEAD: sym = 'H'; break;
+            case T.TAIL: sym = 'T'; break;
+            case T.GEN: sym = 'G'; break;
+            case T.NOTE: sym = '♪'; break;
+            case T.DIODE: sym = '►'; break;
+            case T.DELAY: sym = '⧖'; break;
+            case T.LOGIC: sym = 'L'; break;
+            case T.IF: sym = '?'; break;
+            case T.REGISTER: sym = String(c.p.val||0); break;
+            case T.SPLIT: sym = 'Y'; break;
+            case T.CROSS: sym = 'X'; break;
+            case T.WALL: sym = '#'; break;
+            default: sym = '';
+        }
+        if(sym){
+            // pick contrast-aware text color
+            const textColor = lum(col) > 0.65 ? '#000' : 'rgba(255,255,255,0.95)';
+            ctx.fillStyle = textColor;
+            ctx.font = Math.max(10, Math.floor(innerS * 0.55)) + 'px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(sym, innerX + innerS/2, innerY + innerS/2);
+        }
 
-        // hover highlight
-        if(this.hover && this.hover.x===gx && this.hover.y===gy){ ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1.5; ctx.stroke(path); }
+        // hover highlight (simple outline)
+        if(this.hover && this.hover.x===gx && this.hover.y===gy){
+            ctx.strokeStyle='rgba(255,255,255,0.14)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(innerX+0.5, innerY+0.5, innerS-1, innerS-1);
+        }
+
         ctx.restore(); ctx.globalAlpha=1;
     }
 }
