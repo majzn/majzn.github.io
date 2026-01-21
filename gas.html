@@ -33,6 +33,13 @@
     .status-ok { color: #4ade80; font-size:10px; margin-top:5px; }
     .status-err { color: #f87171; font-size:10px; margin-top:5px; }
 
+    /* Selection visuals */
+    .selection-rect { position: absolute; border: 1px dashed #3b82f6; background: rgba(59,130,246,0.06); pointer-events:none; }
+    .selected-point { background: #f59e0b; }
+    #ctx-menu { position: absolute; display: none; background: rgba(25,25,25,0.98); border: 1px solid #333; color: #eee; padding: 6px; border-radius: 4px; z-index: 10000; }
+    #ctx-menu button { display:block; width:100%; text-align:left; padding:6px 8px; background:transparent; border:none; color:#eee; }
+    #ctx-menu button:hover { background:#333; }
+
     .data-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
     .data-label { color: #888; }
     .data-val { color: #fff; }
@@ -44,6 +51,9 @@
     
     .dim-inputs { display: flex; gap: 10px; }
     .dim-inputs div { flex: 1; }
+    
+    #view-controls { display: flex; gap: 5px; margin-bottom: 5px; }
+    #view-controls button { flex: 1; text-align: center; }
 </style>
 </head>
 <body>
@@ -53,11 +63,22 @@
 
 <div id="ui-layer">
     <div id="toolbar" class="panel">
+        <h3>View</h3>
+        <div id="view-controls">
+            <button id="btn-fit" title="Fit to Screen">Fit View</button>
+        </div>
+        <div class="hint" style="margin-bottom:10px;">
+            Scroll to Zoom<br>Middle-Click Drag to Pan
+        </div>
+
         <h3>Tools</h3>
         <button id="btn-select" class="active">Select / Edit (V)</button>
         <button id="btn-draw-poly">Draw Polygon (P)</button>
         <button id="btn-draw-rect">Draw Rectangle (R)</button>
+        <button id="btn-draw-circ">Draw Circle (C)</button>
         <button id="btn-emitter">Place Emitter (E)</button>
+        <button id="btn-move">Move Selection (M)</button>
+        
         <div class="control-group" style="margin-top: 10px;">
             <label>Snapping (Grid)</label>
             <input type="checkbox" id="chk-snap" checked> <span style="font-size:11px">Enabled</span>
@@ -67,9 +88,13 @@
             <button id="btn-clear-geo" style="background:#522;">Clear All Geometry</button>
         </div>
         <div class="hint">
-            Draw: Click to add points.<br>Click start point to close shape.<br>
-            Edit: Drag points, Del to remove obj
+            Draw Poly: Click points, click start to close.<br>
+            Draw Rect/Circ: Drag to create.<br>
+            Edit: Drag points, Del to remove obj.
         </div>
+
+
+
         <div id="status-display"></div>
     </div>
 
@@ -416,8 +441,26 @@
     uniform float uMin;
     uniform float uMax;
 
+    // View transform
+    uniform vec2 uPan;
+    uniform float uZoom;
+    uniform float uAspect;
+
     void main() {
-        vec4 obs = texture2D(uObstacles, vUv);
+        // Map screen UV (0..1) to world coordinates, accounting for aspect
+        vec2 screen = vUv;
+        vec2 screenWorld = vec2(screen.x * uAspect, screen.y);
+        vec2 worldUV = screenWorld / uZoom - uPan;
+        // Map world to simulation UV (s = x / aspect, t = y)
+        vec2 simUV = vec2(worldUV.x / uAspect, worldUV.y);
+
+        // Outside simulation bounds -> background
+        if(simUV.x < 0.0 || simUV.x > 1.0 || simUV.y < 0.0 || simUV.y > 1.0) {
+            gl_FragColor = vec4(0.03, 0.03, 0.03, 1.0);
+            return;
+        }
+
+        vec4 obs = texture2D(uObstacles, simUV);
         if (obs.x > 0.0) {
             float stripe = mod(gl_FragCoord.x + gl_FragCoord.y, 20.0);
             float c = stripe < 10.0 ? 0.3 : 0.4;
@@ -428,18 +471,18 @@
         float val = 0.0;
 
         if (uMode == 0) { // Dye
-            vec3 d = texture2D(uDensity, vUv).xyz;
+            vec3 d = texture2D(uDensity, simUV).xyz;
             val = length(d); 
         } 
         else if (uMode == 1) { // Velocity
-            vec2 vel = texture2D(uVelocity, vUv).xy;
+            vec2 vel = texture2D(uVelocity, simUV).xy;
             val = length(vel);
         } 
         else if (uMode == 2) { // Pressure
-            val = texture2D(uPressure, vUv).x;
+            val = texture2D(uPressure, simUV).x;
         } 
         else if (uMode == 3) { // Curl
-            val = texture2D(uCurl, vUv).x;
+            val = texture2D(uCurl, simUV).x;
         }
 
         // Normalize
@@ -544,6 +587,34 @@
         boundary: createProgram(gl, vsSource, document.getElementById('fs-boundary').innerText),
         display: createProgram(gl, vsSource, document.getElementById('fs-display').innerText),
         copy: createProgram(gl, vsSource, document.getElementById('fs-copy').innerText)
+    };
+
+    // Utility helpers
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const fmt = (v, n = 2) => (typeof v === 'number' ? v.toFixed(n) : v);
+
+    function makeEmitterDefaults(e) {
+        return Object.assign({ shape: 'circle', size: 0.05, width: 0.05, height: 0.05, spread: 30, angle: 0, force: CONFIG.inflow, amount: 1.0, pressure: 0.0, enabled: true }, e);
+    }
+    function createEmitter(e) { const em = makeEmitterDefaults(e); EDITOR.emitters.push(em); return em; }
+
+    // Cache frequently used uniform locations for faster rendering
+    programs.splat.locs = {
+        uTarget: gl.getUniformLocation(programs.splat, 'uTarget'),
+        aspectRatio: gl.getUniformLocation(programs.splat, 'aspectRatio'),
+        point: gl.getUniformLocation(programs.splat, 'point'),
+        color: gl.getUniformLocation(programs.splat, 'color'),
+        radius: gl.getUniformLocation(programs.splat, 'radius')
+    };
+
+    programs.display.locs = {
+        uPan: gl.getUniformLocation(programs.display, 'uPan'),
+        uZoom: gl.getUniformLocation(programs.display, 'uZoom'),
+        uAspect: gl.getUniformLocation(programs.display, 'uAspect'),
+        uMin: gl.getUniformLocation(programs.display, 'uMin'),
+        uMax: gl.getUniformLocation(programs.display, 'uMax'),
+        uMode: gl.getUniformLocation(programs.display, 'uMode')
     };
 
     function createTexture(width, height) {
@@ -689,22 +760,51 @@
     }
 
     const EDITOR = {
-        mode: 'select', 
+        mode: 'select',
         shapes: [], emitters: [],
-        currentShape: null, hoverPoint: null, selectedShape: null, selectedPointIndex: -1,
+        currentShape: null, hoverPoint: null, selectedShape: null,
+        // Multi-selection
+        selectedPoints: [], // {shape, index}
+        selectedEmitters: [], // indices
         snapping: true, gridSize: 0.02,
+        
+        // View transform state
+        zoom: 1.0,
+        pan: { x: 0, y: 0 },
+        isPanning: false,
+        isBoxSelecting: false,
+        boxStart: null,
+        draggingSelection: false,
+        draggingEmitters: false,
+        movingSelection: false, // new: move whole selected shapes / objects
+        dragLast: null,
+        lastMouse: { x: 0, y: 0 },
         
         screenToWorld: (x, y) => {
             const rect = canvas.getBoundingClientRect();
-            // Map Mouse (0=Top) to World (1=Top)
-            return { 
-                x: (x - rect.left) / rect.width * CONFIG.aspectRatio, 
-                y: 1.0 - (y - rect.top) / rect.height 
-            };
+            // 1. Normalize screen coordinates to 0..1 (Y inverted for standard Cartesian)
+            let nx = (x - rect.left) / rect.width;
+            let ny = 1.0 - (y - rect.top) / rect.height;
+            
+            // 2. Apply aspect ratio to X
+            nx *= CONFIG.aspectRatio;
+            
+            // 3. Apply Zoom and Pan
+            let wx = (nx / EDITOR.zoom) - EDITOR.pan.x;
+            let wy = (ny / EDITOR.zoom) - EDITOR.pan.y;
+            
+            return { x: wx, y: wy };
         },
+        
         snap: (val) => { return EDITOR.snapping ? Math.round(val / EDITOR.gridSize) * EDITOR.gridSize : val; },
         getHover: (m) => {
-            const dist = 0.02; 
+            const dist = 0.02 / EDITOR.zoom;
+            // Emitters first
+            for(let i=0;i<EDITOR.emitters.length;i++){
+                let e = EDITOR.emitters[i];
+                let dx = e.x - m.x; let dy = e.y - m.y;
+                if(Math.sqrt(dx*dx + dy*dy) < Math.max(0.02, e.size || e.radius)/EDITOR.zoom) return { type:'emitter', index:i, emitter:e };
+            }
             for(let s of EDITOR.shapes) {
                 for(let i=0; i<s.points.length; i++) {
                     let p = s.points[i];
@@ -713,55 +813,317 @@
                 }
             }
             return null;
-        }
+        },
+
+        isPointSelected: (shape, idx) => { return EDITOR.selectedPoints.some(sp => sp.shape === shape && sp.index === idx); },
+        togglePointSelection: (shape, idx) => {
+            let found = EDITOR.selectedPoints.findIndex(sp => sp.shape === shape && sp.index === idx);
+            if(found >= 0) EDITOR.selectedPoints.splice(found,1);
+            else EDITOR.selectedPoints.push({shape, index: idx});
+        },
+
+        clearSelection: () => { EDITOR.selectedPoints = []; EDITOR.selectedEmitters = []; EDITOR.selectedShape = null; EDITOR.selectedPointIndex = -1; },
+
+        boxSelectPoints: (a,b, add=false) => {
+            if(!add) EDITOR.selectedPoints = [];
+            if(!add) EDITOR.selectedEmitters = [];
+            const x0 = Math.min(a.x,b.x), x1 = Math.max(a.x,b.x), y0 = Math.min(a.y,b.y), y1 = Math.max(a.y,b.y);
+            for(const s of EDITOR.shapes){
+                for(let i=0;i<s.points.length;i++){
+                    let p = s.points[i];
+                    if(p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1){
+                        if(!EDITOR.selectedPoints.some(sp => sp.shape===s && sp.index===i)) EDITOR.selectedPoints.push({shape:s,index:i});
+                    }
+                }
+            }
+            for(let i=0;i<EDITOR.emitters.length;i++){
+                let e = EDITOR.emitters[i];
+                if(e.x >= x0 && e.x <= x1 && e.y >= y0 && e.y <= y1){
+                    if(!EDITOR.selectedEmitters.includes(i)) EDITOR.selectedEmitters.push(i);
+                }
+            }
+        },
+
+        getSelectedEmitter: () => { if(EDITOR.selectedEmitters.length === 1) return EDITOR.emitters[EDITOR.selectedEmitters[0]]; return null; }
     };
 
     let mouse = { x: 0, y: 0, down: false };
 
+    // --- Interaction Event Handlers ---
+
+    // Emitter popup helper (moved here so it's available before handlers)
+    function showEmitterPopup(screenX, screenY) {
+        const popup = document.getElementById('emitter-popup');
+        if(!popup) return;
+        popup.style.left = Math.min(window.innerWidth - popup.offsetWidth - 10, Math.max(10, screenX + 10)) + 'px';
+        popup.style.top = Math.min(window.innerHeight - popup.offsetHeight - 10, Math.max(10, screenY + 10)) + 'px';
+        popup.style.display = 'block';
+        // populate
+        const idx = EDITOR.selectedEmitters && EDITOR.selectedEmitters.length === 1 ? EDITOR.selectedEmitters[0] : null;
+        if(idx === null) return;
+        popup.dataset.emIndex = idx;
+        const em = EDITOR.emitters[idx];
+        document.getElementById('em-shape').value = em.shape || 'circle';
+        document.getElementById('sl-em-size').value = em.size || em.radius || 0.05; document.getElementById('val-em-size').innerText = (em.size||em.radius||0.05).toFixed(3);
+        document.getElementById('em-rect-w').value = em.width || em.size || 0.05; document.getElementById('em-rect-h').value = em.height || em.size || 0.05;
+        document.getElementById('sl-em-spread').value = em.spread || 30; document.getElementById('val-em-spread').innerText = (em.spread||30) + '°';
+        document.getElementById('sl-em-angle-popup').value = em.angle || 0; document.getElementById('val-em-angle-popup').innerText = (em.angle||0).toFixed(0) + '°';
+        document.getElementById('sl-em-force-popup').value = em.force || em.speed || 0; document.getElementById('val-em-force-popup').innerText = (em.force||em.speed||0).toFixed(2);
+        document.getElementById('sl-em-amount-popup').value = em.amount || em.rate || 1.0; document.getElementById('val-em-amount-popup').innerText = (em.amount||em.rate||1.0).toFixed(2);
+        document.getElementById('sl-em-pressure-popup').value = em.pressure || 0.0; document.getElementById('val-em-pressure-popup').innerText = (em.pressure||0.0).toFixed(2);
+        const shape = em.shape || 'circle';
+        document.getElementById('em-rect-dims').style.display = (shape === 'rect') ? 'block' : 'none';
+        document.getElementById('em-cone').style.display = (shape === 'cone') ? 'block' : 'none';
+        // hide sidebar controls if any
+        const toolbar = document.getElementById('emitter-controls-toolbar'); if(toolbar) toolbar.style.display = 'none';
+    }
+    function hideEmitterPopup() { const popup = document.getElementById('emitter-popup'); if(!popup) return; popup.style.display = 'none'; popup.dataset.emIndex = ''; const toolbar = document.getElementById('emitter-controls-toolbar'); if(toolbar) toolbar.style.display = 'block'; }
+
+    // 1. Zoom
+    uiCanvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mouseNx = (e.clientX - rect.left) / rect.width;
+        const mouseNy = 1.0 - (e.clientY - rect.top) / rect.height;
+        const nx = mouseNx * CONFIG.aspectRatio;
+        const ny = mouseNy;
+
+        const oldZoom = EDITOR.zoom;
+        const zoomFactor = 1 - Math.sign(e.deltaY) * 0.1; // 10% per wheel tick
+        const newZoom = Math.max(0.1, Math.min(10.0, oldZoom * zoomFactor));
+
+        // World coordinate under cursor before zoom
+        const worldX = nx / oldZoom - EDITOR.pan.x;
+        const worldY = ny / oldZoom - EDITOR.pan.y;
+
+        // Update zoom and pan so the point under cursor stays fixed
+        EDITOR.zoom = newZoom;
+        EDITOR.pan.x = nx / newZoom - worldX;
+        EDITOR.pan.y = ny / newZoom - worldY;
+
+        drawUI();
+    }, { passive: false });
+
     uiCanvas.addEventListener('mousedown', e => {
+        // Panning check (Middle mouse or Alt+Left)
+        if(e.button === 1 || (e.button === 0 && e.altKey)) {
+            EDITOR.isPanning = true;
+            EDITOR.lastMouse = { x: e.clientX, y: e.clientY };
+            return;
+        }
+
+        // Right-click: context menu and selection toggles
+        if(e.button === 2) {
+            e.preventDefault();
+            const w = EDITOR.screenToWorld(e.clientX, e.clientY);
+            const hit = EDITOR.getHover(w);
+            if(hit) {
+                if(hit.type === 'emitter') {
+                    if(!e.shiftKey && !e.ctrlKey) { EDITOR.selectedEmitters = [hit.index]; EDITOR.selectedPoints = []; EDITOR.selectedShape = null; }
+                    else {
+                        const idx = EDITOR.selectedEmitters.indexOf(hit.index);
+                        if(idx >= 0) EDITOR.selectedEmitters.splice(idx,1); else EDITOR.selectedEmitters.push(hit.index);
+                    }
+                } else if(hit.type === 'point') {
+                    if(!e.shiftKey && !e.ctrlKey) { EDITOR.selectedPoints = [{shape:hit.shape, index:hit.index}]; EDITOR.selectedEmitters = []; }
+                    else { EDITOR.togglePointSelection(hit.shape, hit.index); }
+                }
+            } else {
+                if(!e.shiftKey && !e.ctrlKey) EDITOR.clearSelection();
+            }
+            showCtxMenu(e.clientX, e.clientY);
+            drawUI();
+            return;
+        }
+
         mouse.down = true;
         let w = EDITOR.screenToWorld(e.clientX, e.clientY);
-        w.x = EDITOR.snap(w.x); w.y = EDITOR.snap(w.y);
+        let snapped = { x: EDITOR.snap(w.x), y: EDITOR.snap(w.y) };
         
         if (EDITOR.mode === 'poly') {
-            if (!EDITOR.currentShape) {
-                EDITOR.currentShape = { points: [w], closed: false }; 
-                EDITOR.shapes.push(EDITOR.currentShape); 
-            } else { 
+            if (!EDITOR.currentShape) { EDITOR.currentShape = { points: [snapped], closed: false }; EDITOR.shapes.push(EDITOR.currentShape); }
+            else {
                 let start = EDITOR.currentShape.points[0];
-                let dx = w.x - start.x;
-                let dy = w.y - start.y;
-                let closeThreshold = EDITOR.snapping ? 0.001 : 0.02;
-                if (Math.sqrt(dx*dx + dy*dy) < closeThreshold && EDITOR.currentShape.points.length >= 2) {
-                    EDITOR.currentShape.closed = true;
-                    EDITOR.currentShape = null;
-                } else {
-                    EDITOR.currentShape.points.push(w); 
+                let dx = snapped.x - start.x; let dy = snapped.y - start.y;
+                let closeThreshold = (EDITOR.snapping ? 0.001 : 0.02) / EDITOR.zoom;
+                if (Math.sqrt(dx*dx + dy*dy) < closeThreshold && EDITOR.currentShape.points.length >= 2) { EDITOR.currentShape.closed = true; EDITOR.currentShape = null; }
+                else { EDITOR.currentShape.points.push(snapped); }
+            }
+        } else if (EDITOR.mode === 'rect') {
+            EDITOR.currentShape = { points: [snapped, snapped, snapped, snapped], closed: true }; EDITOR.shapes.push(EDITOR.currentShape);
+        } else if (EDITOR.mode === 'circle') {
+            EDITOR.currentShape = { center: snapped, radius: 0, points: [], closed: true, type: 'circle' }; EDITOR.shapes.push(EDITOR.currentShape);
+        } else if (EDITOR.mode === 'move') {
+            // Move whole selection or shape
+            const hit = EDITOR.getHover(w);
+            // If clicked on an emitter, start dragging emitters
+            if(hit && hit.type === 'emitter') {
+                EDITOR.selectedEmitters = [hit.index]; EDITOR.draggingEmitters = true; EDITOR.dragLast = w; EDITOR.movingSelection = false;
+            }
+            // If clicked on a point, but user wants to move entire shape, select shape
+            else {
+                // If no explicit selection, try to find a shape containing the point
+                if(EDITOR.selectedPoints.length === 0 && EDITOR.selectedEmitters.length === 0) {
+                    for(let s of EDITOR.shapes) {
+                        if(pointInPolygon(w, s.points)) { EDITOR.selectedShape = s; break; }
+                    }
                 }
+                // Start moving either selected points or entire selected shape
+                EDITOR.movingSelection = true; EDITOR.dragLast = w;
             }
         } else if (EDITOR.mode === 'select') {
-            let hit = EDITOR.getHover(w);
-            if (hit) { EDITOR.selectedShape = hit.shape; EDITOR.selectedPointIndex = hit.index; }
-            else { EDITOR.selectedShape = null; EDITOR.selectedPointIndex = -1; }
+            const hit = EDITOR.getHover(w);
+            // Click on emitter
+            if(hit && hit.type === 'emitter') {
+                if(e.shiftKey || e.ctrlKey) {
+                    const idx = EDITOR.selectedEmitters.indexOf(hit.index);
+                    if(idx >= 0) EDITOR.selectedEmitters.splice(idx,1); else EDITOR.selectedEmitters.push(hit.index);
+                } else {
+                    EDITOR.selectedEmitters = [hit.index]; EDITOR.selectedPoints = []; EDITOR.selectedShape = null; EDITOR.selectedPointIndex = -1;
+                    EDITOR.draggingEmitters = true; EDITOR.dragLast = w;
+                }
+            }
+            // Click on point
+            else if(hit && hit.type === 'point') {
+                if(e.shiftKey || e.ctrlKey) { EDITOR.togglePointSelection(hit.shape, hit.index); }
+                else { EDITOR.selectedPoints = [{shape:hit.shape, index:hit.index}]; EDITOR.selectedEmitters = []; EDITOR.selectedShape = hit.shape; EDITOR.selectedPointIndex = hit.index; EDITOR.draggingSelection = true; EDITOR.dragLast = w; }
+            }
+            // Empty space => start box select
+            else {
+                if(!e.shiftKey && !e.ctrlKey) EDITOR.clearSelection();
+                EDITOR.isBoxSelecting = true; EDITOR.boxStart = w;
+            }
         } else if (EDITOR.mode === 'emitter') {
-            EDITOR.emitters.push({x: w.x, y: w.y, size: 0.05});
+            const newEm = makeEmitterDefaults({ x: snapped.x, y: snapped.y });
+            createEmitter(newEm);
+            EDITOR.selectedEmitters = [EDITOR.emitters.length - 1];
+            const sp = worldToScreen(EDITOR.emitters[EDITOR.emitters.length - 1]);
+            showEmitterPopup(sp.x, sp.y);
         }
         updateObstacles();
+        drawUI();
     });
 
     uiCanvas.addEventListener('mousemove', e => {
+        // Panning Logic
+        if(EDITOR.isPanning) {
+            let dx = e.clientX - EDITOR.lastMouse.x;
+            let dy = e.clientY - EDITOR.lastMouse.y; // Screen Y goes down
+            
+            let dNx = (dx / uiCanvas.width) * CONFIG.aspectRatio;
+            let dNy = -(dy / uiCanvas.height); // Invert Y
+            
+            EDITOR.pan.x += dNx / EDITOR.zoom;
+            EDITOR.pan.y += dNy / EDITOR.zoom;
+            
+            EDITOR.lastMouse = { x: e.clientX, y: e.clientY };
+            drawUI();
+            return;
+        }
+
         let raw = EDITOR.screenToWorld(e.clientX, e.clientY);
         mouse.x = raw.x; mouse.y = raw.y;
         let w = { x: EDITOR.snap(raw.x), y: EDITOR.snap(raw.y) };
-        if (mouse.down && EDITOR.mode === 'select' && EDITOR.selectedShape) {
-            EDITOR.selectedShape.points[EDITOR.selectedPointIndex] = w;
-            updateObstacles();
+
+        if (EDITOR.isBoxSelecting && mouse.down) {
+            // Just update UI rectangle
+            drawUI();
+            return;
         }
-        EDITOR.hoverPoint = EDITOR.getHover(w);
+
+        if (mouse.down) {
+            // Move whole selection (shapes and/or emitters)
+            if (EDITOR.movingSelection) {
+                let dx = raw.x - EDITOR.dragLast.x; let dy = raw.y - EDITOR.dragLast.y;
+                // Move selected points if any
+                if (EDITOR.selectedPoints.length > 0) {
+                    EDITOR.selectedPoints.forEach(sp => {
+                        sp.shape.points[sp.index].x = EDITOR.snap(sp.shape.points[sp.index].x + dx);
+                        sp.shape.points[sp.index].y = EDITOR.snap(sp.shape.points[sp.index].y + dy);
+                    });
+                }
+                // Move entire selected shape if set and no individual points
+                else if (EDITOR.selectedShape) {
+                    EDITOR.selectedShape.points.forEach(p => {
+                        p.x = EDITOR.snap(p.x + dx);
+                        p.y = EDITOR.snap(p.y + dy);
+                    });
+                }
+                // Move any selected emitters
+                if (EDITOR.selectedEmitters.length > 0) {
+                    EDITOR.selectedEmitters.forEach(i => {
+                        EDITOR.emitters[i].x = EDITOR.snap(EDITOR.emitters[i].x + dx);
+                        EDITOR.emitters[i].y = EDITOR.snap(EDITOR.emitters[i].y + dy);
+                    });
+                }
+                EDITOR.dragLast = raw; updateObstacles(); drawUI();
+                return;
+            }
+
+            else if (EDITOR.draggingSelection && EDITOR.selectedPoints.length > 0) {
+                let dx = raw.x - EDITOR.dragLast.x; let dy = raw.y - EDITOR.dragLast.y;
+                EDITOR.selectedPoints.forEach(sp => {
+                    sp.shape.points[sp.index].x = EDITOR.snap(sp.shape.points[sp.index].x + dx);
+                    sp.shape.points[sp.index].y = EDITOR.snap(sp.shape.points[sp.index].y + dy);
+                });
+                EDITOR.dragLast = raw; updateObstacles();
+            }
+            else if (EDITOR.draggingEmitters && EDITOR.selectedEmitters.length > 0) {
+                let dx = raw.x - EDITOR.dragLast.x; let dy = raw.y - EDITOR.dragLast.y;
+                EDITOR.selectedEmitters.forEach(i => {
+                    EDITOR.emitters[i].x = EDITOR.snap(EDITOR.emitters[i].x + dx);
+                    EDITOR.emitters[i].y = EDITOR.snap(EDITOR.emitters[i].y + dy);
+                });
+                EDITOR.dragLast = raw; drawUI(); updateObstacles();
+            }
+            else if (EDITOR.mode === 'rect' && EDITOR.currentShape) {
+                let p0 = EDITOR.currentShape.points[0];
+                EDITOR.currentShape.points[1] = { x: p0.x, y: w.y };
+                EDITOR.currentShape.points[2] = { x: w.x, y: w.y };
+                EDITOR.currentShape.points[3] = { x: w.x, y: p0.y };
+                updateObstacles();
+            }
+            else if (EDITOR.mode === 'circle' && EDITOR.currentShape) {
+                let center = EDITOR.currentShape.center;
+                let dx = w.x - center.x;
+                let dy = w.y - center.y;
+                let r = Math.sqrt(dx*dx + dy*dy);
+                EDITOR.currentShape.radius = r;
+                let segments = 32; EDITOR.currentShape.points = [];
+                for(let i=0; i<segments; i++) {
+                    let theta = (i / segments) * Math.PI * 2;
+                    EDITOR.currentShape.points.push({ x: center.x + Math.cos(theta) * r, y: center.y + Math.sin(theta) * r });
+                }
+                updateObstacles();
+            }
+        }
+        EDITOR.hoverPoint = EDITOR.getHover(raw);
         updateProbe(raw.x, raw.y);
+        drawUI();
     });
 
-    uiCanvas.addEventListener('mouseup', () => { mouse.down = false; EDITOR.selectedPointIndex = -1; });
+    uiCanvas.addEventListener('mouseup', () => { 
+        mouse.down = false; 
+        EDITOR.isPanning = false;
+        // Finish drag moves
+        EDITOR.draggingSelection = false; EDITOR.draggingEmitters = false; EDITOR.movingSelection = false; EDITOR.dragLast = null;
+        if (EDITOR.isBoxSelecting) {
+            let a = EDITOR.boxStart; let b = { x: mouse.x, y: mouse.y };
+            EDITOR.boxSelectPoints(a,b, false);
+            EDITOR.isBoxSelecting = false; EDITOR.boxStart = null;
+        }
+        EDITOR.selectedPointIndex = -1;
+        if(EDITOR.mode === 'rect' || EDITOR.mode === 'circle') { EDITOR.currentShape = null; }
+        // If exactly one emitter selected, show popup near it
+        if(EDITOR.selectedEmitters.length === 1) {
+            const idx = EDITOR.selectedEmitters[0];
+            const sp = worldToScreen(EDITOR.emitters[idx]);
+            showEmitterPopup(sp.x, sp.y);
+        } else {
+            hideEmitterPopup();
+        }
+        drawUI();
+    });
 
     window.addEventListener('keydown', e => {
         if (e.key === 'Enter' && EDITOR.mode === 'poly' && EDITOR.currentShape) {
@@ -774,7 +1136,9 @@
         if(e.key === 'v') setMode('select');
         if(e.key === 'p') setMode('poly');
         if(e.key === 'r') setMode('rect'); 
+        if(e.key === 'c') setMode('circle'); 
         if(e.key === 'e') setMode('emitter');
+        if(e.key === 'm') setMode('move');
     });
 
     function setMode(m) {
@@ -783,16 +1147,25 @@
         if(m === 'select') document.getElementById('btn-select').classList.add('active');
         if(m === 'poly') document.getElementById('btn-draw-poly').classList.add('active');
         if(m === 'rect') document.getElementById('btn-draw-rect').classList.add('active');
+        if(m === 'circle') document.getElementById('btn-draw-circ').classList.add('active');
         if(m === 'emitter') document.getElementById('btn-emitter').classList.add('active');
+        if(m === 'move') document.getElementById('btn-move').classList.add('active');
     }
 
     function worldToScreen(p) {
-        // Map 0..aspect to 0..width
-        // Map 1..0 to 0..height (Canvas Y=0 is top)
-        return { 
-            x: (p.x / CONFIG.aspectRatio) * uiCanvas.width, 
-            y: (1.0 - p.y) * uiCanvas.height 
-        }; 
+        // Inverse of screenToWorld
+        // wx = (nx / zoom) - pan.x  => nx = (wx + pan.x) * zoom
+        // wy = (ny / zoom) - pan.y  => ny = (wy + pan.y) * zoom
+        
+        let nx = (p.x + EDITOR.pan.x) * EDITOR.zoom;
+        let ny = (p.y + EDITOR.pan.y) * EDITOR.zoom;
+        
+        // Remove aspect ratio from X, Invert Y
+        // nx = (x - left)/width * aspect => x = (nx / aspect) * width + left
+        let x = (nx / CONFIG.aspectRatio) * uiCanvas.width;
+        let y = (1.0 - ny) * uiCanvas.height;
+        
+        return { x: x, y: y }; 
     }
 
     function drawUI() {
@@ -800,16 +1173,27 @@
         
         if(EDITOR.snapping) {
             ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
-            let sx = (EDITOR.gridSize / CONFIG.aspectRatio) * uiCanvas.width;
-            let sy = EDITOR.gridSize * uiCanvas.height;
+            let pMin = EDITOR.screenToWorld(0, uiCanvas.height); // Bottom-Left
+            let pMax = EDITOR.screenToWorld(uiCanvas.width, 0); // Top-Right
+            let startX = Math.floor(pMin.x / EDITOR.gridSize) * EDITOR.gridSize;
+            let startY = Math.floor(pMin.y / EDITOR.gridSize) * EDITOR.gridSize;
             ctx.beginPath();
-            for(let x=0; x<uiCanvas.width; x+=sx) { ctx.moveTo(x,0); ctx.lineTo(x, uiCanvas.height); }
-            for(let y=0; y<uiCanvas.height; y+=sy) { ctx.moveTo(0,y); ctx.lineTo(uiCanvas.width, y); }
+            for(let x = startX; x < pMax.x; x += EDITOR.gridSize) {
+                let p1 = worldToScreen({x: x, y: pMin.y});
+                let p2 = worldToScreen({x: x, y: pMax.y});
+                ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+            }
+            for(let y = startY; y < pMax.y; y += EDITOR.gridSize) {
+                let p1 = worldToScreen({x: pMin.x, y: y});
+                let p2 = worldToScreen({x: pMax.x, y: y});
+                ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+            }
             ctx.stroke();
         }
         
         if(CONFIG.showVectors) drawVectors();
 
+        // Draw shapes and points
         EDITOR.shapes.forEach(s => {
             ctx.beginPath();
             if(s.points.length > 0) {
@@ -821,37 +1205,79 @@
             ctx.lineWidth = 2; ctx.stroke();
             if(s.closed) { ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fill(); }
             
-            ctx.fillStyle = (s === EDITOR.selectedShape) ? '#3b82f6' : '#888';
-            s.points.forEach(p => { let sp = worldToScreen(p); ctx.fillRect(sp.x-3, sp.y-3, 6, 6); });
+            s.points.forEach((p, idx) => {
+                let sp = worldToScreen(p);
+                let sel = EDITOR.isPointSelected(s, idx);
+                ctx.fillStyle = sel ? '#f59e0b' : ((s === EDITOR.selectedShape) ? '#3b82f6' : '#888');
+                ctx.fillRect(sp.x-3, sp.y-3, 6, 6);
+            });
         });
 
-        ctx.fillStyle = '#0f0';
-        EDITOR.emitters.forEach(e => {
-            let sp = worldToScreen(e);
-            ctx.beginPath(); ctx.arc(sp.x, sp.y, 5, 0, Math.PI*2); ctx.fill();
+        // Draw emitters with shapes
+        EDITOR.emitters.forEach((e, i) => {
+            const sp = worldToScreen(e);
+            const sel = EDITOR.selectedEmitters.includes(i);
+            ctx.save();
+            ctx.translate(sp.x, sp.y);
+            const ang = ((e.angle || 0) * Math.PI / 180.0);
+            ctx.rotate(-ang); // invert Y for canvas coordinate
+            if(e.shape === 'rect') {
+                const w = (e.width || e.size || 0.05);
+                const h = (e.height || e.size || 0.05);
+                const edgeP = worldToScreen({x:e.x + w, y:e.y});
+                const pixelW = Math.abs(edgeP.x - sp.x);
+                const pixelH = Math.abs(worldToScreen({x:e.x, y:e.y + h}).y - sp.y);
+                ctx.fillStyle = sel ? 'rgba(245,158,11,0.75)' : 'rgba(0,255,0,0.5)';
+                ctx.fillRect(-pixelW, -pixelH, pixelW*2, pixelH*2);
+                ctx.strokeStyle = sel ? '#f59e0b' : '#000';
+                ctx.lineWidth = 2; ctx.strokeRect(-pixelW, -pixelH, pixelW*2, pixelH*2);
+            } else if(e.shape === 'cone') {
+                const length = e.size || e.radius || 0.05;
+                const spread = (e.spread || 30) * Math.PI / 180.0;
+                const pxLen = Math.abs(worldToScreen({x:e.x + Math.cos(ang)*length, y:e.y + Math.sin(ang)*length}).x - sp.x);
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0, pxLen, -spread/2, spread/2); ctx.closePath();
+                ctx.fillStyle = sel ? 'rgba(245,158,11,0.4)' : 'rgba(0,255,0,0.2)'; ctx.fill();
+                ctx.strokeStyle = sel ? '#f59e0b' : '#000'; ctx.lineWidth = 2; ctx.stroke();
+            } else {
+                const edge = worldToScreen({x: e.x + (e.size || e.radius || 0.05), y: e.y});
+                const rp = Math.abs(edge.x - sp.x);
+                ctx.beginPath(); ctx.fillStyle = sel ? '#f59e0b' : '#0f0'; ctx.arc(0,0, Math.max(4, rp), 0, Math.PI*2); ctx.fill();
+
+                // rotation indicator arrow scaled by force
+                const arrowLen = Math.max(8, rp * 1.2 * (e.force || 1.0));
+                ctx.strokeStyle = sel ? '#f59e0b' : '#000'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(arrowLen,0); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(arrowLen,0); ctx.lineTo(arrowLen-6,-4); ctx.lineTo(arrowLen-6,4); ctx.closePath(); ctx.fillStyle = sel ? '#f59e0b' : '#000'; ctx.fill();
+
+                if(sel) { ctx.lineWidth = 2; ctx.strokeStyle = '#f59e0b'; ctx.beginPath(); ctx.arc(0,0, Math.max(4, rp)+2, 0, Math.PI*2); ctx.stroke(); }
+            }
+            ctx.restore();
         });
+
+        // Box selection
+        if(EDITOR.isBoxSelecting && EDITOR.boxStart) {
+            let a = worldToScreen(EDITOR.boxStart);
+            let b = worldToScreen({x: mouse.x, y: mouse.y});
+            let x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+            let w = Math.abs(a.x - b.x), h = Math.abs(a.y - b.y);
+            ctx.strokeStyle = '#3b82f6'; ctx.fillStyle = 'rgba(59,130,246,0.06)'; ctx.lineWidth = 1; ctx.strokeRect(x,y,w,h); ctx.fillRect(x,y,w,h);
+        }
 
         if (EDITOR.mode === 'poly' && EDITOR.currentShape) {
             let s = EDITOR.currentShape; 
             ctx.beginPath();
             let p0 = worldToScreen(s.points[0]); ctx.moveTo(p0.x, p0.y);
             for(let i=1; i<s.points.length; i++) { let p = worldToScreen(s.points[i]); ctx.lineTo(p.x, p.y); }
-            
             let nextP = { x: EDITOR.snap(mouse.x), y: EDITOR.snap(mouse.y) };
             let start = s.points[0];
             let dx = nextP.x - start.x; let dy = nextP.y - start.y;
-            let closeThreshold = EDITOR.snapping ? 0.001 : 0.02;
+            let closeThreshold = (EDITOR.snapping ? 0.001 : 0.02) / EDITOR.zoom;
             let isClosing = Math.sqrt(dx*dx + dy*dy) < closeThreshold && s.points.length >= 2;
-            
             let target = isClosing ? start : nextP;
             let sTarget = worldToScreen(target);
             ctx.lineTo(sTarget.x, sTarget.y);
             ctx.strokeStyle = '#ffff00'; ctx.stroke();
-            
-            if(isClosing) {
-                ctx.fillStyle = 'rgba(255, 255, 0, 0.2)'; ctx.fill(); 
-                ctx.beginPath(); ctx.arc(sTarget.x, sTarget.y, 6, 0, Math.PI*2); ctx.fillStyle='#ffff00'; ctx.fill();
-            }
+            if(isClosing) { ctx.fillStyle = 'rgba(255, 255, 0, 0.2)'; ctx.fill(); ctx.beginPath(); ctx.arc(sTarget.x, sTarget.y, 6, 0, Math.PI*2); ctx.fillStyle='#ffff00'; ctx.fill(); }
         }
         
         let cursor = worldToScreen({x: EDITOR.snap(mouse.x), y: EDITOR.snap(mouse.y)});
@@ -872,10 +1298,58 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         return pixelBuf;
     }
+
+    function showCtxMenu(x,y) {
+        const el = document.getElementById('ctx-menu');
+        el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.display = 'block';
+    }
+    function hideCtxMenu() { const el = document.getElementById('ctx-menu'); if(el) el.style.display = 'none'; }
+
+    function deleteSelectedItems() {
+        // Delete points
+        if(EDITOR.selectedPoints.length > 0) {
+            // Group deletions by shape
+            const groups = new Map();
+            EDITOR.selectedPoints.forEach(sp => {
+                if(!groups.has(sp.shape)) groups.set(sp.shape, []);
+                groups.get(sp.shape).push(sp.index);
+            });
+            groups.forEach((indices, shape) => {
+                indices.sort((a,b)=>b-a); // delete descending
+                indices.forEach(idx => { shape.points.splice(idx,1); });
+            });
+            // Remove empty shapes
+            EDITOR.shapes = EDITOR.shapes.filter(s => s.points.length >= 2);
+            EDITOR.selectedPoints = [];
+            updateObstacles();
+        }
+        // Delete emitters
+        if(EDITOR.selectedEmitters.length > 0) {
+            EDITOR.selectedEmitters.sort((a,b)=>b-a);
+            EDITOR.selectedEmitters.forEach(i => { EDITOR.emitters.splice(i,1); });
+            EDITOR.selectedEmitters = [];
+            updateObstacles();
+            hideEmitterPopup();
+        }
+        drawUI();
+    }
+
+    function updateEmitterUI() {
+        // Open popup when a single emitter is selected, otherwise hide popup
+        if(EDITOR.selectedEmitters.length === 1) {
+            const idx = EDITOR.selectedEmitters[0];
+            const sp = worldToScreen(EDITOR.emitters[idx]);
+            showEmitterPopup(sp.x, sp.y);
+        } else {
+            hideEmitterPopup();
+        }
+    }
+
+    document.addEventListener('click', hideCtxMenu);
     
     function updateProbe(wx, wy) {
         document.getElementById('data-x').innerText = wx.toFixed(2);
-        document.getElementById('data-y').innerText = wy.toFixed(2);
+        document.getElementById('data-y').innerText = (1.0-wy).toFixed(2);
         let d = readTextureValue(density.read, wx, wy);
         let v = readTextureValue(velocity.read, wx, wy);
         let p = readTextureValue(pressure.read, wx, wy);
@@ -912,10 +1386,16 @@
                 let sx = (x + 0.5) * spacing;
                 let sy = (y + 0.5) * spacing;
                 
-                // UVs
-                let u = sx / uiCanvas.width;
-                let v = 1.0 - (sy / uiCanvas.height); // Flip for read (Top=1)
+                // Get World coords for this screen pixel to lookup in simulation
+                // Use screenToWorld logic
+                let wPos = EDITOR.screenToWorld(sx, sy);
                 
+                // Then to UV
+                let u = wPos.x / CONFIG.aspectRatio;
+                let v = wPos.y; 
+                
+                if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+
                 const ix = Math.floor(u * w);
                 const iy = Math.floor(v * h);
                 const idx = (iy * w + ix) * 4;
@@ -1043,20 +1523,98 @@
             blit(density.write); density.swap();
 
             p = programs.splat; gl.useProgram(p);
-            EDITOR.emitters.forEach(e => {
-                gl.uniform1i(gl.getUniformLocation(p, "uTarget"), 0);
-                gl.uniform1f(gl.getUniformLocation(p, "aspectRatio"), CONFIG.aspectRatio);
-                // Normalized coordinate correction handled here
-                gl.uniform2f(gl.getUniformLocation(p, "point"), e.x / CONFIG.aspectRatio, e.y);
-                gl.uniform3f(gl.getUniformLocation(p, "color"), CONFIG.inflow, 0.0, 0.0);
-                gl.uniform1f(gl.getUniformLocation(p, "radius"), 0.0005);
-                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
-                blit(velocity.write); velocity.swap();
+            const L = p.locs;
+            gl.uniform1i(L.uTarget, 0);
+            gl.uniform1f(L.aspectRatio, CONFIG.aspectRatio);
 
-                gl.uniform1i(gl.getUniformLocation(p, "uTarget"), 0);
-                gl.uniform3f(gl.getUniformLocation(p, "color"), CONFIG.dyeColor[0], CONFIG.dyeColor[1], CONFIG.dyeColor[2]);
-                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
-                blit(density.write); density.swap();
+            EDITOR.emitters.forEach(e => {
+                if(!e.enabled) return;
+                const angle = (e.angle || 0) * Math.PI / 180.0;
+                const dirx = Math.cos(angle);
+                const diry = Math.sin(angle);
+                const vx = dirx * (e.force || e.speed || 0);
+                const vy = diry * (e.force || e.speed || 0);
+
+                if(e.shape === 'rect') {
+                    const w = e.width || e.size || 0.05;
+                    const h = e.height || e.size || 0.05;
+                    const nx = 3, ny = 2;
+                    for(let iy=0; iy<ny; iy++){
+                        for(let ix=0; ix<nx; ix++){
+                            const fx = (ix/(nx-1)-0.5)*w;
+                            const fy = (iy/(ny-1)-0.5)*h;
+                            const px = e.x + fx * Math.cos(angle) - fy * Math.sin(angle);
+                            const py = e.y + fx * Math.sin(angle) + fy * Math.cos(angle);
+                            const rad = Math.max((w+h)/8, 0.001);
+
+                            gl.uniform2f(L.point, px / CONFIG.aspectRatio, py);
+                            gl.uniform3f(L.color, vx * (e.force || 1.0), vy * (e.force || 1.0), 0.0);
+                            gl.uniform1f(L.radius, rad);
+                            gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                            blit(velocity.write); velocity.swap();
+
+                            gl.uniform3f(L.color, CONFIG.dyeColor[0] * (e.amount || 1.0), CONFIG.dyeColor[1] * (e.amount || 1.0), CONFIG.dyeColor[2] * (e.amount || 1.0));
+                            gl.uniform1f(L.radius, rad);
+                            gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                            blit(density.write); density.swap();
+
+                            if(Math.abs(e.pressure || 0) > 0.0001) {
+                                gl.uniform3f(L.color, (e.pressure||0), 0.0, 0.0);
+                                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
+                                gl.uniform1f(L.radius, rad * 0.5);
+                                blit(pressure.write); pressure.swap();
+                            }
+                        }
+                    }
+                } else if(e.shape === 'cone') {
+                    const length = e.size || e.radius || 0.05;
+                    const spread = (e.spread || 30) * Math.PI / 180.0;
+                    const steps = 6;
+                    for(let sIdx=0; sIdx<steps; sIdx++){
+                        const t = (sIdx+1)/steps;
+                        const ang = angle + ((((sIdx%2)===0)?1:-1) * (spread * (sIdx/(steps-1))/2));
+                        const px = e.x + Math.cos(ang) * length * t;
+                        const py = e.y + Math.sin(ang) * length * t;
+                        const rad = length * 0.15;
+
+                        gl.uniform2f(L.point, px / CONFIG.aspectRatio, py);
+                        gl.uniform3f(L.color, vx * (e.force || 1.0), vy * (e.force || 1.0), 0.0);
+                        gl.uniform1f(L.radius, rad);
+                        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                        blit(velocity.write); velocity.swap();
+
+                        gl.uniform3f(L.color, CONFIG.dyeColor[0] * (e.amount || 1.0), CONFIG.dyeColor[1] * (e.amount || 1.0), CONFIG.dyeColor[2] * (e.amount || 1.0));
+                        gl.uniform1f(L.radius, rad);
+                        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                        blit(density.write); density.swap();
+
+                        if(Math.abs(e.pressure || 0) > 0.0001) {
+                            gl.uniform3f(L.color, (e.pressure||0), 0.0, 0.0);
+                            gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
+                            gl.uniform1f(L.radius, rad * 0.5);
+                            blit(pressure.write); pressure.swap();
+                        }
+                    }
+                } else {
+                    const rad = e.size || e.radius || 0.005;
+                    gl.uniform2f(L.point, e.x / CONFIG.aspectRatio, e.y);
+                    gl.uniform3f(L.color, vx * (e.force || 1.0), vy * (e.force || 1.0), 0.0);
+                    gl.uniform1f(L.radius, rad);
+                    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                    blit(velocity.write); velocity.swap();
+
+                    gl.uniform3f(L.color, CONFIG.dyeColor[0] * (e.amount || 1.0), CONFIG.dyeColor[1] * (e.amount || 1.0), CONFIG.dyeColor[2] * (e.amount || 1.0));
+                    gl.uniform1f(L.radius, rad);
+                    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(density.write); density.swap();
+
+                    if(Math.abs(e.pressure || 0) > 0.0001) {
+                        gl.uniform3f(L.color, (e.pressure||0), 0.0, 0.0);
+                        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
+                        gl.uniform1f(L.radius, rad * 0.5);
+                        blit(pressure.write); pressure.swap();
+                    }
+                }
             });
 
             p = programs.divergence; gl.useProgram(p);
@@ -1105,8 +1663,14 @@
         gl.uniform1i(gl.getUniformLocation(p, "uObstacles"), 4);
         gl.uniform1i(gl.getUniformLocation(p, "uGradient"), 5);
         gl.uniform1i(gl.getUniformLocation(p, "uMode"), CONFIG.visMode);
-        gl.uniform1f(gl.getUniformLocation(p, "uMin"), currentMin);
-        gl.uniform1f(gl.getUniformLocation(p, "uMax"), currentMax);
+        
+        // Transform uniforms for display shader (Pan/Zoom) - use cached locs
+        gl.uniform2f(programs.display.locs.uPan, EDITOR.pan.x, EDITOR.pan.y);
+        gl.uniform1f(programs.display.locs.uZoom, EDITOR.zoom);
+        gl.uniform1f(programs.display.locs.uAspect, CONFIG.aspectRatio);
+
+        gl.uniform1f(programs.display.locs.uMin, currentMin);
+        gl.uniform1f(programs.display.locs.uMax, currentMax);
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
@@ -1132,7 +1696,7 @@
         EDITOR.shapes.push({points:[{x:0,y:0},{x:1,y:0},{x:1,y:0.2},{x:0,y:0.2}], closed:true});
         EDITOR.shapes.push({points:[{x:0,y:1},{x:1,y:1},{x:1,y:0.8},{x:0,y:0.8}], closed:true});
         EDITOR.shapes.push({points:[{x:0.4,y:0.4},{x:0.5,y:0.5},{x:0.4,y:0.6}], closed:true});
-        EDITOR.emitters.push({x:0.1, y:0.5, size:0.05});
+        createEmitter({x:0.1, y:0.5, shape:'circle', size:0.05, force: CONFIG.inflow, amount:1.0, pressure:0.0, spread:30, angle:0, enabled:true});
         updateObstacles();
         updateGradient();
     }
@@ -1157,8 +1721,12 @@
 
         bind('btn-select', 'onclick', () => setMode('select'));
         bind('btn-draw-poly', 'onclick', () => setMode('poly'));
-        bind('btn-draw-rect', 'onclick', () => setMode('poly')); 
+        bind('btn-draw-rect', 'onclick', () => setMode('rect')); 
+        bind('btn-draw-circ', 'onclick', () => setMode('circle')); 
         bind('btn-emitter', 'onclick', () => setMode('emitter'));
+        bind('btn-move', 'onclick', () => setMode('move'));
+        bind('btn-fit', 'onclick', () => { EDITOR.zoom = 1.0; EDITOR.pan = {x:0, y:0}; });
+        
         bind('chk-snap', 'onchange', (e) => EDITOR.snapping = e.target.checked);
         bind('sl-iter', 'oninput', (e) => { CONFIG.iterations = parseInt(e.target.value); document.getElementById('val-iter').innerText = CONFIG.iterations; });
         bind('sl-diss', 'oninput', (e) => { CONFIG.dissipation = parseFloat(e.target.value); });
@@ -1207,6 +1775,90 @@
             });
         });
 
+        // Emitter controls moved to popup. Keep only delete/clear bindings
+        bind('btn-delete-selected', 'onclick', () => { deleteSelectedItems(); });
+        bind('btn-clear-emitters', 'onclick', () => { EDITOR.emitters = []; updateObstacles(); drawUI(); hideEmitterPopup(); });
+
+        // Disable default browser context menu for the UI canvas
+        uiCanvas.addEventListener('contextmenu', (e) => { e.preventDefault(); return false; });
+
+        // Simple Point-in-Polygon test used by move tool
+        function pointInPolygon(pt, poly) {
+            if(!poly || poly.length < 3) return false;
+            let x = pt.x, y = pt.y;
+            let inside = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                let xi = poly[i].x, yi = poly[i].y;
+                let xj = poly[j].x, yj = poly[j].y;
+
+                let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi + 0.0) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        // Hook up ctx menu delete
+        document.getElementById('ctx-delete').onclick = () => { deleteSelectedItems(); hideCtxMenu(); };
+
+        // Hide ctx menu on outside click already wired above
+
+        // popup drag
+        (function(){
+            const popup = document.getElementById('emitter-popup'); const header = document.getElementById('emitter-popup-header');
+            let dragging=false, offX=0, offY=0;
+            header.addEventListener('mousedown', (ev)=>{ dragging=true; offX = ev.clientX - popup.offsetLeft; offY = ev.clientY - popup.offsetTop; ev.preventDefault(); ev.stopPropagation(); });
+            document.addEventListener('mousemove', (ev)=>{ if(dragging){ popup.style.left = Math.min(window.innerWidth - popup.offsetWidth - 10, Math.max(10, ev.clientX - offX)) + 'px'; popup.style.top = Math.min(window.innerHeight - popup.offsetHeight - 10, Math.max(10, ev.clientY - offY)) + 'px'; } });
+            document.addEventListener('mouseup', ()=>{ dragging=false; });
+        })();
+
+        // popup input handlers (safer parsing and clamping)
+        const popupEl = $('emitter-popup');
+        const setPopupIdx = () => popupEl ? popupEl.dataset.emIndex : null;
+
+        $('em-shape').addEventListener('change', (e) => {
+            const idx = setPopupIdx(); if(idx == null) return; const em = EDITOR.emitters[idx]; em.shape = e.target.value; $('em-rect-dims').style.display = (em.shape === 'rect') ? 'block' : 'none'; $('em-cone').style.display = (em.shape === 'cone') ? 'block' : 'none'; drawUI();
+        });
+
+        $('sl-em-size').addEventListener('input', (e) => {
+            const idx = setPopupIdx(); if(idx == null) return; const v = clamp(parseFloat(e.target.value), 0.001, 1.0); EDITOR.emitters[idx].size = v; $('val-em-size').innerText = v.toFixed(3); drawUI();
+        });
+
+        $('em-rect-w').addEventListener('input', (e) => { const idx = setPopupIdx(); if(idx == null) return; EDITOR.emitters[idx].width = clamp(parseFloat(e.target.value), 0.001, 1.0); drawUI(); });
+        $('em-rect-h').addEventListener('input', (e) => { const idx = setPopupIdx(); if(idx == null) return; EDITOR.emitters[idx].height = clamp(parseFloat(e.target.value), 0.001, 1.0); drawUI(); });
+
+        $('sl-em-spread').addEventListener('input', (e)=>{ const idx = setPopupIdx(); if(idx == null) return; const v = clamp(parseFloat(e.target.value), 0, 180); EDITOR.emitters[idx].spread = v; $('val-em-spread').innerText = v.toFixed(0) + '°'; drawUI(); });
+        $('sl-em-angle-popup').addEventListener('input', (e)=>{ const idx = setPopupIdx(); if(idx == null) return; const v = ((parseFloat(e.target.value) % 360) + 360) % 360; EDITOR.emitters[idx].angle = v; $('val-em-angle-popup').innerText = v.toFixed(0) + '°'; drawUI(); });
+
+        $('sl-em-force-popup').addEventListener('input', (e)=>{ const idx = setPopupIdx(); if(idx == null) return; const v = clamp(parseFloat(e.target.value), 0, 100); EDITOR.emitters[idx].force = v; $('val-em-force-popup').innerText = v.toFixed(2); drawUI(); });
+        $('sl-em-amount-popup').addEventListener('input', (e)=>{ const idx = setPopupIdx(); if(idx == null) return; const v = clamp(parseFloat(e.target.value), 0, 100); EDITOR.emitters[idx].amount = v; $('val-em-amount-popup').innerText = v.toFixed(2); drawUI(); });
+        $('sl-em-pressure-popup').addEventListener('input', (e)=>{ const idx = setPopupIdx(); if(idx == null) return; const v = clamp(parseFloat(e.target.value), -100, 100); EDITOR.emitters[idx].pressure = v; $('val-em-pressure-popup').innerText = v.toFixed(2); drawUI(); });
+
+        $('btn-em-close').addEventListener('click', ()=>{ hideEmitterPopup(); });
+        $('btn-em-apply').addEventListener('click', ()=>{ hideEmitterPopup(); updateObstacles(); });
+
+        // Hide ctx menu on outside click already wired above
+
+        // Delete key handler for selected elements
+        window.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && EDITOR.mode === 'poly' && EDITOR.currentShape) {
+                EDITOR.currentShape.closed = true; EDITOR.currentShape = null; updateObstacles();
+            }
+            if (e.key === 'Delete') {
+                deleteSelectedItems();
+            }
+            if(e.key === 'v') setMode('select');
+            if(e.key === 'p') setMode('poly');
+            if(e.key === 'r') setMode('rect'); 
+            if(e.key === 'c') setMode('circle'); 
+            if(e.key === 'e') setMode('emitter');
+        });
+
+        // Update emitter UI when clicking selection
+        uiCanvas.addEventListener('mouseup', () => { updateEmitterUI(); });
+
+        // ensure ctx menu hides on ESC
+        window.addEventListener('keydown', (e) => { if(e.key === 'Escape') hideCtxMenu(); });
+
         // Setup Initial State
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -1220,5 +1872,24 @@
     });
 
 </script>
+
+    <div id="emitter-popup" class="panel" style="position:absolute; display:none; width:240px; z-index:10001; cursor:default;">
+        <div id="emitter-popup-header" style="cursor:move; font-weight:600; margin-bottom:6px;">Emitter Settings <span style="float:right; font-weight:400; font-size:12px; opacity:0.8;">Drag to move</span></div>
+        <div id="emitter-popup-body">
+            <div class="control-group"><label>Shape</label><select id="em-shape"><option value="circle">Circle</option><option value="rect">Rectangle</option><option value="cone">Cone</option></select></div>
+            <div class="control-group" id="em-size-group"><label>Size <span id="val-em-size" class="value-display">0.05</span></label><input id="sl-em-size" type="range" min="0.001" max="0.5" step="0.001" value="0.05"></div>
+            <div class="control-group" id="em-rect-dims" style="display:none;"><label>Rect W / H</label><div style="display:flex; gap:6px;"><input id="em-rect-w" type="number" step="0.001" value="0.05" style="width:80px;"><input id="em-rect-h" type="number" step="0.001" value="0.05" style="width:80px;"></div></div>
+            <div class="control-group" id="em-cone" style="display:none;"><label>Spread <span id="val-em-spread" class="value-display">30°</span></label><input id="sl-em-spread" type="range" min="0" max="90" value="30"></div>
+            <div class="control-group"><label>Angle <span id="val-em-angle-popup" class="value-display">0°</span></label><input id="sl-em-angle-popup" type="range" min="0" max="360" step="1" value="0"></div>
+            <div class="control-group"><label>Force <span id="val-em-force-popup" class="value-display">1.5</span></label><input id="sl-em-force-popup" type="range" min="0" max="10" step="0.1" value="1.5"></div>
+            <div class="control-group"><label>Amount <span id="val-em-amount-popup" class="value-display">1.0</span></label><input id="sl-em-amount-popup" type="range" min="0" max="10" step="0.1" value="1.0"></div>
+            <div class="control-group"><label>Pressure <span id="val-em-pressure-popup" class="value-display">0.00</span></label><input id="sl-em-pressure-popup" type="range" min="-5" max="5" step="0.1" value="0"></div>
+            <div style="display:flex;gap:6px; margin-top:8px;"><button id="btn-em-close">Close</button><button id="btn-em-apply" style="background:#3b82f6; color:#fff;">Apply</button></div>
+        </div>
+    </div>
+
+    <div id="ctx-menu">
+        <button id="ctx-delete">Delete</button>
+    </div> 
 </body>
 </html>
