@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Automata Synth Pro</title>
+<style>
+:root {
+    --bg: #121212; --panel: #1a1a1a; --border: #333;
+    --text: #e0e0e0; --text-dim: #888;
+    --accent: #00bcd4; --accent-hover: #26c6da;
+    --c-wire: #546e7a; --c-head: #00e5ff; --c-tail: #006064;
+    --c-gen: #76ff03; --c-note: #d500f9; --c-diode: #ff9100;
+    --c-delay: #ff4081; --c-logic: #ffff00; --c-if: #ffffff;
+    --c-wall: #616161;
+}
+* { box-sizing: border-box; outline: none; }
+body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    user-select: none;
+}
+input, select { user-select: none; }
+
+/* Interactions */
+button, .tool-btn, input[type="range"], select, .section-header, label, .lib-item { cursor: pointer; }
+.knob-control { cursor: ns-resize; touch-action: none; }
+
+/* Header */
+header {
+    height: 48px; background: var(--panel); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px; justify-content: space-between;
+    flex-shrink: 0; z-index: 10;
+}
+h1 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: 1px; color: var(--accent); text-transform: uppercase; }
+.controls { display: flex; gap: 8px; align-items: center; }
+
+/* Buttons */
+button {
+    background: #252525; border: 1px solid var(--border); color: var(--text);
+    padding: 5px 12px; border-radius: 3px; font-size: 11px;
+    font-weight: 600; text-transform: uppercase; transition: all 0.1s;
+    display: flex; align-items: center; gap: 6px; height: 28px;
+}
+button:hover { border-color: var(--accent); color: var(--accent); background: #303030; }
+button.active { background: var(--accent); color: #000; border-color: var(--accent); }
+button.primary { background: var(--accent); color: #000; border: none; }
+button.primary:hover { background: var(--accent-hover); }
+button.danger:hover { border-color: #ff5252; color: #ff5252; }
+
+/* Layout */
+#workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
+#sidebar {
+    width: 340px; background: var(--panel); display: flex; flex-direction: column;
+    flex-shrink: 0; min-width: 280px; max-width: 600px;
+    border-right: 1px solid var(--border); position: relative; z-index: 5;
+}
+#resizer {
+    width: 6px; height: 100%; cursor: col-resize; position: absolute; right: -3px; top: 0;
+    z-index: 100; transition: background 0.2s;
+}
+#resizer:hover, #resizer.dragging { background: var(--accent); }
+
+/* Panels */
+.panel-scroll { overflow-y: auto; flex: 1; padding: 0; scrollbar-width: thin; scrollbar-color: #444 #222; }
+.panel-section { border-bottom: 1px solid var(--border); }
+.section-header {
+    padding: 10px 12px; background: #222; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; color: var(--text-dim);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.section-header:hover { color: var(--text); background: #2a2a2a; }
+.section-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.section-body.collapsed { display: none; }
+
+/* Tools */
+.grid-tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.tool-btn {
+    height: 48px; flex-direction: column; justify-content: center; gap: 4px;
+    background: #222; border-color: transparent; font-size: 10px; border-radius: 4px;
+}
+.tool-btn.active { background: #333; border-color: var(--accent); color: var(--accent); }
+.color-dot { width: 6px; height: 6px; border-radius: 50%; box-shadow: 0 0 5px currentColor; }
+
+/* Library */
+.lib-controls { display: flex; gap: 4px; margin-bottom: 8px; }
+.lib-controls button { flex: 1; justify-content: center; }
+.lib-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 2px; }
+.lib-item {
+    background: #222; border: 1px solid #333; border-radius: 4px; padding: 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative;
+    transition: all 0.1s;
+}
+.lib-item:hover { border-color: var(--accent); background: #2a2a2a; }
+.lib-thumb { width: 100%; aspect-ratio: 1; background: #111; border-radius: 2px; image-rendering: pixelated; object-fit: contain; }
+.lib-name { font-size: 9px; color: #aaa; width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-del {
+    position: absolute; top: 2px; right: 2px; width: 14px; height: 14px;
+    background: rgba(0,0,0,0.8); color: #ff5252; border-radius: 2px;
+    display: none; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;
+}
+.lib-item:hover .lib-del { display: flex; }
+.lib-del:hover { background: #ff5252; color: #fff; }
+
+/* Controls */
+.control-grid { display: flex; flex-direction: column; gap: 8px; }
+.control-item { display: flex; flex-direction: column; gap: 4px; }
+label { font-size: 10px; color: var(--text-dim); font-weight: 500; display: flex; justify-content: space-between; }
+.slider-group { display: flex; align-items: center; gap: 8px; }
+input[type="range"] {
+    flex: 1; height: 4px; background: #333; border-radius: 2px;
+    accent-color: var(--accent); appearance: none; -webkit-appearance: none; -moz-appearance: none;
+}
+input[type="number"], select {
+    background: #111; border: 1px solid #333; color: var(--text);
+    font-size: 11px; padding: 4px 6px; border-radius: 3px; width: 60px; outline: none;
+}
+select { width: 100%; }
+input:focus, select:focus { border-color: var(--accent); }
+.chk-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #aaa; }
+input[type="checkbox"] { width: auto; }
+
+/* Matrix Table */
+.matrix-table { display: grid; grid-template-columns: 40px repeat(4, 1fr); gap: 4px; font-size: 10px; text-align: center; color: #aaa; margin-top: 5px; }
+.matrix-head { font-weight: bold; color: var(--accent); border-bottom: 1px solid #333; padding-bottom: 2px; }
+.matrix-cell { display: flex; justify-content: center; align-items: center; background: #222; border-radius: 2px; height: 20px; }
+.matrix-cell.disabled { opacity: 0.2; pointer-events: none; }
+
+.env-wrapper { background: #151515; border: 1px solid #333; border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.env-graph { position: relative; height: 100px; width: 100%; background: #111; border-bottom: 1px solid #222; cursor: default; }
+.env-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.env-knobs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.env-knobs.plus-amt { grid-template-columns: repeat(5, 1fr); }
+.knob-control { display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative; touch-action: none; }
+.knob-svg { width: 32px; height: 32px; pointer-events: none; }
+.knob-track { fill: none; stroke: #333; stroke-width: 3; stroke-linecap: round; }
+.knob-value { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.knob-label { font-size: 9px; color: #666; text-transform: uppercase; font-weight: 600; pointer-events: none; }
+.knob-val-text { font-size: 9px; color: #aaa; margin-top: -2px; pointer-events: none; }
+
+#canvas-wrap { flex: 1; position: relative; background: #080808; overflow: auto; }
+canvas { display: block; touch-action: none; width:100%; height:100%; }
+#status-bar { height: 24px; background: var(--panel); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 12px; font-size: 10px; color: var(--text-dim); font-family: monospace; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 999; display: flex; align-items: center; justify-content: center; }
+.modal-box { background: var(--panel); border: 1px solid var(--border); padding: 30px; border-radius: 8px; max-width: 400px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.key-hint { background: #333; padding: 2px 4px; border-radius: 3px; color: #fff; font-family: monospace; }
+input[type="text"] { user-select: text; cursor: text; padding: 8px; width: 100%; margin-bottom: 15px; background: #111; border: 1px solid #333; color: white; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Automata Synth Pro</h1>
+    <div class="controls">
+        <button id="btn-save-proj">💾 Save</button>
+        <button id="btn-load-proj">📂 Open</button>
+        <input type="file" id="proj-file-in" accept=".json" style="display:none">
+        <div style="width:1px; height:20px; background:#333; margin:0 4px"></div>
+        <button id="btn-clear">Clear</button>
+        <button id="btn-reset">Reset</button>
+        <button id="btn-undo">↶</button>
+        <button id="btn-redo">↷</button>
+        <div style="width:1px; height:20px; background:#333; margin:0 4px"></div>
+        <button id="btn-play" class="primary">▶ Play</button>
+        <button id="btn-step">Step</button>
+    </div>
+</header>
+
+<div id="workspace">
+    <div id="sidebar">
+        <div class="panel-scroll">
+            <div class="panel-section">
+                <div class="section-header">Palette</div>
+                <div class="section-body">
+                    <div class="grid-tools">
+                        <button class="tool-btn active" data-tool="select"><span>🖱️</span>Select</button>
+                        <button class="tool-btn" data-tool="wire"><span class="color-dot" style="color:var(--c-wire);background:var(--c-wire)"></span>Wire</button>
+                        <button class="tool-btn" data-tool="head"><span class="color-dot" style="color:var(--c-head);background:var(--c-head)"></span>Signal</button>
+                        <button class="tool-btn" data-tool="tail"><span class="color-dot" style="color:var(--c-tail);background:var(--c-tail)"></span>Tail</button>
+                        <button class="tool-btn" data-tool="diode"><span class="color-dot" style="color:var(--c-diode);background:var(--c-diode)"></span>Diode</button>
+                        <button class="tool-btn" data-tool="delay"><span class="color-dot" style="color:var(--c-delay);background:var(--c-delay)"></span>Delay</button>
+                        <button class="tool-btn" data-tool="logic"><span class="color-dot" style="color:var(--c-logic);background:var(--c-logic)"></span>Logic</button>
+                        <button class="tool-btn" data-tool="if"><span class="color-dot" style="color:var(--c-if);background:var(--c-if)"></span>If</button>
+                        <button class="tool-btn" data-tool="gen"><span class="color-dot" style="color:var(--c-gen);background:var(--c-gen)"></span>Clock</button>
+                        <button class="tool-btn" data-tool="note"><span class="color-dot" style="color:var(--c-note);background:var(--c-note)"></span>Synth</button>
+                        <button class="tool-btn" data-tool="wall"><span class="color-dot" style="color:var(--c-wall);background:var(--c-wall)"></span>Wall</button>
+                        <button class="tool-btn" data-tool="erase" style="color:#ff5252"><span>✕</span>Erase</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="section-header">Pattern Library</div>
+                <div class="section-body">
+                    <div class="lib-controls"><button id="btn-lib-save">✚ Save Selection</button></div>
+                    <div id="lib-list" class="lib-grid"><div style="grid-column:1/-1;text-align:center;color:#666;font-size:10px;padding:10px;">Library Empty</div></div>
+                </div>
+            </div>
+            <div id="inspector"></div>
+            <div class="panel-section">
+                <div class="section-header">Global Settings</div>
+                <div class="section-body" id="global-settings"></div>
+            </div>
+        </div>
+        <div id="resizer"></div>
+    </div>
+    <div id="canvas-wrap"><canvas id="c"></canvas></div>
+</div>
+
+<div id="status-bar"><span id="stat-status">Ready</span><span id="stat-coord" style="min-width: 80px; text-align: center;">X: 0 Y: 0</span><span><span class="key-hint">DEL</span> delete, <span class="key-hint">Ctrl+C/V</span> copy/paste</span></div>
+<div class="modal-overlay" id="splash">
+    <div class="modal-box">
+        <h2 style="color:var(--accent); margin-top:0">AUTOMATA SYNTH PRO</h2>
+        <p style="color:#aaa; line-height:1.6; font-size:13px; margin-bottom:30px;"><b>Select Tool:</b> Drag to box select.<br><b>Move:</b> Drag selection to move.<br><b>Edit:</b> Use precision sliders and knobs.</p>
+        <button id="btn-init" class="primary" style="padding:12px 30px; font-size:14px">START ENGINE</button>
+    </div>
+</div>
+<div class="modal-overlay" id="save-modal" style="display:none">
+    <div class="modal-box"><h3 style="color:var(--accent);margin-top:0;margin-bottom:15px">Save Pattern</h3><input type="text" id="save-name" placeholder="Pattern Name"><div style="display:flex; gap:10px; justify-content:center;"><button id="btn-save-confirm" class="primary" style="padding:8px 20px">Save</button><button id="btn-save-cancel" style="padding:8px 20px">Cancel</button></div></div>
+</div>
+<div class="modal-overlay" id="alert-modal" style="display:none"><div class="modal-box"><h3 style="color:#e0e0e0;margin-top:0;margin-bottom:15px" id="alert-msg">Message</h3><button id="btn-alert-ok" class="primary" style="padding:8px 20px">OK</button></div></div>
+<input type="file" id="synth-file-in" accept=".wav,.mp3" style="display:none">
+
+<script>
+(() => {
+const T = { EMPTY:0, WIRE:1, HEAD:2, TAIL:3, WALL:4, GEN:5, NOTE:6, DIODE:7, DELAY:8, LOGIC:9, IF:10 };
+// Nearly monochrome palette with subtle tints for differentiation
+const C = { [T.EMPTY]:'#0c0c0c', [T.WIRE]:'#141414', [T.HEAD]:'#232323', [T.TAIL]:'#1b1b1b', [T.GEN]:'#191919', [T.NOTE]:'#20161f', [T.DIODE]:'#1a140f', [T.DELAY]:'#161215', [T.LOGIC]:'#141414', [T.IF]:'#101010', [T.WALL]:'#0f0f0f' };
+const F = {'C2':65.41,'C#2':69.3,'D2':73.4,'D#2':77.7,'E2':82.4,'F2':87.3,'F#2':92.5,'G2':98,'G#2':103.8,'A2':110,'A#2':116.5,'B2':123.4,'C3':130.8,'C#3':138.5,'D3':146.8,'D#3':155.5,'E3':164.8,'F3':174.6,'F#3':185,'G3':196,'G#3':207.6,'A3':220,'A#3':233,'B3':246.9,'C4':261.6,'C#4':277.1,'D4':293.6,'D#4':311.1,'E4':329.6,'F4':349.2,'F#4':369.9,'G4':392,'G#4':415.3,'A4':440,'A#4':466.1,'B4':493.8,'C5':523.2};
+// Helper: convert hex to rgba
+function hexToRgba(hex, a){ if(!hex) return `rgba(255,255,255,${a})`; const h = hex.replace('#',''); const bigint = parseInt(h.length===3? h.split('').map(c=>c+c).join(''):h,16); const r=(bigint>>16)&255,g=(bigint>>8)&255,b=bigint&255; return `rgba(${r},${g},${b},${a})`; }
+const mkSlider = (lbl, val, min, max, step, cb) => {
+    const d = document.createElement('div'); d.className='control-item';
+    d.innerHTML = `<label>${lbl}</label><div class="slider-group"><input type="range" min="${min}" max="${max}" step="${step}" value="${val}"><input type="number" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
+    const r = d.querySelector('input[type=range]'), n = d.querySelector('input[type=number]');
+    r.oninput = () => { n.value = r.value; cb(+r.value); }; n.oninput = () => { r.value = n.value; cb(+n.value); }; return d;
+};
+class AudioSys {
+    constructor() { this.ctx=null;this.out=null;this.verb=null;this.verbGain=null;this.delay=null;this.delayGain=null;this.comp=null;this.samples={};this.rawSamples={};this.waves={}; }
+    async init() {
+        if(this.ctx)return; this.ctx=new(window.AudioContext||window.webkitAudioContext)();
+        this.comp=this.ctx.createDynamicsCompressor();this.comp.connect(this.ctx.destination);
+        this.out=this.ctx.createGain();this.out.connect(this.comp);
+        this.verb=this.ctx.createConvolver();this.mkImpulse(); this.verbGain=this.ctx.createGain();this.verb.connect(this.verbGain);this.verbGain.connect(this.out);
+        this.delay=this.ctx.createDelay(5.0);const fbk=this.ctx.createGain();fbk.gain.value=0.4;this.delay.connect(fbk);fbk.connect(this.delay);this.delayGain=this.ctx.createGain();this.delay.connect(this.delayGain);this.delayGain.connect(this.out);
+        this.mkWaves();
+    }
+    mkImpulse() { const sr=this.ctx.sampleRate,b=this.ctx.createBuffer(2,sr*2.5,sr);for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<b.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/b.length,3)} this.verb.buffer=b; }
+    mkWaves() { const R=new Float32Array(64),I=new Float32Array(64); for(let n=1;n<64;n+=2)R[n]=1/n;this.waves['organ']=this.ctx.createPeriodicWave(R,I); R.fill(0);I.fill(0);for(let n=1;n<64;n++)I[n]=1/n;this.waves['saw']=this.ctx.createPeriodicWave(R,I); R.fill(0);I.fill(0);for(let n=1;n<64;n+=2)I[n]=1/n;this.waves['square']=this.ctx.createPeriodicWave(R,I); }
+    async loadFile(n,b) {
+        if(!this.ctx) await this.init();
+        if(this.ctx.state==='suspended') await this.ctx.resume();
+        let decoded = null;
+        try {
+            // Prefer direct ArrayBuffer from the File for decoding
+            const arr = await (typeof b.arrayBuffer === 'function' ? b.arrayBuffer() : new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=(e)=>res(e.target.result); fr.onerror=rej; fr.readAsArrayBuffer(b); }));
+            try { decoded = await this.ctx.decodeAudioData(arr); }
+            catch(err) { // Older spec fallback
+                decoded = await new Promise((res,rej)=> this.ctx.decodeAudioData(arr, res, rej));
+            }
+            this.samples[n] = decoded;
+            // notify listeners that a sample decoded (so UI can update quickly)
+            try{ document.dispatchEvent(new CustomEvent('samples-updated',{detail:{name:n}})); }catch(e){}
+        } catch(e){ console.error('Decode failed', e); return false; }
+        // Also store raw data URL for project export/restore
+        const fr2 = new FileReader();
+        return new Promise(res=>{ fr2.onload = e=>{ this.rawSamples[n] = e.target.result; try{ document.dispatchEvent(new CustomEvent('samples-updated',{detail:{name:n}})); }catch(e){}; res(true); }; fr2.onerror = ()=>{ res(true); }; fr2.readAsDataURL(b); });
+    }
+    async restoreSamples(m) {
+        if(!this.ctx) await this.init();
+        this.rawSamples = m;
+        const ps = [];
+        const dataURLToArrayBuffer = (dataURL) => {
+            const base64 = dataURL.split(',')[1] || '';
+            const binary = atob(base64);
+            const len = binary.length;
+            const ab = new Uint8Array(len);
+            for(let i=0;i<len;i++) ab[i] = binary.charCodeAt(i);
+            return ab.buffer;
+        };
+        for(const [n,b] of Object.entries(m)) ps.push((async ()=>{
+            try {
+                let arr;
+                if(typeof b === 'string' && b.startsWith('data:')) arr = dataURLToArrayBuffer(b);
+                else arr = await (await fetch(b)).arrayBuffer();
+                try { this.samples[n] = await this.ctx.decodeAudioData(arr); }
+                catch(err) { this.samples[n] = await new Promise((res,rej)=> this.ctx.decodeAudioData(arr, res, rej)); }
+            } catch(err) { console.warn('Failed to restore sample', n, err); }
+        })());
+        await Promise.all(ps);
+        try{ document.dispatchEvent(new CustomEvent('samples-updated',{detail:{restored:true}})); }catch(e){}
+    }
+    play(d) {
+        if(!this.ctx)return; const t=this.ctx.currentTime,v=this.ctx.createGain(); const p=this.ctx.createStereoPanner(); p.pan.value=d.pan||0; v.connect(p);p.connect(this.out);v.connect(this.verb);v.connect(this.delay);
+        const a=d.atk,dc=d.dec,s=d.sus,r=d.rel; v.gain.setValueAtTime(0,t); v.gain.linearRampToValueAtTime(d.vol,t+a); if(dc>0)v.gain.exponentialRampToValueAtTime(Math.max(0.001,d.vol*s),t+a+dc); v.gain.exponentialRampToValueAtTime(0.001,t+a+dc+r); v.gain.linearRampToValueAtTime(0,t+a+dc+r+0.01);
+        let src,fr=F[d.pitch]||440;
+        if(d.src==='sample'){
+            // ensure file exists; if not, pick first available sample
+            if(!d.file || !this.samples[d.file]){
+                const keys = Object.keys(this.samples);
+                if(keys.length){ d.file = keys[0]; } else { d.src='osc'; }
+            }
+            if(d.src==='sample' && this.samples[d.file]){
+                src=this.ctx.createBufferSource();src.buffer=this.samples[d.file];
+                // Use proper playback rate calculation (root pitch + detune in cents)
+                const rootFreq = F[d.root]||261.63;
+                const rate = (fr / rootFreq) * Math.pow(2, (d.detune||0)/1200);
+                src.playbackRate.value = rate;
+                src.loop=d.loop;
+            }
+        }
+        else { src=this.ctx.createOscillator();src.frequency.value=fr;src.detune.value=d.detune; if(d.src==='custom'&&this.waves[d.wave])src.setPeriodicWave(this.waves[d.wave]);else src.type=d.wave; if(d.fmIdx>0){const m=this.ctx.createOscillator(),mg=this.ctx.createGain();m.frequency.value=fr*d.fmRat;mg.gain.value=fr*d.fmIdx;m.connect(mg).connect(src.frequency);m.start(t);m.stop(t+a+dc+r+1)} }
+        let n=src; if(d.filtType!=='none'){ const f=this.ctx.createBiquadFilter();f.type=d.filtType;f.Q.value=d.filtRes; const b=Math.max(20,d.filtFreq); f.frequency.setValueAtTime(b,t); if(d.fAmt!==0){const pk=Math.max(20,Math.min(22000,b+(d.fAmt*10))); f.frequency.linearRampToValueAtTime(pk,t+d.fAtk);f.frequency.exponentialRampToValueAtTime(Math.max(20,b+(d.fAmt*10*d.fSus)),t+d.fAtk+d.fDec);f.frequency.exponentialRampToValueAtTime(b,t+d.fAtk+d.fDec+d.fRel)} src.connect(f);n=f; }
+        if(d.lfoAmt>0&&d.lfoDest!=='none'){
+            const l=this.ctx.createOscillator(), lg=this.ctx.createGain();
+            l.frequency.value=d.lfoRate; l.start(t); l.stop(t+a+dc+r+1);
+            if(d.lfoDest==='pitch'){
+                // For oscillators we modulate detune (cents), for buffer sources modulate playbackRate
+                if(src && src.playbackRate){
+                    // scale amount to reasonable playbackRate offset
+                    lg.gain.value = d.lfoAmt * 0.2; // empiric scale
+                    l.connect(lg).connect(src.playbackRate);
+                } else if(src && 'detune' in src){
+                    lg.gain.value = d.lfoAmt * 100; // cents
+                    l.connect(lg).connect(src.detune);
+                }
+            } else if(d.lfoDest==='filter'&&n.frequency){ lg.gain.value = d.lfoAmt * 1000; l.connect(lg).connect(n.frequency); }
+            else if(d.lfoDest==='amp'){ lg.gain.value = d.lfoAmt * 0.5; l.connect(lg).connect(v.gain); }
+        }
+        n.connect(v); src.start(t); const dur=a+dc+r+(d.loop?2:0.1); src.stop(t+dur); setTimeout(()=>v.disconnect(),dur*1000+200);
+    }
+}
+class Knob { constructor(l,v,min,max,step,cb){this.val=v;this.min=min;this.max=max;this.step=step;this.cb=cb;this.el=document.createElement('div');this.el.className='knob-control';this.el.title=`${l}: ${v}`;this.el.innerHTML=`<svg class="knob-svg" viewBox="0 0 32 32"><path class="knob-track"/><path class="knob-value"/></svg><div class="knob-label">${l}</div><div class="knob-val-text">${v}</div>`;this.track=this.el.querySelector('.knob-track');this.valPath=this.el.querySelector('.knob-value');this.valText=this.el.querySelector('.knob-val-text');let sy,sv;const mv=e=>{const d=sy-e.clientY;let nv=sv+(d/100)*(max-min);nv=Math.max(min,Math.min(max,nv));if(step)nv=Math.round(nv/step)*step;this.setVal(parseFloat(nv.toFixed(2)),true)};const up=e=>{this.el.releasePointerCapture(e.pointerId);this.el.removeEventListener('pointermove',mv);this.el.removeEventListener('pointerup',up)};this.el.onpointerdown=e=>{sy=e.clientY;sv=this.val;this.el.setPointerCapture(e.pointerId);this.el.addEventListener('pointermove',mv);this.el.addEventListener('pointerup',up);e.preventDefault()};this.updateSvg()} setVal(v,e=false){this.val=v;this.valText.innerText=v;this.el.title=this.el.querySelector('.knob-label').innerText+': '+v;this.updateSvg();if(e)this.cb(v)} updateSvg(){const r=12,c=16,sa=2.356,ea=7.068,nm=(this.val-this.min)/(this.max-this.min),ca=sa+nm*(ea-sa);const arc=(s,e)=>{const la=(e-s)>Math.PI?1:0;return`M ${c+r*Math.cos(s)} ${c+r*Math.sin(s)} A ${r} ${r} 0 ${la} 1 ${c+r*Math.cos(e)} ${c+r*Math.sin(e)}`};this.track.setAttribute('d',arc(sa,ea));this.valPath.setAttribute('d',arc(sa,ca))} }
+
+// --- MAIN APP ---
+class App {
+    constructor() {
+        this.cvs=document.getElementById('c'); this.ctx=this.cvs.getContext('2d',{alpha:false});
+        this.aud=new AudioSys(); this.grid={w:64,h:48,d:[],b:[],tick:0};
+        for(let i=0;i<64*48;i++){this.grid.d.push({t:T.EMPTY,p:{}});this.grid.b.push({t:T.EMPTY,p:{}})}
+        this.sz=20; this.tool='select'; this.playing=false; this.bpm=120; this.global={vol:0.5,verb:0.3,delay:0.0};
+        this.selRect=null; this.dragState=null; this.clip=null; this.lastMouse={x:0,y:0}; this.library=[]; this.history=[]; this.histIdx=-1;
+        // Camera for pan/zoom (world coords in pixels)
+        this.cam={x:0,y:0,zoom:1,vx:0,vy:0};
+        this.hover=null;
+        this.defs={
+            gen:{rate:8,burst:0},diode:{rot:0,ret:T.DIODE},delay:{time:4,ret:T.DELAY},logic:{func:'OR',rot:0,ret:T.LOGIC},
+            if:{
+                mode: 'standard', // 'standard' or 'countdown'
+                logic: 'OR', limit: 4, val: 0,
+                sides: [ // U, R, D, L
+                    {type:'input', mode:'modulo', limit:2, val:0}, 
+                    {type:'output', mode:'modulo', limit:2, val:0}, 
+                    {type:'none', mode:'modulo', limit:2, val:0}, 
+                    {type:'none', mode:'modulo', limit:2, val:0}
+                ],
+                // For Countdown mode inputs
+                inputs: [
+                    {dec:true, rst:false}, {dec:true, rst:false}, {dec:true, rst:false}, {dec:true, rst:false}
+                ],
+                ret:T.IF
+            },
+            wire:{ret:T.WIRE,instant:false},
+            note:{src:'osc',wave:'sine',pitch:'C3',detune:0,pan:0,atk:0.05,dec:0.2,sus:0.4,rel:0.5,vol:0.6,filtType:'none',filtFreq:2000,filtRes:1,fAmt:0,fAtk:0.01,fDec:0.3,fSus:0,fRel:0.2,lfoDest:'none',lfoRate:4,lfoAmt:0,fmIdx:0,fmRat:2,file:'',root:'C4',loop:false,prop:'step',ret:T.NOTE,cool:0}
+        };
+        this.saveState(); this.init(); this.loop();
+    }
+    at(x,y){if(x<0||x>=this.grid.w||y<0||y>=this.grid.h)return{t:T.WALL};return this.grid.d[y*this.grid.w+x]}
+    put(x,y,t,p={}){if(x>=0&&x<this.grid.w&&y>=0&&y<this.grid.h){const c=this.grid.d[y*this.grid.w+x];c.t=t;c.p=JSON.parse(JSON.stringify(p))}}
+    getRect(r){const b=[];for(let y=0;y<r.h;y++){const row=[];for(let x=0;x<r.w;x++)row.push(JSON.parse(JSON.stringify(this.at(r.x+x,r.y+y))));b.push(row)}return b}
+    setRect(x,y,b){for(let r=0;r<b.length;r++)for(let c=0;c<b[r].length;c++){const cell=b[r][c];if(cell)this.put(x+c,y+r,cell.t,cell.p)}}
+    clearRect(r){for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++)this.put(r.x+x,r.y+y,T.EMPTY)}
+    refreshLib(){const l=document.getElementById('lib-list');l.innerHTML='';if(this.library.length==0){l.innerHTML='<div style="grid-column:1/-1;text-align:center;color:#666;font-size:10px;padding:10px;">Library Empty</div>';return}this.library.forEach((it,i)=>{const el=document.createElement('div');el.className='lib-item';el.innerHTML=`<img src="${it.thumb}" class="lib-thumb"><div class="lib-name">${it.name}</div><div class="lib-del" title="Delete">✕</div>`;el.onclick=()=>{this.tool='select';document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool==='select'));this.clip=it.data;const sx=this.lastMouse.x||Math.floor(this.grid.w/2-it.w/2),sy=this.lastMouse.y||Math.floor(this.grid.h/2-it.h/2);this.dragState={mode:'paste',buffer:this.clip,current:{x:sx,y:sy}};this.draw()};el.querySelector('.lib-del').onclick=e=>{e.stopPropagation();this.library.splice(i,1);this.refreshLib()};l.appendChild(el)})}
+    saveToLib(){if(!this.selRect){this.showAlert('Select cells first!');return}document.getElementById('save-modal').style.display='flex';document.getElementById('save-name').focus()}
+    finalizeSave(){const n=document.getElementById('save-name').value||'Untitled',d=this.getRect(this.selRect),t=this.genThumb(d,this.selRect.w,this.selRect.h);this.library.push({name:n,w:this.selRect.w,h:this.selRect.h,data:d,thumb:t});this.refreshLib();document.getElementById('save-modal').style.display='none'}
+    genThumb(d,w,h){const cvs=document.createElement('canvas'),dim=Math.max(w,h),s=60/dim;cvs.width=60;cvs.height=60;const ctx=cvs.getContext('2d');ctx.fillStyle='#111';ctx.fillRect(0,0,60,60);const ox=(60-w*s)/2,oy=(60-h*s)/2;for(let r=0;r<h;r++)for(let c=0;c<w;c++){const cell=d[r][c];if(cell&&cell.t!==T.EMPTY){ctx.fillStyle=C[cell.t]||'#fff';ctx.fillRect(ox+c*s,oy+r*s,s,s)}}return cvs.toDataURL()}
+    showAlert(m){document.getElementById('alert-msg').innerText=m;document.getElementById('alert-modal').style.display='flex'}
+    exportProject(){const d={grid:this.grid.d,library:this.library,settings:{bpm:this.bpm,vol:this.global.vol,verb:this.global.verb,delay:this.global.delay},samples:this.aud.rawSamples};const b=new Blob([JSON.stringify(d)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='automata_project.json';a.click()}
+    loadProject(f){const r=new FileReader();r.onload=async e=>{try{const d=JSON.parse(e.target.result);if(d.samples)await this.aud.restoreSamples(d.samples);if(d.grid)this.grid.d=d.grid;if(d.library)this.library=d.library;if(d.settings){this.bpm=d.settings.bpm;this.global=d.settings;if(this.aud.out)this.aud.out.gain.value=this.global.vol;if(this.aud.verbGain)this.aud.verbGain.gain.value=this.global.verb;if(this.aud.delayGain)this.aud.delayGain.gain.value=this.global.delay;this.setupGlobalUI()}this.refreshLib();this.draw();this.saveState()}catch(x){console.error(x);alert('Load failed')}};r.readAsText(f)}
+    saveState(){const s=JSON.stringify(this.grid.d);if(this.histIdx<this.history.length-1)this.history=this.history.slice(0,this.histIdx+1);this.history.push(s);if(this.history.length>50)this.history.shift();else this.histIdx++}
+    undo(){if(this.histIdx>0){this.histIdx--;this.grid.d=JSON.parse(this.history[this.histIdx]);this.draw()}}
+    redo(){if(this.histIdx<this.history.length-1){this.histIdx++;this.grid.d=JSON.parse(this.history[this.histIdx]);this.draw()}}
+    
+    // --- UI SETUP & LOGIC ---
+    setupGlobalUI(){const p=document.getElementById('global-settings');p.innerHTML='';p.append(mkSlider('BPM',this.bpm,40,300,1,v=>this.bpm=v));p.append(mkSlider('Volume',this.global.vol,0,1,0.01,v=>{this.global.vol=v;if(this.aud.out)this.aud.out.gain.value=v}));p.append(mkSlider('Reverb',this.global.verb,0,1,0.01,v=>{this.global.verb=v;if(this.aud.verbGain)this.aud.verbGain.gain.value=v}));p.append(mkSlider('Delay',this.global.delay,0,1,0.01,v=>{this.global.delay=v;if(this.aud.delayGain)this.aud.delayGain.gain.value=v}))}
+    init(){
+        const on=(i,e,f)=>document.getElementById(i)?.addEventListener(e,f);
+        // panning state for right-drag camera movement
+        on('btn-init','click',async()=>{await this.aud.init();this.aud.out.gain.value=this.global.vol;this.aud.verbGain.gain.value=this.global.verb;this.aud.delayGain.gain.value=this.global.delay;document.getElementById('splash').style.display='none'});
+        on('btn-play','click',e=>{this.playing=!this.playing;e.target.innerHTML=this.playing?'⏹ Stop':'▶ Play';e.target.classList.toggle('active');if(this.playing)this.runTick()});
+        on('btn-step','click',()=>{this.step();this.draw()});on('btn-clear','click',()=>{this.grid.d.forEach(c=>{c.t=T.EMPTY;c.p={}});this.selRect=null;this.saveState();this.draw()});on('btn-reset','click',()=>{this.grid.d.forEach(c=>{if(c.t===T.HEAD||c.t===T.TAIL)c.t=c.p.ret||T.WIRE});this.draw()});on('btn-undo','click',()=>this.undo());on('btn-redo','click',()=>this.redo());
+        on('btn-save-proj','click',()=>this.exportProject());on('btn-load-proj','click',()=>document.getElementById('proj-file-in').click());on('proj-file-in','change',e=>{if(e.target.files[0])this.loadProject(e.target.files[0])});
+        on('btn-lib-save','click',()=>this.saveToLib());on('btn-save-confirm','click',()=>this.finalizeSave());on('btn-save-cancel','click',()=>document.getElementById('save-modal').style.display='none');on('btn-alert-ok','click',()=>document.getElementById('alert-modal').style.display='none');
+        on('synth-file-in','change',e=>{
+            const f = e.target.files[0];
+            if(!f) return;
+            const st = document.getElementById('stat-status'); if(st) st.innerText = 'Loading sample...';
+            this.aud.loadFile(f.name, f).then(ok => {
+                if(ok){
+                    // Attach to selected cell (either `this.sel` or single-cell `selRect`)
+                    let rx=null, ry=null;
+                    if(this.sel){ rx=this.sel.x; ry=this.sel.y; }
+                    else if(this.selRect && this.selRect.w===1 && this.selRect.h===1){ rx=this.selRect.x; ry=this.selRect.y; }
+                    if(rx!==null){ const c=this.at(rx,ry); if(c.t===T.NOTE){ c.p.file=f.name; c.p.src='sample'; this.put(rx,ry,T.NOTE,c.p); this.saveState(); } }
+                    // Force inspector to refresh (clear cache) so file shows up immediately
+                    this.inspSig = '';
+                    this.insp();
+                    if(st) st.innerText = 'Sample loaded';
+                } else {
+                    alert('Load failed'); if(st) st.innerText = 'Load failed';
+                }
+                // Clear input so same file can be re-selected later
+                e.target.value = '';
+                this.draw();
+            });
+        });
+        
+        this.setupGlobalUI();
+        // Refresh inspector when samples change (force rebuild)
+        document.addEventListener('samples-updated', ()=>{ this.inspSig=''; this.insp(); });
+        document.querySelectorAll('.tool-btn').forEach(b=>{b.onclick=()=>{document.querySelectorAll('.tool-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');this.tool=b.dataset.tool;this.selRect=null;this.sel=null;this.dragState=null;this.insp();this.draw()}});
+        
+        const cvs=this.cvs;
+        window.onresize=()=>this.draw();
+        cvs.onmousedown=e=>{
+            // Right button starts panning
+            if(e.button===2){ panning = {sx:e.clientX, sy:e.clientY, ox:this.cam.x, oy:this.cam.y, lastTime:performance.now(), lastX:e.clientX, lastY:e.clientY}; document.body.style.cursor='grabbing'; return; }
+            const p=this.gPos(e);
+            if(this.dragState&&this.dragState.mode==='paste'){
+                this.saveState(); this.setRect(this.dragState.current.x,this.dragState.current.y,this.dragState.buffer);
+                this.selRect={x:this.dragState.current.x,y:this.dragState.current.y,w:this.dragState.buffer[0].length,h:this.dragState.buffer.length};
+                this.dragState=null; this.tool='select'; this.saveState(); this.insp();
+            } else if(this.tool==='select'){
+                if(this.selRect && p.x>=this.selRect.x && p.x<this.selRect.x+this.selRect.w && p.y>=this.selRect.y && p.y<this.selRect.y+this.selRect.h){
+                    const b=this.getRect(this.selRect); this.clearRect(this.selRect);
+                    this.dragState={mode:'move',start:p,current:p,buffer:b,originRect:{...this.selRect}};
+                } else { this.selRect={x:p.x,y:p.y,w:1,h:1}; this.dragState={mode:'box',start:p,current:p}; }
+                this.insp();
+            } else { this.paint(p.x,p.y); this.saveState(); this.sel=null; this.selRect=null; this.insp(); }
+            this.draw();
+        };
+        cvs.onmousemove=e=>{
+            const p=this.gPos(e); this.lastMouse=p; this.hover={x:p.x,y:p.y}; const st=document.getElementById('stat-coord'); if(st) st.innerText = `X: ${p.x} Y: ${p.y}`;
+            if(this.dragState){
+                this.dragState.current=p;
+                if(this.dragState.mode==='box'){
+                    const x=Math.min(this.dragState.start.x,p.x), y=Math.min(this.dragState.start.y,p.y), w=Math.abs(this.dragState.start.x-p.x)+1, h=Math.abs(this.dragState.start.y-p.y)+1;
+                    this.selRect={x,y,w,h};
+                }
+                this.draw();
+            } else if(e.buttons&&this.tool!=='select' && !panning){this.paint(p.x,p.y); if(this.sel||this.selRect){ this.sel=null; this.selRect=null; this.insp(); } this.draw()}
+            else if(this.dragState && this.dragState.mode === 'paste') { this.dragState.current = p; this.draw(); }
+        };
+        cvs.onmouseup=e=>{
+            if(this.dragState){
+                if(this.dragState.mode==='box'){
+                    if(this.selRect.w===1&&this.selRect.h===1){const c=this.at(this.selRect.x,this.selRect.y);if(c.t!==T.EMPTY)this.sel={x:this.selRect.x,y:this.selRect.y};else this.sel=null}
+                    this.dragState=null; this.insp();
+                } else if(this.dragState.mode==='move'){
+                    const dx=this.dragState.current.x-this.dragState.start.x, dy=this.dragState.current.y-this.dragState.start.y;
+                    const nx=this.dragState.originRect.x+dx, ny=this.dragState.originRect.y+dy;
+                    this.setRect(nx,ny,this.dragState.buffer);
+                    this.selRect={x:nx,y:ny,w:this.dragState.originRect.w,h:this.dragState.originRect.h};
+                    this.dragState=null; this.saveState(); this.insp();
+                }
+            }
+            this.draw();
+        };
+        window.addEventListener('keydown',e=>{
+            if(e.target.tagName==='INPUT')return; const k=e.key.toLowerCase();
+            if((k==='delete'||k==='backspace')&&this.selRect){this.saveState();this.clearRect(this.selRect);this.selRect=null;this.insp();this.draw()}
+            if(e.ctrlKey&&k==='c'&&this.selRect){this.clip=this.getRect(this.selRect)}
+            if(e.ctrlKey&&k==='v'&&this.clip){this.dragState={mode:'paste',buffer:this.clip,current:{...this.lastMouse}};this.tool='select';document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool==='select'));this.selRect=null;this.draw()}
+            if(e.ctrlKey&&k==='z')this.undo(); if(e.ctrlKey&&k==='y')this.redo();
+        });
+        const sb=document.getElementById('sidebar'), rs=document.getElementById('resizer');
+        let rsz=false;
+        rs.onmousedown=()=>{ rsz=true; rs.classList.add('dragging'); document.body.style.cursor='col-resize'; };
+        window.addEventListener('mouseup',()=>{ rsz=false; rs.classList.remove('dragging'); document.body.style.cursor=''; });
+        window.addEventListener('mousemove',e=>{ if(rsz) sb.style.width=Math.max(280,Math.min(600,e.clientX))+'px'; });
+        // Keep canvas full size of container with devicePixelRatio handling
+        const fit = ()=>{
+            // use bounding rect for accurate size
+            const r = this.cvs.getBoundingClientRect();
+            const cw = Math.max(1, r.width), ch = Math.max(1, r.height);
+            this.dpr = window.devicePixelRatio || 1;
+            // ensure canvas fills parent
+            this.cvs.style.width = '100%'; this.cvs.style.height = '100%';
+            // set pixel size
+            this.cvs.width = Math.max(1, Math.round(cw * this.dpr));
+            this.cvs.height = Math.max(1, Math.round(ch * this.dpr));
+            // reset transform for screen-space drawing
+            this.ctx.setTransform(this.dpr,0,0,this.dpr,0,0);
+            this.draw();
+        };
+        // try a few times to ensure layout has settled
+        fit(); requestAnimationFrame(fit); setTimeout(fit, 50); setTimeout(fit, 200);
+        window.addEventListener('resize', fit);
+
+        // Interaction: prevent context menu and add panning/zoom
+        this.cvs.oncontextmenu = e => e.preventDefault();
+        let panning = null;
+        window.addEventListener('mousemove', e=>{
+            if(panning){
+                const dx = (e.clientX - panning.sx)/this.cam.zoom; const dy = (e.clientY - panning.sy)/this.cam.zoom;
+                this.cam.x = panning.ox - dx; this.cam.y = panning.oy - dy;
+                // velocity for inertia
+                const now = performance.now(); const dt = Math.max(1, now - panning.lastTime);
+                this.cam.vx = (e.clientX - panning.lastX)/dt; this.cam.vy = (e.clientY - panning.lastY)/dt;
+                panning.lastTime = now; panning.lastX = e.clientX; panning.lastY = e.clientY;
+                this.draw();
+            }
+        });
+        window.addEventListener('mouseup', e=>{ if(panning){ panning=null; document.body.style.cursor=''; } });
+        this.cvs.addEventListener('wheel', e=>{
+            // Robust zoom-to-cursor: compute world point under cursor and re-center after zoom
+            const rect = this.cvs.getBoundingClientRect();
+            const sx = e.clientX - rect.left; const sy = e.clientY - rect.top; // CSS pixels
+            const delta = (e.deltaMode === 1) ? e.deltaY * 16 : e.deltaY; // normalize line mode
+            // scale down sensitivity and clamp per-event factor to avoid jumps
+            const sensitivity = 0.001;
+            let zoomFactor = Math.exp(-delta * sensitivity);
+            zoomFactor = Math.max(0.8, Math.min(1.25, zoomFactor));
+            const newZoom = Math.max(0.25, Math.min(4, this.cam.zoom * zoomFactor));
+
+            // World coordinate under cursor (CSS pixels) using old zoom
+            const worldX = this.cam.x + sx / this.cam.zoom;
+            const worldY = this.cam.y + sy / this.cam.zoom;
+
+            // Apply new zoom and adjust camera so world point stays under cursor
+            this.cam.zoom = newZoom;
+            this.cam.x = worldX - sx / this.cam.zoom;
+            this.cam.y = worldY - sy / this.cam.zoom;
+
+            e.preventDefault(); this.draw();
+        }, { passive: false });
+    }
+    
+    gPos(e) {
+        const r = this.cvs.getBoundingClientRect();
+        const sx = e.clientX - r.left;
+        const sy = e.clientY - r.top;
+        const worldX = this.cam.x + (sx / this.cam.zoom);
+        const worldY = this.cam.y + (sy / this.cam.zoom);
+        const x = Math.floor(worldX / this.sz);
+        const y = Math.floor(worldY / this.sz);
+        return { x, y, px: sx, py: sy, wx: worldX, wy: worldY };
+    }
+
+    // --- Missing Methods Restored ---
+    expandGridToInclude(x,y){
+        // Only support expanding to positive coords for now
+        if(x<0||y<0) return;
+        let nw = this.grid.w, nh = this.grid.h;
+        if(x>=nw) nw = x+1; if(y>=nh) nh = y+1;
+        if(nw===this.grid.w && nh===this.grid.h) return;
+        const nd = []; const nb = [];
+        for(let yy=0;yy<nh;yy++){
+            for(let xx=0;xx<nw;xx++){
+                if(xx<this.grid.w && yy<this.grid.h){ nd.push(JSON.parse(JSON.stringify(this.grid.d[yy*this.grid.w+xx]))); nb.push(JSON.parse(JSON.stringify(this.grid.b[yy*this.grid.w+xx]))); }
+                else { nd.push({t:T.EMPTY,p:{}}); nb.push({t:T.EMPTY,p:{}}); }
+            }
+        }
+        this.grid.w = nw; this.grid.h = nh; this.grid.d = nd; this.grid.b = nb;
+    }
+
+    paint(x,y) {
+        // clamp negative for now
+        if(x<0) x=0; if(y<0) y=0;
+        // expand grid as needed
+        if(x>=this.grid.w || y>=this.grid.h) this.expandGridToInclude(x,y);
+        let t=T.EMPTY, p={};
+        const m={ wire:[T.WIRE,{ret:T.WIRE,instant:false}], head:[T.HEAD,{ret:T.WIRE}], tail:[T.TAIL,{ret:T.WIRE}], wall:[T.WALL], gen:[T.GEN,{...this.defs.gen}], diode:[T.DIODE,{...this.defs.diode}], note:[T.NOTE,{...this.defs.note}], delay:[T.DELAY,{...this.defs.delay}], logic:[T.LOGIC,{...this.defs.logic}], if:[T.IF,JSON.parse(JSON.stringify(this.defs.if))], erase:[T.EMPTY] };
+        if(m[this.tool]) this.put(x,y,m[this.tool][0], m[this.tool][1]||{});
+    }
+
+    loop() { requestAnimationFrame(()=>this.loop()); }
+    runTick() { if(this.playing){ this.step(); this.draw(); setTimeout(()=>this.runTick(), 60000/this.bpm/4); } }
+    
+    // --- INSPECTOR UI ---
+    insp(){
+        const el=document.getElementById('inspector');
+        let d=null,t=null,isSel=false,sig='';
+        if(this.selRect){
+            if(this.selRect.w===1&&this.selRect.h===1){const c=this.at(this.selRect.x,this.selRect.y);if(c.t!==T.EMPTY){d=c.p;t=c.t;isSel=true;sig=`sel-${this.selRect.x}-${this.selRect.y}-${t}`}}
+            else{el.innerHTML=`<div style="text-align:center;padding:20px;color:#666;font-size:11px">Selection: ${this.selRect.w}x${this.selRect.h}</div>`;this.inspSig='multi';return}
+        }
+        if(!d && ['gen','note','diode','delay','logic','if','wire'].includes(this.tool)) {
+            t=this.tool==='gen'?T.GEN:(this.tool==='diode'?T.DIODE:(this.tool==='delay'?T.DELAY:(this.tool==='logic'?T.LOGIC:(this.tool==='if'?T.IF:(this.tool==='wire'?T.WIRE:T.NOTE)))));
+            d=this.defs[this.tool]; sig=`tool-${this.tool}`;
+        }
+        if(!d){el.innerHTML='<div style="text-align:center;padding:20px;color:#666;font-size:11px">Select item</div>';this.inspSig='';return}
+        if(this.inspSig===sig)return; this.inspSig=sig; el.innerHTML='';
+
+        const update=(k,v)=>{
+            d[k]=v;
+            // If changing source away from 'sample', clear file reference
+            if(k==='src' && v!=='sample' && d.file) d.file='';
+            // If switching to sample, auto-select first sample if none assigned
+            if(k==='src' && v==='sample' && (!d.file || !this.aud.samples[d.file])){
+                const keys = Object.keys(this.aud.samples);
+                if(keys.length) d.file = keys[0];
+            }
+            // Persist change to selected cell
+            if(isSel && this.selRect){ this.put(this.selRect.x,this.selRect.y,t,d); this.saveState(); }
+            // Force rebuild for UI changes that alter inspector contents
+            if(k==='src' || k==='file' || k==='filtType') this.inspSig='';
+            const knob=el.querySelector(`#knob-${k}`); if(knob&&knob._knob) knob._knob.setVal(v);
+            const gr=el.querySelector(`#graph-${k.startsWith('f')?'filt':'amp'}`); if(gr&&gr._redraw) gr._redraw();
+            this.draw();
+            // Rebuild inspector if structure changed
+            if(k==='src' || k==='file' || k==='filtType') this.insp();
+        };
+        const mkGrp=(tit)=>{const s=document.createElement('div');s.className='panel-section';s.innerHTML=`<div class="section-header"><span>${tit}</span><span>▼</span></div><div class="section-body"></div>`;s.firstChild.onclick=e=>{s.lastChild.classList.toggle('collapsed');e.currentTarget.lastChild.innerText=s.lastChild.classList.contains('collapsed')?'◀':'▼'};el.append(s);return s.lastChild};
+        const mkRow=(p,l,c)=>{const r=document.createElement('div');r.className='control-item';if(c.tagName==='SELECT')r.classList.add('full');r.innerHTML=`<label>${l}</label>`;r.append(c);p.append(r)};
+
+        if(t===T.GEN) { const p=mkGrp('Generator'); p.append(mkSlider('Rate',d.rate,1,64,1,v=>update('rate',v))); p.append(mkSlider('Burst (0=Inf)',d.burst||0,0,32,1,v=>update('burst',v))); }
+        else if(t===T.DELAY) { const p=mkGrp('Delay'); p.append(mkSlider('Time (Ticks)',d.time,1,64,1,v=>update('time',v))); }
+        else if(t===T.WIRE) { const p=mkGrp('Wire Props'); const i=document.createElement('input'); i.type='checkbox'; i.checked=d.instant; i.onchange=e=>update('instant',e.target.checked); const dI=document.createElement('div'); dI.className='chk-row'; dI.innerHTML='<label>Instant Propagation</label>'; dI.append(i); p.append(dI); }
+        else if(t===T.LOGIC) { const p=mkGrp('Logic Gate'); const s=document.createElement('select'); ['OR','AND','XOR','NAND','NOT'].forEach(l=>{const o=document.createElement('option');o.value=l;o.text=l;if(d.func==l)o.selected=true;s.append(o)}); s.onchange=e=>update('func',e.target.value); mkRow(p,'Function',s); const s2=document.createElement('select'); ['Up','Right','Down','Left'].forEach((l,i)=>{const o=document.createElement('option');o.value=i;o.text=l;if(d.rot==i)o.selected=true;s2.append(o)}); s2.onchange=e=>update('rot',+e.target.value); mkRow(p,'Output Dir',s2); }
+        else if(t===T.IF) {
+            const p=mkGrp('IF Configuration');
+            const sMode=document.createElement('select'); ['standard','countdown'].forEach(m=>{const o=document.createElement('option');o.value=m;o.text=m.toUpperCase();if(d.mode==m)o.selected=true;sMode.append(o)});
+            sMode.onchange=e=>{d.mode=e.target.value;this.inspSig='';this.insp();if(isSel)this.put(this.selRect.x,this.selRect.y,t,d)};
+            mkRow(p,'Mode',sMode);
+
+            if(d.mode === 'countdown') {
+                p.append(mkSlider('Limit (N)', d.limit, 1, 64, 1, v=>update('limit',v)));
+                const lM = document.createElement('label'); lM.innerText = 'Input Matrix'; p.append(lM);
+                const mat = document.createElement('div'); mat.className = 'matrix-table';
+                mat.innerHTML = `<div class="matrix-head"></div><div class="matrix-head">U</div><div class="matrix-head">R</div><div class="matrix-head">D</div><div class="matrix-head">L</div><div style="font-weight:bold;color:#fff">Count</div><div id="m-dec-0" class="matrix-cell"><input type="checkbox"></div><div id="m-dec-1" class="matrix-cell"><input type="checkbox"></div><div id="m-dec-2" class="matrix-cell"><input type="checkbox"></div><div id="m-dec-3" class="matrix-cell"><input type="checkbox"></div><div style="font-weight:bold;color:#ff5252">Reset</div><div id="m-rst-0" class="matrix-cell"><input type="checkbox"></div><div id="m-rst-1" class="matrix-cell"><input type="checkbox"></div><div id="m-rst-2" class="matrix-cell"><input type="checkbox"></div><div id="m-rst-3" class="matrix-cell"><input type="checkbox"></div>`;
+                p.append(mat);
+                ['dec','rst'].forEach(action => { [0,1,2,3].forEach(dir => { const cell = mat.querySelector(`#m-${action}-${dir}`); const chk = cell.querySelector('input'); if (d.sides[dir].type !== 'input') { cell.classList.add('disabled'); chk.disabled = true; } else { chk.checked = d.inputs[dir][action]; chk.onchange = e => { d.inputs[dir][action] = e.target.checked; if(isSel)this.put(this.selRect.x,this.selRect.y,t,d); }; } }); });
+            } else {
+                const sLogic=document.createElement('select');['OR','AND','XOR'].forEach(l=>{const o=document.createElement('option');o.value=l;o.text=l;if(d.logic==l)o.selected=true;sLogic.append(o)});
+                sLogic.onchange=e=>update('logic',e.target.value);mkRow(p,'Input Logic',sLogic);
+            }
+            ['Up','Right','Down','Left'].forEach((dirName,idx)=>{
+                const pSide=mkGrp(`Side: ${dirName}`);
+                const sType=document.createElement('select');
+                ['none','input','output'].forEach(l=>{const o=document.createElement('option');o.value=l;o.text=l.toUpperCase();if(d.sides[idx].type==l)o.selected=true;sType.append(o)});
+                sType.onchange=e=>{d.sides[idx].type=e.target.value;this.inspSig='';this.insp();if(isSel)this.put(this.selRect.x,this.selRect.y,t,d);this.draw()};
+                mkRow(pSide,'Type',sType);
+                if(d.sides[idx].type==='output'){
+                    if (d.mode !== 'countdown') {
+                        const sMode=document.createElement('select');
+                        ['modulo','toggle','random'].forEach(m=>{const o=document.createElement('option');o.value=m;o.text=m.toUpperCase();if(d.sides[idx].mode==m)o.selected=true;sMode.append(o)});
+                        sMode.onchange=e=>{d.sides[idx].mode=e.target.value;if(isSel)this.put(this.selRect.x,this.selRect.y,t,d)};mkRow(pSide,'Mode',sMode);
+                        const iLim=document.createElement('input');iLim.type='number';iLim.min=1;iLim.max=64;iLim.value=d.sides[idx].limit;
+                        iLim.oninput=e=>{d.sides[idx].limit=+e.target.value;if(isSel)this.put(this.selRect.x,this.selRect.y,t,d)};mkRow(pSide,'Limit/N',iLim);
+                    } else {
+                        const info = document.createElement('div'); info.style.fontSize='10px'; info.style.color='#aaa'; info.innerText = 'Triggers on 0'; pSide.append(info);
+                    }
+                }
+            });
+        }
+        else if(t===T.DIODE){const p=mkGrp('Diode'),s=document.createElement('select');['Up','Right','Down','Left'].forEach((l,i)=>{const o=document.createElement('option');o.value=i;o.text=l;if(d.rot==i)o.selected=true;s.append(o)});s.onchange=e=>update('rot',+e.target.value);mkRow(p,'Dir',s)}
+        else if(t===T.NOTE){
+            const p1=mkGrp('Source');
+            const sSrc=document.createElement('select'); ['osc','sample','custom'].forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k.toUpperCase();if(d.src===k)o.selected=true;sSrc.append(o)});
+            sSrc.onchange=e=>{ update('src', e.target.value); }; mkRow(p1,'Source',sSrc);
+            if(d.src==='sample') {
+                const sFile=document.createElement('select'), keys=Object.keys(this.aud.samples);
+                if(keys.length) keys.forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k;if(d.file===k)o.selected=true;sFile.append(o)}); else sFile.innerHTML='<option>No files</option>';
+                sFile.onchange=e=>update('file',e.target.value); 
+                const btnImp = document.createElement('button'); btnImp.innerText = 'Import Audio'; btnImp.style.width='100%'; btnImp.onclick = () => document.getElementById('synth-file-in').click();
+                const dSamp = document.createElement('div'); dSamp.className='control-item full'; dSamp.style.gap='8px'; dSamp.append(sFile, btnImp); mkRow(p1, 'File', dSamp);
+                const iLoop=document.createElement('input'); iLoop.type='checkbox'; iLoop.checked=d.loop; iLoop.onchange=e=>update('loop',e.target.checked); mkRow(p1,'Loop',iLoop);
+            } else {
+                const sWave=document.createElement('select'), ws=d.src==='custom'?Object.keys(this.aud.waves):['sine','square','sawtooth','triangle'];
+                ws.forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k;if(d.wave===k)o.selected=true;sWave.append(o)});
+                sWave.onchange=e=>update('wave',e.target.value); mkRow(p1,'Wave',sWave);
+                p1.append(mkSlider('FM Depth', d.fmIdx, 0, 5, 0.1, v=>update('fmIdx',v)));
+                p1.append(mkSlider('FM Ratio', d.fmRat, 0.1, 16, 0.1, v=>update('fmRat',v)));
+            }
+            const sPt=document.createElement('select'); Object.keys(F).forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k;if(d.pitch===k)o.selected=true;sPt.append(o)});
+            sPt.onchange=e=>update('pitch',e.target.value); mkRow(p1,'Pitch',sPt);
+            p1.append(mkSlider('Detune', d.detune, -1200, 1200, 1, v=>update('detune',v)));
+            p1.append(mkSlider('Pan', d.pan||0, -1, 1, 0.1, v=>update('pan',v)));
+            const sProp=document.createElement('select'); ['step','instant'].forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k.toUpperCase();if(d.prop===k)o.selected=true;sProp.append(o)});
+            sProp.onchange=e=>update('prop',e.target.value); mkRow(p1,'Propagate',sProp);
+            const p2=mkGrp('Envelopes'); const lA=document.createElement('label'); lA.innerText='Amp Env'; p2.append(lA); p2.append(this.mkEnv(d,['atk','dec','sus','rel'],update,'amp'));
+            if(d.filtType!=='none') { const lF=document.createElement('label'); lF.innerText='Filter Env'; lF.style.marginTop='10px'; p2.append(lF); p2.append(this.mkEnv(d,['fAtk','fDec','fSus','fRel'],update,'filt','fAmt')); }
+            const p3=mkGrp('Filter & LFO'); const sF=document.createElement('select'); ['none','lowpass','highpass','bandpass'].forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k;if(d.filtType===k)o.selected=true;sF.append(o)});
+            sF.onchange=e=>{ update('filtType', e.target.value); }; mkRow(p3,'Type',sF);
+            if(d.filtType!=='none') { p3.append(mkSlider('Cutoff', d.filtFreq, 20, 10000, 10, v=>update('filtFreq',v))); p3.append(mkSlider('Res', d.filtRes, 0, 20, 0.1, v=>update('filtRes',v))); }
+            const sLfo=document.createElement('select'); ['none','pitch','filter','amp'].forEach(k=>{const o=document.createElement('option');o.value=k;o.text=k;if(d.lfoDest===k)o.selected=true;sLfo.append(o)});
+            sLfo.onchange=e=>update('lfoDest',e.target.value); mkRow(p3,'LFO Target',sLfo);
+            if(d.lfoDest!=='none') { p3.append(mkSlider('Rate', d.lfoRate, 0.1, 20, 0.1, v=>update('lfoRate',v))); p3.append(mkSlider('Amount', d.lfoAmt, 0, 1, 0.01, v=>update('lfoAmt',v))); }
+        }
+    }
+    mkEnv(d, keys, cb, idBase, amtKey=null) {
+        const [kA,kD,kS,kR] = keys;
+        const w = document.createElement('div'); w.className='env-wrapper';
+        const g = document.createElement('div'); g.className='env-graph'; g.id=`graph-${idBase}`;
+        const c = document.createElement('canvas'); c.className='env-canvas';
+        g.append(c); w.append(g);
+        const kDiv=document.createElement('div'); kDiv.className='env-knobs'+(amtKey?' plus-amt':'');
+        const addK=(l,k,min,max,st)=>{const kn=new Knob(l,d[k],min,max,st,v=>cb(k,v)); kn.el.id=`knob-${k}`; kn.el._knob=kn; kDiv.append(kn.el)};
+        addK('Atk',kA,0.01,2,0.01); addK('Dec',kD,0.01,2,0.01); addK('Sus',kS,0,1,0.01); addK('Rel',kR,0.01,5,0.01);
+        if(amtKey) addK('Amt',amtKey,-5000,5000,50); w.append(kDiv);
+
+        let drag = null;
+        const ctx=c.getContext('2d');
+        const getPts = () => {
+            const W=c.width, H=c.height, S=W/3;
+            const a=d[kA], dc=d[kD], s=d[kS], rl=d[kR];
+            return { x1:a*S, y1:0, x2:(a+dc)*S, y2:H*(1-s), x3:(a+dc+rl)*S, y3:H, W, H, S };
+        };
+        g._redraw = () => {
+            const p = getPts();
+            ctx.clearRect(0,0,p.W,p.H); ctx.fillStyle='#111'; ctx.fillRect(0,0,p.W,p.H);
+            ctx.beginPath(); ctx.moveTo(0,p.H); ctx.lineTo(p.x1,p.y1); ctx.lineTo(p.x2,p.y2); ctx.lineTo(p.x3,p.y3);
+            ctx.fillStyle='rgba(0,188,212,0.15)'; ctx.fill();
+            ctx.strokeStyle='#00bcd4'; ctx.lineWidth=2; ctx.stroke();
+            const dot=(x,y,h)=>{ ctx.beginPath(); ctx.arc(x,y,h?6:4,0,Math.PI*2); ctx.fillStyle=h?'#fff':'#aaa'; ctx.fill(); };
+            dot(p.x1,p.y1, drag==='a'); dot(p.x2,p.y2, drag==='d'); dot(p.x3,p.y3, drag==='r');
+        };
+        const obs = new ResizeObserver(() => { const r=g.getBoundingClientRect(); if(r.width>0){ c.width=r.width; c.height=r.height; g._redraw(); } });
+        obs.observe(g);
+        const hit = 15;
+        c.onpointerdown = e => {
+            const r=c.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top, p=getPts();
+            if(Math.hypot(mx-p.x1,my-p.y1)<hit) drag='a'; else if(Math.hypot(mx-p.x2,my-p.y2)<hit) drag='d'; else if(Math.hypot(mx-p.x3,my-p.y3)<hit) drag='r';
+            if(drag) { c.setPointerCapture(e.pointerId); g._redraw(); }
+        };
+        c.onpointermove = e => {
+            const r=c.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+            if(drag) {
+                const t=Math.max(0,mx/getPts().S), y=Math.max(0,Math.min(1,1-(my/r.height)));
+                if(drag==='a') cb(kA, Math.max(0.01,parseFloat(t.toFixed(2))));
+                else if(drag==='d') { cb(kD, Math.max(0.01,parseFloat((t-d[kA]).toFixed(2)))); cb(kS, parseFloat(y.toFixed(2))); }
+                else if(drag==='r') cb(kR, Math.max(0.01,parseFloat((t-d[kA]-d[kD]).toFixed(2))));
+            } else {
+                const p=getPts();
+                c.style.cursor = (Math.hypot(mx-p.x1,my-p.y1)<hit||Math.hypot(mx-p.x2,my-p.y2)<hit||Math.hypot(mx-p.x3,my-p.y3)<hit) ? 'pointer':'default';
+            }
+        };
+        c.onpointerup = e => { if(drag){ drag=null; g._redraw(); c.releasePointerCapture(e.pointerId); } };
+        return w;
+    }
+
+    step() {
+        this.grid.tick++;
+        // Update pulses and camera inertia
+        for(let i=0;i<this.grid.d.length;i++){ const c=this.grid.d[i]; if(c.p._pulse){ c.p._pulse = Math.max(0, c.p._pulse - 0.25); } }
+        // camera inertia
+        if(Math.abs(this.cam.vx)>0.001 || Math.abs(this.cam.vy)>0.001){ this.cam.x -= this.cam.vx * 32; this.cam.y -= this.cam.vy * 32; this.cam.vx *= 0.92; this.cam.vy *= 0.92; this.draw(); }
+        
+        const dirs = [[0,-1],[1,0],[0,1],[-1,0]];
+        for(let i=0;i<this.grid.d.length;i++){this.grid.b[i].t=this.grid.d[i].t;this.grid.b[i].p={...this.grid.d[i].p};}
+        const inst = new Set();
+        
+        // pulse helper: mark a cell to display a subtle glow animation
+        const spawnPulse = (x,y,c)=>{
+            if(x<0||y<0||x>=this.grid.w||y>=this.grid.h) return;
+            const idx = y*this.grid.w+x; const cell = this.grid.d[idx]; cell.p._pulse = Math.max(cell.p._pulse||0, 6); cell.p._pulseCol = c;
+        };
+        
+        const flood = (sx,sy) => {
+            const q=[[sx,sy]];
+            while(q.length){
+                const [cx,cy]=q.pop(), i=cy*this.grid.w+cx;
+                if(inst.has(i)) continue; inst.add(i);
+                const c=this.grid.d[i], n=this.grid.b[i];
+                n.t=T.HEAD; n.p.cool=2; if(c.t===T.NOTE) { this.aud.play(c.p); spawnPulse(cx,cy,C[T.NOTE]); }
+                for(let d of dirs) {
+                    const nx=cx+d[0], ny=cy+d[1], ni=ny*this.grid.w+nx;
+                    if(nx>=0&&nx<this.grid.w&&ny>=0&&ny<this.grid.h){
+                        const nc=this.grid.d[ni];
+                        if((nc.t===T.NOTE && nc.p.prop==='instant' && (!nc.p.cool||nc.p.cool<=0)) || (nc.t===T.WIRE && nc.p.instant) && !inst.has(ni)) q.push([nx,ny]);
+                    }
+                }
+            }
+        };
+
+        for(let y=0;y<this.grid.h;y++) for(let x=0;x<this.grid.w;x++) {
+            const i=y*this.grid.w+x;
+            if(inst.has(i)) continue;
+            const c=this.grid.d[i], n=this.grid.b[i];
+            if(c.p.cool>0) n.p.cool--;
+
+            if(c.t===T.HEAD) n.t=T.TAIL;
+            else if(c.t===T.TAIL) n.t=c.p.ret||T.WIRE;
+            else if(c.t===T.DELAY) {
+                if(c.p.wait > 0) {
+                    n.p.wait--;
+                    if(n.p.wait === 0) { n.t = T.HEAD; spawnPulse(x,y,C[T.DELAY]); }
+                } else {
+                    let h=0; for(let d of dirs) if(this.at(x+d[0],y+d[1]).t===T.HEAD) h++;
+                    if(h>0) n.p.wait = c.p.time;
+                }
+            }
+            else if(c.t===T.LOGIC) {
+                const r=c.p.rot||0; let inputs=0;
+                [1,2,3].forEach(offset => {
+                    const dIdx = (r + offset) % 4;
+                    const tx = x + dirs[dIdx][0], ty = y + dirs[dIdx][1];
+                    if(this.at(tx, ty).t === T.HEAD) inputs++;
+                });
+                
+                let active = false;
+                switch(c.p.func) {
+                    case 'OR': active = inputs > 0; break;
+                    case 'AND': active = inputs >= 2; break;
+                    case 'XOR': active = inputs === 1; break;
+                    case 'NAND': active = inputs !== 2; break;
+                    case 'NOT': active = inputs === 0; break; 
+                }
+                if(active) {
+                    const d=dirs[r], ni=(y+d[1])*this.grid.w+(x+d[0]);
+                    if(ni>=0 && ni<this.grid.d.length) {
+                        const nc = this.grid.d[ni];
+                        if(nc.t===T.WIRE||nc.t===T.NOTE||nc.t===T.DELAY||nc.t===T.IF||nc.t===T.LOGIC||nc.t===T.DIODE) {
+                             this.grid.b[ni].t = T.HEAD;
+                             if(nc.t===T.NOTE) this.aud.play(nc.p);
+                        }
+                    }
+                }
+            }
+            else if(c.t===T.IF) {
+                // Determine active inputs
+                let inputActive = false;
+                let activeInputs = 0;
+                let validSides = 0;
+
+                if(c.p.sides) {
+                    c.p.sides.forEach((side, idx) => {
+                        if(side.type === 'input') {
+                            validSides++;
+                            const d = dirs[idx];
+                            if (this.at(x+d[0], y+d[1]).t === T.HEAD) activeInputs++;
+                        }
+                    });
+                }
+                
+                if (c.p.mode === 'countdown') {
+                    let reset = false, decrement = false;
+                    c.p.sides.forEach((s,idx)=>{
+                        if(s.type==='input'){
+                            const d=dirs[idx]; if(this.at(x+d[0],y+d[1]).t===T.HEAD){
+                                if(c.p.inputs[idx].rst) reset=true;
+                                if(c.p.inputs[idx].dec) decrement=true;
+                            }
+                        }
+                    });
+                    if(reset) n.p.val = c.p.limit;
+                    else if(decrement && c.p.val > 0) n.p.val = c.p.val - 1;
+
+                    if(n.p.val === 0 && c.p.val > 0) inputActive = true; 
+                } else {
+                    const logic = c.p.logic || 'OR';
+                    if (logic === 'OR') inputActive = activeInputs > 0;
+                    else if (logic === 'AND') inputActive = activeInputs === validSides && validSides > 0;
+                    else if (logic === 'XOR') inputActive = activeInputs === 1;
+                }
+
+                if(inputActive) {
+                    c.p.sides.forEach((side, idx) => {
+                        if(side.type === 'output') {
+                            let fire = false;
+                            if (c.p.mode === 'countdown') {
+                                fire = true; // Countdown reached 0
+                            }
+                            else if (side.mode === 'toggle') {
+                                n.p.sides[idx].val = (side.val + 1);
+                                if (n.p.sides[idx].val >= side.limit) {
+                                    n.p.sides[idx].val = 0;
+                                    n.p.sides[idx].state = !side.state;
+                                }
+                                if(n.p.sides[idx].state) fire = true;
+                            } 
+                            else if (side.mode === 'random') {
+                                fire = Math.random() < (1/side.limit);
+                            }
+                            else { // Modulo
+                                n.p.sides[idx].val = (side.val + 1) % side.limit;
+                                if (n.p.sides[idx].val === 0) fire = true;
+                            }
+
+                            if (fire) {
+                                const d = dirs[idx];
+                                const ni = (y+d[1])*this.grid.w + (x+d[0]);
+                                if(ni>=0 && ni<this.grid.d.length) {
+                                    const nc = this.grid.d[ni];
+                                    if(nc.t!==T.WALL && nc.t!==T.EMPTY && nc.t!==T.TAIL && nc.t!==T.HEAD) {
+                                        this.grid.b[ni].t = T.HEAD;
+                                        if(nc.t===T.NOTE) this.aud.play(nc.p);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            else if(c.t===T.WIRE || c.t===T.NOTE) {
+                let heads=0, blockedHeads=0;
+                for(let d of dirs) {
+                    const nb = this.at(x+d[0],y+d[1]);
+                    if(nb.t===T.HEAD) {
+                        heads++;
+                        let hasWall=false, hasOtherPath=false;
+                        for(let d2 of dirs) {
+                            const nb2 = this.at(x+d[0]+d2[0], y+d[1]+d2[1]);
+                            if(nb2.t===T.WALL) hasWall=true;
+                            // Consider generators as a valid connected path so heads driven by a clock aren't treated as "blocked"
+                            if(!(d2[0]===-d[0]&&d2[1]===-d[1]) && (nb2.t===T.WIRE||nb2.t===T.HEAD||nb2.t===T.TAIL||nb2.t===T.GEN)) hasOtherPath=true;
+                        }
+                        if(!hasWall && !hasOtherPath) blockedHeads++; 
+                    }
+                }
+                if(heads > 0 && heads === blockedHeads) {} 
+                else if(heads===1 || heads===2) {
+                    if((c.t===T.NOTE&&c.p.prop==='instant'&&(!c.p.cool||c.p.cool<=0))||(c.t===T.WIRE&&c.p.instant)) flood(x,y);
+                    else { n.t=T.HEAD; if(c.t===T.NOTE&&(!c.p.cool||c.p.cool<=0)){this.aud.play(c.p);n.p.cool=2;spawnPulse(x,y,C[T.NOTE])} }
+                }
+            }
+            else if(c.t===T.GEN && (this.grid.tick%c.p.rate)===0) {
+                spawnPulse(x,y,'#fff');
+                for(let d of dirs) {
+                    const nx=x+d[0], ny=y+d[1], ni=ny*this.grid.w+nx;
+                    if(nx>=0&&nx<this.grid.w&&ny>=0&&ny<this.grid.h) {
+                         const nc=this.grid.d[ni];
+                         if(nc.t===T.DELAY) this.grid.b[ni].p.wait=nc.p.time;
+                         else if (nc.t===T.WIRE||nc.t===T.NOTE) {
+                            if((nc.t===T.NOTE&&nc.p.prop==='instant'&&(!nc.p.cool||nc.p.cool<=0))||(nc.t===T.WIRE&&nc.p.instant)) flood(nx,ny);
+                            else { this.grid.b[ni].t=T.HEAD; if(nc.t===T.NOTE&&(!nc.p.cool||nc.p.cool<=0)){this.aud.play(nc.p);this.grid.b[ni].p.cool=2} }
+                        }
+                    }
+                }
+            }
+        }
+        let tp=this.grid.d; this.grid.d=this.grid.b; this.grid.b=tp;
+    }
+
+    // --- DRAW ---
+    draw() {
+        const ctx=this.ctx;
+        // soft background gradient (screen-space) with DPR scaling
+        const cw = this.cvs.clientWidth, ch = this.cvs.clientHeight;
+        ctx.setTransform(this.dpr,0,0,this.dpr,0,0);
+        const g = ctx.createLinearGradient(0,0,0,ch);
+        g.addColorStop(0,'#070708'); g.addColorStop(1,'#0b0b0c');
+        ctx.fillStyle = g; ctx.fillRect(0,0,cw,ch);
+        // subtle grid texture (screen-space)
+        ctx.fillStyle='rgba(255,255,255,0.01)';
+        for(let gx=10;gx<cw;gx+=20) for(let gy=10;gy<ch;gy+=20) ctx.fillRect(gx-1,gy-1,2,2);
+
+        // world transform for cells and selections (include DPR)
+        ctx.save();
+        // Apply world transform: scale by DPR*zoom and translate so cam.x/cam.y are the top-left world coords
+        const s = this.dpr * this.cam.zoom;
+        ctx.setTransform(s,0,0,s,-s*this.cam.x,-s*this.cam.y);
+
+        // compute visible cell range to render (in CSS pixels)
+        const left = Math.floor(this.cam.x / this.sz) - 1;
+        const top = Math.floor(this.cam.y / this.sz) - 1;
+        const right = Math.ceil((this.cam.x + (cw)/this.cam.zoom) / this.sz) + 1;
+        const bottom = Math.ceil((this.cam.y + (ch)/this.cam.zoom) / this.sz) + 1;
+
+        for(let y=Math.max(0,top); y<Math.min(this.grid.h,bottom); y++){
+            for(let x=Math.max(0,left); x<Math.min(this.grid.w,right); x++){
+                const c = this.at(x,y); if(c.t!==T.EMPTY) this.drawCell(x*this.sz,y*this.sz,c,1);
+            }
+        }
+
+        // selection (soft neumorphic outline) in world-space
+        if(this.selRect){ ctx.save(); ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=8; ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=2; ctx.strokeRect(this.selRect.x*this.sz+2,this.selRect.y*this.sz+2,this.selRect.w*this.sz-4,this.selRect.h*this.sz-4); ctx.restore(); }
+
+        // drag previews (world-space)
+        if(this.dragState){
+            const ox=this.dragState.mode==='box'?0:(this.dragState.current.x-(this.dragState.mode==='paste'?0:this.dragState.start.x));
+            const oy=this.dragState.mode==='box'?0:(this.dragState.current.y-(this.dragState.mode==='paste'?0:this.dragState.start.y));
+            if(this.dragState.mode==='move'||this.dragState.mode==='paste'){
+                const b=this.dragState.buffer, bx=this.dragState.mode==='move'?this.dragState.originRect.x+ox:this.dragState.current.x, by=this.dragState.mode==='move'?this.dragState.originRect.y+oy:this.dragState.current.y;
+                for(let r=0;r<b.length;r++) for(let c=0;c<b[r].length;c++){const cell=b[r][c]; if(cell&&cell.t!==T.EMPTY) this.drawCell((bx+c)*this.sz,(by+r)*this.sz,cell,0.6)}
+                ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.03)'; ctx.lineWidth=1; ctx.strokeRect(bx*this.sz+1,by*this.sz+1,b[0].length*this.sz-2,b.length*this.sz-2); ctx.restore();
+            }
+            if(this.dragState.mode==='box'){
+                const x=Math.min(this.dragState.start.x,this.dragState.current.x), y=Math.min(this.dragState.start.y,this.dragState.current.y), w=Math.abs(this.dragState.start.x-this.dragState.current.x)+1, h=Math.abs(this.dragState.start.y-this.dragState.current.y)+1;
+                ctx.fillStyle='rgba(255,255,255,0.02)'; ctx.fillRect(x*this.sz+2,y*this.sz+2,w*this.sz-4,h*this.sz-4); ctx.strokeStyle='rgba(255,255,255,0.03)'; ctx.lineWidth=1; ctx.strokeRect(x*this.sz+2,y*this.sz+2,w*this.sz-4,h*this.sz-4);
+            }
+        }
+
+        ctx.restore();
+    }
+    drawCell(xx, yy, c, alpha) {
+        const ctx=this.ctx; ctx.globalAlpha=alpha;
+        const x = xx, y = yy, s = this.sz;
+        const cx = x + 2, cy = y + 2, cw = s-4, ch = s-4, r = Math.max(4, Math.floor(s*0.3));
+        const gx = Math.round(x / this.sz), gy = Math.round(y / this.sz);
+        const same = (dx,dy) => { const n = this.at(gx+dx, gy+dy); return n && n.t === c.t; };
+        const col = C[c.t] || '#151515';
+
+        // Base shape
+        ctx.save();
+        // outer soft shadow for neumorphic lift
+        ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
+        // fill for central rounded rect
+        const path = new Path2D();
+        const drawRounded = (px,py,pw,ph,rad)=>{ path.moveTo(px+rad,py); path.arcTo(px+pw,py,px+pw,py+ph,rad); path.arcTo(px+pw,py+ph,px,py+ph,rad); path.arcTo(px,py+ph,px,py,rad); path.arcTo(px,py,px+pw,py,rad); };
+        drawRounded(cx,cy,cw,ch,r);
+        ctx.fillStyle = col; ctx.fill(path);
+        ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+        // connectors for adjacent same-type cells (left,right,up,down)
+        ctx.fillStyle = col;
+        const connW = Math.max(4, Math.round(s*0.3));
+        const connH = s - 4;
+        const connY = y + 2;
+        if(same(-1,0)) ctx.fillRect(x, connY, connW, connH);
+        if(same(1,0)) ctx.fillRect(x + s - connW, connY, connW, connH);
+        if(same(0,-1)) ctx.fillRect(x + 2, y, s - 4, connW);
+        if(same(0,1)) ctx.fillRect(x + 2, y + s - connW, s - 4, connW);
+
+        // subtle top highlight (embossed)
+        const grad = ctx.createLinearGradient(0, y, 0, y+20);
+        grad.addColorStop(0, 'rgba(255,255,255,0.05)'); grad.addColorStop(1, 'rgba(0,0,0,0.12)');
+        ctx.fillStyle = grad; ctx.fill(path);
+
+        // inner shadow / edge for embossed look
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; ctx.stroke(path);
+
+        // pulse glow
+        const cxC = x + s/2, cyC = y + s/2;
+        if(c.p && c.p._pulse && c.p._pulse>0){
+            const v = c.p._pulse/6; const colr = c.p._pulseCol || '#ffffff';
+            const pr = Math.max(12, Math.round(s * 1.2));
+            const rg = ctx.createRadialGradient(cxC,cyC,0,cxC,cyC,pr);
+            rg.addColorStop(0, hexToRgba(colr, 0.18 * v)); rg.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(cxC,cyC,pr,0,Math.PI*2); ctx.fill();
+        }
+        // active indicator for HEAD/TAIL (subtle)
+        if(c.t===T.HEAD){ ctx.fillStyle='rgba(255,255,255,0.03)'; ctx.beginPath(); ctx.arc(cxC,cyC,Math.max(3,Math.round(s*0.25)),0,Math.PI*2); ctx.fill(); }
+
+        // small label for NOTE
+        if(c.t===T.NOTE){ ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font=Math.max(8,Math.round(s*0.35))+'px sans-serif'; ctx.textAlign='center'; ctx.fillText(c.p.pitch || '', cxC, cyC+Math.round(s*0.12)); }
+
+        // hover highlight
+        if(this.hover && this.hover.x===gx && this.hover.y===gy){ ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1.5; ctx.stroke(path); }
+        ctx.restore(); ctx.globalAlpha=1;
+    }
+}
+window.onload = () => new App();
+})();
+</script>
+</body>
+</html>
