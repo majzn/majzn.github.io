@@ -1,5 +1,6 @@
-#ifndef TERMBOX_WIN32_H
-#define TERMBOX_WIN32_H
+
+#ifndef TERMBOX_H
+#define TERMBOX_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,7 +70,13 @@ int tb_audio_free_space(void);
 
 typedef void* tb_thread_t;
 typedef void* tb_mutex_t;
-typedef unsigned (__stdcall *tb_thread_func_t)(void* user_data);
+
+/* Platform-specific thread function signature */
+#ifdef _WIN32
+    typedef unsigned (__stdcall *tb_thread_func_t)(void* user_data);
+#else
+    typedef void* (*tb_thread_func_t)(void* user_data);
+#endif
 
 tb_thread_t tb_thread_create(tb_thread_func_t func, void* user_data);
 void tb_thread_join(tb_thread_t thread);
@@ -87,35 +94,14 @@ void tb_sleep(int ms);
 
 #ifdef TB_IMPLEMENTATION
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#include <mmdeviceapi.h>
-#include <audioclient.h>
-#include <process.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
-#ifndef __cplusplus
-#define COBJMACROS
-#endif
-
 #define MAX_KEYS 512
 #define MAX_AUDIO_BUFFER 32768
 #define AUDIO_BUFFER_MASK (MAX_AUDIO_BUFFER - 1)
-
-#ifndef AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
-#define AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM 0x80000000
-#endif
-#ifndef AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
-#define AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY 0x08000000
-#endif
-#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
-#endif
 
 typedef struct {
     char ch;
@@ -130,7 +116,7 @@ typedef struct {
     int keys[MAX_KEYS];
     int prev_keys[MAX_KEYS];
     tb_mouse_state_t mouse;
-    long running;
+    volatile long running;
 
     float audio_buffer[MAX_AUDIO_BUFFER];
     volatile unsigned int audio_write_idx;
@@ -147,6 +133,37 @@ typedef struct {
 } eng_state_t;
 
 static eng_state_t g_engine;
+
+static void eng_init(int w, int h);
+static void eng_resize_buffer(int w, int h);
+static void eng_handle_input(int key, int down);
+static void eng_handle_mouse(int x, int y, int btn, int wheel, int down);
+static void eng_handle_resize(int w, int h);
+static void eng_audio_mix(float* output, int frames, int channels);
+
+#ifdef _WIN32
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <process.h>
+
+#ifndef __cplusplus
+#define COBJMACROS
+#endif
+
+#ifndef AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+#define AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM 0x80000000
+#endif
+#ifndef AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
+#define AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY 0x08000000
+#endif
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
 
 typedef struct {
     HANDLE h_out;
@@ -172,13 +189,6 @@ typedef struct {
 
 static pf_state_t g_platform;
 
-static void eng_init(int w, int h);
-static void eng_resize_buffer(int w, int h);
-static void eng_handle_input(int key, int down);
-static void eng_handle_mouse(int x, int y, int btn, int wheel, int down);
-static void eng_handle_resize(int w, int h);
-static void eng_audio_mix(float* output, int frames, int channels);
-
 static int pf_init_console(int w, int h, const char* title);
 static void pf_close_console(void);
 static void pf_poll_events(void);
@@ -191,7 +201,7 @@ static unsigned __stdcall pf_audio_thread_proc(void* data);
 static BOOL WINAPI pf_ctrl_handler(DWORD fdwCtrlType);
 
 tb_thread_t tb_thread_create(tb_thread_func_t func, void* user_data) {
-    HANDLE h = (HANDLE)_beginthreadex(NULL, 0, func, user_data, 0, NULL);
+    HANDLE h = (HANDLE)_beginthreadex(NULL, 0, (unsigned (__stdcall *)(void *))func, user_data, 0, NULL);
     return (tb_thread_t)h;
 }
 
@@ -636,6 +646,447 @@ static unsigned __stdcall pf_audio_thread_proc(void* data) {
     return 0;
 }
 
+static void tb_shutdown_platform(void) {
+    InterlockedExchange(&g_engine.running, 0);
+    if (g_platform.h_audio_event) SetEvent(g_platform.h_audio_event);
+
+    if (g_engine.audio_thread) {
+        tb_thread_join(g_engine.audio_thread);
+        g_engine.audio_thread = NULL;
+    }
+    pf_close_console();
+}
+
+static int tb_update_platform(void) {
+    memcpy(g_engine.prev_keys, g_engine.keys, sizeof(g_engine.keys));
+    pf_poll_events();
+    return (int)InterlockedCompareExchange(&g_engine.running, 1, 1);
+}
+
+#else
+
+#include <unistd.h>
+#include <termios.h>
+#include <sys/ioctl.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <pthread.h>
+#include <signal.h>
+#include <time.h>
+#include <poll.h>
+
+#ifndef TB_NO_AUDIO
+#include <alsa/asoundlib.h>
+#endif
+
+typedef struct {
+    struct termios orig_termios;
+    int console_initialized;
+#ifndef TB_NO_AUDIO
+    snd_pcm_t* audio_handle;
+#endif
+    float* conversion_buffer;
+    int conversion_buffer_cap;
+    int hw_channels;
+    int hw_is_float;
+    int hw_bits_per_sample;
+} pf_state_t;
+
+static pf_state_t g_platform;
+
+static int pf_init_console(int w, int h, const char* title);
+static void pf_close_console(void);
+static void pf_poll_events(void);
+static void pf_present_buffer(const eng_cell_t* buffer, int w, int h);
+static int pf_init_audio_backend(int sample_rate);
+static void pf_close_audio_backend(void);
+static void pf_process_audio_chunk(void);
+static void* pf_audio_thread_proc(void* data);
+static void pf_signal_handler(int sig);
+static void pf_winch_handler(int sig);
+
+tb_thread_t tb_thread_create(tb_thread_func_t func, void* user_data) {
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, (void* (*)(void*))func, user_data) != 0) return NULL;
+    return (tb_thread_t)thread;
+}
+
+void tb_thread_join(tb_thread_t thread) {
+    if (thread) {
+        pthread_join((pthread_t)thread, NULL);
+    }
+}
+
+tb_mutex_t tb_mutex_init(void) {
+    pthread_mutex_t* mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+    if (mutex) pthread_mutex_init(mutex, NULL);
+    return (tb_mutex_t)mutex;
+}
+
+void tb_mutex_lock(tb_mutex_t mutex) {
+    if (mutex) pthread_mutex_lock((pthread_mutex_t*)mutex);
+}
+
+void tb_mutex_unlock(tb_mutex_t mutex) {
+    if (mutex) pthread_mutex_unlock((pthread_mutex_t*)mutex);
+}
+
+void tb_mutex_destroy(tb_mutex_t mutex) {
+    if (mutex) {
+        pthread_mutex_destroy((pthread_mutex_t*)mutex);
+        free(mutex);
+    }
+}
+
+void tb_sleep(int ms) {
+    struct timespec ts;
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000;
+    nanosleep(&ts, NULL);
+}
+
+static void pf_signal_handler(int sig) {
+    __sync_lock_test_and_set(&g_engine.running, 0);
+}
+
+static void pf_winch_handler(int sig) {
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) {
+        eng_handle_resize(ws.ws_col, ws.ws_row);
+    }
+}
+
+static int pf_init_console(int w, int h, const char* title) {
+    struct termios raw;
+    struct winsize ws;
+
+    if (tcgetattr(STDIN_FILENO, &g_platform.orig_termios) == -1) return 0;
+
+    raw = g_platform.orig_termios;
+    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_oflag &= ~(OPOST);
+    raw.c_cflag |= (CS8);
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    raw.c_cc[VMIN] = 0;
+    raw.c_cc[VTIME] = 0;
+
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) return 0;
+
+    printf("\x1b[?1049h\x1b[?25l");
+    printf("\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h");
+    fflush(stdout);
+
+    signal(SIGINT, pf_signal_handler);
+    signal(SIGTERM, pf_signal_handler);
+    signal(SIGWINCH, pf_winch_handler);
+
+    if (w == 0 || h == 0) {
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) {
+            w = ws.ws_col;
+            h = ws.ws_row;
+        } else {
+            w = 80; h = 25;
+        }
+    }
+
+    g_platform.console_initialized = 1;
+    eng_init(w, h);
+    return 1;
+}
+
+static void pf_close_console(void) {
+    if (!g_platform.console_initialized) return;
+
+    printf("\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l");
+    printf("\x1b[?25h\x1b[?1049l");
+    fflush(stdout);
+
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_platform.orig_termios);
+    g_platform.console_initialized = 0;
+}
+
+static void pf_parse_escape_seq(const char* buf, int len, int* consumed) {
+    int i = 0;
+    *consumed = 0;
+
+    if (len < 1) return;
+    if (buf[0] != 0x1B) {
+        if (buf[0] >= 32 && buf[0] < 127) eng_handle_input(buf[0], 1);
+        else if (buf[0] == 127) eng_handle_input(TB_KEY_BACKSPACE, 1);
+        else if (buf[0] == 13) eng_handle_input(TB_KEY_ENTER, 1);
+        else if (buf[0] == 9) eng_handle_input(TB_KEY_TAB, 1);
+        *consumed = 1;
+        return;
+    }
+
+    if (len == 1) {
+        eng_handle_input(TB_KEY_ESCAPE, 1);
+        *consumed = 1;
+        return;
+    }
+
+    if (buf[1] == '[' || buf[1] == 'O') {
+        if (len < 3) return;
+
+        if (buf[2] == 'A') { eng_handle_input(TB_KEY_UP, 1); *consumed = 3; return; }
+        if (buf[2] == 'B') { eng_handle_input(TB_KEY_DOWN, 1); *consumed = 3; return; }
+        if (buf[2] == 'C') { eng_handle_input(TB_KEY_RIGHT, 1); *consumed = 3; return; }
+        if (buf[2] == 'D') { eng_handle_input(TB_KEY_LEFT, 1); *consumed = 3; return; }
+        if (buf[2] == 'H') { eng_handle_input(TB_KEY_HOME, 1); *consumed = 3; return; }
+        if (buf[2] == 'F') { eng_handle_input(TB_KEY_END, 1); *consumed = 3; return; }
+
+        if (buf[2] == 'P') { eng_handle_input(TB_KEY_F1, 1); *consumed = 3; return; }
+        if (buf[2] == 'Q') { eng_handle_input(TB_KEY_F2, 1); *consumed = 3; return; }
+        if (buf[2] == 'R') { eng_handle_input(TB_KEY_F3, 1); *consumed = 3; return; }
+        if (buf[2] == 'S') { eng_handle_input(TB_KEY_F4, 1); *consumed = 3; return; }
+
+        if (buf[2] == 'M') {
+             *consumed = 3; return;
+        }
+
+        if (buf[2] == '<') {
+            int b, x, y;
+            char type;
+            int n, end = 0;
+            for (n = 3; n < len; n++) {
+                if (buf[n] == 'm' || buf[n] == 'M') {
+                    end = n;
+                    break;
+                }
+            }
+            if (!end) return;
+
+            if (sscanf(buf + 3, "%d;%d;%d%c", &b, &x, &y, &type) == 4) {
+                int btn = 0;
+                int wheel = 0;
+                int is_down = (type == 'M');
+
+                if (b == 0) btn = TB_MOUSE_LEFT;
+                else if (b == 1) btn = TB_MOUSE_MIDDLE;
+                else if (b == 2) btn = TB_MOUSE_RIGHT;
+                else if (b == 64) { wheel = 1; btn = TB_MOUSE_LEFT; }
+                else if (b == 65) { wheel = -1; btn = TB_MOUSE_LEFT; }
+
+                eng_handle_mouse(x - 1, y - 1, btn, wheel, is_down);
+            }
+            *consumed = end + 1;
+            return;
+        }
+
+        if (len >= 4 && buf[3] == '~') {
+            if (buf[2] == '1') eng_handle_input(TB_KEY_HOME, 1);
+            else if (buf[2] == '2') eng_handle_input(TB_KEY_INSERT, 1);
+            else if (buf[2] == '3') eng_handle_input(TB_KEY_DELETE, 1);
+            else if (buf[2] == '4') eng_handle_input(TB_KEY_END, 1);
+            else if (buf[2] == '5') eng_handle_input(TB_KEY_PGUP, 1);
+            else if (buf[2] == '6') eng_handle_input(TB_KEY_PGDN, 1);
+            *consumed = 4;
+            return;
+        }
+
+        if (len >= 5 && buf[4] == '~') {
+             int f = 0;
+             if (buf[2] == '1' && buf[3] == '5') f = TB_KEY_F5;
+             else if (buf[2] == '1' && buf[3] == '7') f = TB_KEY_F6;
+             else if (buf[2] == '1' && buf[3] == '8') f = TB_KEY_F7;
+             else if (buf[2] == '1' && buf[3] == '9') f = TB_KEY_F8;
+             else if (buf[2] == '2' && buf[3] == '0') f = TB_KEY_F9;
+             else if (buf[2] == '2' && buf[3] == '1') f = TB_KEY_F10;
+             else if (buf[2] == '2' && buf[3] == '3') f = TB_KEY_F11;
+             else if (buf[2] == '2' && buf[3] == '4') f = TB_KEY_F12;
+
+             if (f) eng_handle_input(f, 1);
+             *consumed = 5;
+             return;
+        }
+    }
+
+    *consumed = 1;
+}
+
+static void pf_poll_events(void) {
+    struct pollfd pfd;
+    char buf[128];
+    int n, processed;
+
+    g_engine.mouse.wheel = 0;
+
+    pfd.fd = STDIN_FILENO;
+    pfd.events = POLLIN;
+
+    while (poll(&pfd, 1, 0) > 0) {
+        if (pfd.revents & POLLIN) {
+            n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+            if (n > 0) {
+                buf[n] = 0;
+                int offset = 0;
+                while (offset < n) {
+                    pf_parse_escape_seq(buf + offset, n - offset, &processed);
+                    if (processed == 0) break;
+                    offset += processed;
+                }
+            }
+        }
+    }
+}
+
+static void pf_present_buffer(const eng_cell_t* buffer, int w, int h) {
+    if (!buffer) return;
+
+    int est_size = w * h * 45;
+
+    if (g_engine.render_buffer_cap < est_size) {
+        char* temp = (char*)realloc(g_engine.render_buffer, est_size);
+        if (!temp) return;
+        g_engine.render_buffer = temp;
+        g_engine.render_buffer_cap = est_size;
+    }
+
+    if (!g_engine.render_buffer) return;
+
+    char* ptr = g_engine.render_buffer;
+    char* end = g_engine.render_buffer + g_engine.render_buffer_cap;
+    int last_fg = -1;
+    int last_bg = -1;
+    int i;
+    int count = w * h;
+    int written_bytes;
+
+    written_bytes = snprintf(ptr, (size_t)(end - ptr), "\x1b[H");
+    if (written_bytes > 0) ptr += written_bytes;
+
+    for (i = 0; i < count; ++i) {
+        eng_cell_t c = buffer[i];
+
+        if (c.fg != last_fg || c.bg != last_bg) {
+            written_bytes = snprintf(ptr, (size_t)(end - ptr), "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm",
+                (c.fg >> 16) & 0xFF, (c.fg >> 8) & 0xFF, c.fg & 0xFF,
+                (c.bg >> 16) & 0xFF, (c.bg >> 8) & 0xFF, c.bg & 0xFF);
+            if (written_bytes > 0) ptr += written_bytes;
+            last_fg = c.fg;
+            last_bg = c.bg;
+        }
+
+        if (ptr < end - 1) {
+            *ptr++ = c.ch;
+        }
+    }
+
+    if (write(STDOUT_FILENO, g_engine.render_buffer, ptr - g_engine.render_buffer) == -1) {}
+}
+
+#ifndef TB_NO_AUDIO
+static int pf_init_audio_backend(int sample_rate) {
+    int err;
+    unsigned int rate = sample_rate;
+    snd_pcm_hw_params_t *hw_params;
+
+    if ((err = snd_pcm_open(&g_platform.audio_handle, "default", SND_PCM_STREAM_PLAYBACK, 0)) < 0) return 0;
+
+    if ((err = snd_pcm_hw_params_malloc(&hw_params)) < 0) return 0;
+    if ((err = snd_pcm_hw_params_any(g_platform.audio_handle, hw_params)) < 0) return 0;
+    if ((err = snd_pcm_hw_params_set_access(g_platform.audio_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) return 0;
+
+    g_platform.hw_is_float = 1;
+    if ((err = snd_pcm_hw_params_set_format(g_platform.audio_handle, hw_params, SND_PCM_FORMAT_FLOAT_LE)) < 0) {
+        g_platform.hw_is_float = 0;
+        if ((err = snd_pcm_hw_params_set_format(g_platform.audio_handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) return 0;
+    }
+
+    if ((err = snd_pcm_hw_params_set_rate_near(g_platform.audio_handle, hw_params, &rate, 0)) < 0) return 0;
+    if ((err = snd_pcm_hw_params_set_channels(g_platform.audio_handle, hw_params, 2)) < 0) return 0;
+
+    if ((err = snd_pcm_hw_params(g_platform.audio_handle, hw_params)) < 0) return 0;
+    snd_pcm_hw_params_free(hw_params);
+
+    if ((err = snd_pcm_prepare(g_platform.audio_handle)) < 0) return 0;
+
+    g_platform.hw_channels = 2;
+    g_platform.hw_bits_per_sample = g_platform.hw_is_float ? 32 : 16;
+    g_platform.conversion_buffer_cap = 4096;
+    g_platform.conversion_buffer = (float*)malloc(g_platform.conversion_buffer_cap * 2 * sizeof(float));
+
+    return 1;
+}
+
+static void pf_close_audio_backend(void) {
+    if (g_platform.audio_handle) {
+        snd_pcm_close(g_platform.audio_handle);
+        g_platform.audio_handle = NULL;
+    }
+    if (g_platform.conversion_buffer) free(g_platform.conversion_buffer);
+}
+
+static void pf_process_audio_chunk(void) {
+    snd_pcm_sframes_t frames_to_deliver;
+    int avail;
+
+    if (!g_platform.audio_handle) return;
+
+    avail = snd_pcm_avail_update(g_platform.audio_handle);
+    if (avail < 0) {
+        snd_pcm_recover(g_platform.audio_handle, avail, 1);
+        return;
+    }
+
+    if (avail > g_platform.conversion_buffer_cap) avail = g_platform.conversion_buffer_cap;
+    if (avail == 0) return;
+
+    eng_audio_mix(g_platform.conversion_buffer, avail, 2);
+
+    if (!g_platform.hw_is_float) {
+        short* s16 = (short*)g_platform.conversion_buffer;
+        int i;
+        int total = avail * 2;
+        for (i = 0; i < total; ++i) {
+            float s = g_platform.conversion_buffer[i];
+            if (s > 1.0f) s = 1.0f;
+            if (s < -1.0f) s = -1.0f;
+            s16[i] = (short)(s * 32767.0f);
+        }
+    }
+
+    frames_to_deliver = snd_pcm_writei(g_platform.audio_handle, g_platform.conversion_buffer, avail);
+    if (frames_to_deliver < 0) {
+        snd_pcm_recover(g_platform.audio_handle, frames_to_deliver, 1);
+    }
+}
+#else
+static int pf_init_audio_backend(int sample_rate) { return 0; }
+static void pf_close_audio_backend(void) { }
+static void pf_process_audio_chunk(void) { }
+#endif
+
+static void* pf_audio_thread_proc(void* data) {
+    if (!pf_init_audio_backend(g_engine.audio_sample_rate)) return NULL;
+
+    while (__sync_add_and_fetch(&g_engine.running, 0)) {
+        pf_process_audio_chunk();
+        struct timespec ts = {0, 5000000};
+        nanosleep(&ts, NULL);
+    }
+
+    pf_close_audio_backend();
+    return NULL;
+}
+
+static void tb_shutdown_platform(void) {
+    __sync_lock_test_and_set(&g_engine.running, 0);
+    if (g_engine.audio_thread) {
+        tb_thread_join(g_engine.audio_thread);
+        g_engine.audio_thread = NULL;
+    }
+    pf_close_console();
+}
+
+static int tb_update_platform(void) {
+    memcpy(g_engine.prev_keys, g_engine.keys, sizeof(g_engine.keys));
+    pf_poll_events();
+    return (int)__sync_add_and_fetch(&g_engine.running, 0);
+}
+
+#endif
+
 static void eng_init(int w, int h) {
     g_engine.width = w;
     g_engine.height = h;
@@ -645,7 +1096,11 @@ static void eng_init(int w, int h) {
     memset(g_engine.keys, 0, sizeof(g_engine.keys));
     memset(g_engine.prev_keys, 0, sizeof(g_engine.prev_keys));
     memset(&g_engine.mouse, 0, sizeof(tb_mouse_state_t));
+#ifdef _WIN32
     InterlockedExchange(&g_engine.running, 1);
+#else
+    __sync_lock_test_and_set(&g_engine.running, 1);
+#endif
 
     g_engine.audio_write_idx = 0;
     g_engine.audio_read_idx = 0;
@@ -736,7 +1191,11 @@ static void eng_audio_mix(float* output, int frames, int channels) {
         }
     }
 
+    #ifdef _WIN32
     MemoryBarrier();
+    #else
+    __sync_synchronize();
+    #endif
     g_engine.audio_read_idx = read_ptr;
 }
 
@@ -787,14 +1246,11 @@ int tb_init(int width, int height, const char* title) {
 }
 
 void tb_shutdown(void) {
-    InterlockedExchange(&g_engine.running, 0);
-    if (g_platform.h_audio_event) SetEvent(g_platform.h_audio_event);
-
-    if (g_engine.audio_thread) {
-        tb_thread_join(g_engine.audio_thread);
-        g_engine.audio_thread = NULL;
-    }
-    pf_close_console();
+#ifdef _WIN32
+    tb_shutdown_platform();
+#else
+    tb_shutdown_platform();
+#endif
     if (g_engine.back_buffer) {
         free(g_engine.back_buffer);
         g_engine.back_buffer = NULL;
@@ -806,9 +1262,11 @@ void tb_shutdown(void) {
 }
 
 int tb_update(void) {
-    memcpy(g_engine.prev_keys, g_engine.keys, sizeof(g_engine.keys));
-    pf_poll_events();
-    return (int)InterlockedCompareExchange(&g_engine.running, 1, 1);
+#ifdef _WIN32
+    return tb_update_platform();
+#else
+    return tb_update_platform();
+#endif
 }
 
 void tb_present(void) {
@@ -832,7 +1290,11 @@ void tb_audio_push(float* samples, int count) {
         }
     }
 
+    #ifdef _WIN32
     MemoryBarrier();
+    #else
+    __sync_synchronize();
+    #endif
     g_engine.audio_write_idx = write_ptr;
 }
 
