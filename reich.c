@@ -146,3 +146,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
   return 0;
 }
+
+void mainCRTStartup(void) {
+    int result;
+    STARTUPINFOA si;
+    reich_memset(&si, 0, sizeof(STARTUPINFOA));
+    si.cb = sizeof(STARTUPINFOA);
+    GetStartupInfoA(&si);
+    result = WinMain(
+        GetModuleHandleA(NULL), 
+        NULL, 
+        GetCommandLineA(), 
+        (si.dwFlags & STARTF_USESHOWWINDOW) ? si.wShowWindow : SW_SHOWDEFAULT
+    );
+    ExitProcess(result);
+}
+

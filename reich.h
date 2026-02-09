@@ -802,7 +802,7 @@ static int32 reich_sys_window_init(reichContext *ctx, const char *title,
   RECT wr;
   reichPlatformContext *plat = (reichPlatformContext *)ctx->platform;
   HMODULE winmm;
-
+  SetProcessDPIAware();
   AttachConsole((DWORD)-1);
 
   if (!plat) {
