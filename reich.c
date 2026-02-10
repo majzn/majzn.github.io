@@ -10,9 +10,9 @@ struct app_state_t {
   int32 show_grid;
 } app_state;
 
-static void append_int(char **buffer, int32 value) {
+static void append_int(char** buffer, int32 value) {
   char temp[16];
-  char *t = temp;
+  char* t = temp;
   int32 v = value;
   if (v < 0) {
     *(*buffer)++ = '-';
@@ -26,20 +26,16 @@ static void append_int(char **buffer, int32 value) {
       v /= 10;
     }
   }
-  while (t > temp) {
-    *(*buffer)++ = *--t;
-  }
+  while (t > temp) { *(*buffer)++ = *--t; }
   **buffer = '\0';
 }
 
-static void append_str(char **buffer, const char *str) {
-  while (*str) {
-    *(*buffer)++ = *str++;
-  }
+static void append_str(char** buffer, const char* str) {
+  while (*str) { *(*buffer)++ = *str++; }
   **buffer = '\0';
 }
 
-void update(reichContext *ctx) {
+void update(reichContext* ctx) {
   app_state.box_x += app_state.box_dir_x;
   app_state.box_y += app_state.box_dir_y;
   if (app_state.box_x <= 0 || app_state.box_x + 50 >= ctx->screen.width) {
@@ -51,19 +47,17 @@ void update(reichContext *ctx) {
   }
 }
 
-void input(reichContext *ctx) {
+void input(reichContext* ctx) {
   if (reich_key_pressed(ctx, 'G')) {
     app_state.show_grid = !app_state.show_grid;
   }
 
-  if (reich_key_pressed(ctx, 0x1B)) {
-    ctx->running = 0;
-  }
+  if (reich_key_pressed(ctx, 0x1B)) { ctx->running = 0; }
 }
 
-void render(reichContext *ctx, real64 alpha) {
+void render(reichContext* ctx, real64 alpha) {
   char buf[64];
-  char *ptr = buf;
+  char* ptr = buf;
   int32 i;
   int32 mx, my;
   reich_clear(ctx, 0xFF202020);
@@ -77,8 +71,8 @@ void render(reichContext *ctx, real64 alpha) {
     }
   }
 
-  reich_draw_rect(ctx, app_state.box_x, app_state.box_y, 50, 50,
-                  app_state.box_color);
+  reich_draw_rect(
+      ctx, app_state.box_x, app_state.box_y, 50, 50, app_state.box_color);
   reich_draw_frame(ctx, app_state.box_x, app_state.box_y, 50, 50, 0xFFFFFFFF);
 
   reich_draw_rect(ctx, 10, 50, 200, 150, 0xFF404040);
@@ -104,26 +98,34 @@ void render(reichContext *ctx, real64 alpha) {
   }
 
   if (reich_ui_btn(ctx, 2, 20, 155, 180, 25, "Toggle Color", 0xFF804040)) {
-    if (app_state.box_color == 0xFFFF0000)
+    if (app_state.box_color == 0xFFFF0000) {
       app_state.box_color = 0xFF0000FF;
-    else
+    } else {
       app_state.box_color = 0xFFFF0000;
+    }
   }
 
   reich_draw_rect(ctx, mx - 10, my, 20, 1, 0xFF00FF00);
   reich_draw_rect(ctx, mx, my - 10, 1, 20, 0xFF00FF00);
-  reich_draw_text(ctx, 10, ctx->screen.height - 20,
-                  "Press 'G' to toggle grid. ESC to quit.", 0xFF888888);
+  reich_draw_text(
+      ctx,
+      10,
+      ctx->screen.height - 20,
+      "Press 'G' to toggle grid. ESC to quit.",
+      0xFF888888);
 }
 
-void resize(reichContext *ctx, int32 w, int32 h) {
+void resize(reichContext* ctx, int32 w, int32 h) {
   (void)ctx;
   (void)w;
   (void)h;
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-                   LPSTR lpCmdLine, int nShowCmd) {
+int WINAPI WinMain(
+    HINSTANCE hInstance,
+    HINSTANCE hPrevInstance,
+    LPSTR lpCmdLine,
+    int nShowCmd) {
   reichContext ctx;
   (void)hInstance;
   (void)hPrevInstance;
@@ -136,9 +138,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   app_state.box_color = 0xFFFF0000;
   app_state.show_grid = 1;
 
-  if (!reich_init(&ctx, "Reich Debug App", 800, 600, 60.0)) {
-    return -1;
-  }
+  if (!reich_init(&ctx, "Reich Debug App", 800, 600, 60.0)) { return -1; }
   reich_load_fonts(&ctx, "FONT_11X11_TER.bmp", 11, 11, 255);
   ctx.activeFont = 1;
   reich_set_callbacks(&ctx, update, render, resize, input);
@@ -148,17 +148,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 }
 
 void mainCRTStartup(void) {
-    int result;
-    STARTUPINFOA si;
-    reich_memset(&si, 0, sizeof(STARTUPINFOA));
-    si.cb = sizeof(STARTUPINFOA);
-    GetStartupInfoA(&si);
-    result = WinMain(
-        GetModuleHandleA(NULL), 
-        NULL, 
-        GetCommandLineA(), 
-        (si.dwFlags & STARTF_USESHOWWINDOW) ? si.wShowWindow : SW_SHOWDEFAULT
-    );
-    ExitProcess(result);
+  int result;
+  STARTUPINFOA si;
+  reich_memset(&si, 0, sizeof(STARTUPINFOA));
+  si.cb = sizeof(STARTUPINFOA);
+  GetStartupInfoA(&si);
+  result = WinMain(
+      GetModuleHandleA(NULL),
+      NULL,
+      GetCommandLineA(),
+      (si.dwFlags & STARTF_USESHOWWINDOW) ? si.wShowWindow : SW_SHOWDEFAULT);
+  ExitProcess(result);
 }
-

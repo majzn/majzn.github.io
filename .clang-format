@@ -1,0 +1,72 @@
+
+# .clang-format
+BasedOnStyle: LLVM
+ColumnLimit: 79
+
+# Always Allman-style braces
+BraceWrapping:
+  AfterFunction:         true
+  AfterStruct:           true
+  AfterEnum:             true
+  AfterControlStatement: true
+  BeforeElse:            true
+
+# Function & call parameter wrapping
+AlignAfterOpenBracket:   AlwaysBreak  # newline immediately after '('
+BinPackParameters:       false        # disable bin-packing params
+BinPackArguments:        false        # disable bin-packing args
+BreakBeforeBraces: Attach
+
+BreakBeforeTernaryOperators: true
+BreakAfterReturnType: Automatic
+
+
+# Indentation
+IndentWidth:            2
+UseTab:                 Never
+
+# Alignments
+AlignTrailingComments:        true
+AlignConsecutiveDeclarations: false
+AlignOperands:                false
+AlignConsecutiveMacros: true
+AlignConsecutiveAssignments: false
+AlignEscapedNewlines: Left
+
+# Blank lines
+MaxEmptyLinesToKeep:      1
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# Comments
+ReflowComments:           false
+
+# Includes & macros
+SortIncludes:             false
+IncludeBlocks:            Preserve
+
+# Spacing
+SpaceBeforeParens:        ControlStatements
+SpacesInParentheses:      false
+SpacesInSquareBrackets:   false
+SpacesInAngles:           false
+PointerAlignment: Left
+SortUsingDeclarations: true
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceBeforeAssignmentOperators: true
+SpaceInEmptyParentheses: false
+SpacesInCStyleCastParentheses: false
+AlwaysBreakAfterDefinitionReturnType: false
+PenaltyReturnTypeOnItsOwnLine: '99999'
+InsertBraces: true
+AllowAllParametersOfDeclarationOnNextLine: true
+QualifierAlignment: Left
+
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Empty
+AllowAllArgumentsOnNextLine: true
+
+
+
