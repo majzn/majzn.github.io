@@ -23,12 +23,12 @@
     <header class="bg-slate-900 border-b border-slate-800 h-14 shrink-0 flex items-center justify-between px-4 z-30">
         <div class="flex items-center gap-3"><div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-900/20">C</div><div><h1 class="text-sm font-bold text-slate-100 tracking-tight leading-tight">C89 Studio</h1><div class="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Formatter & Linter</div></div></div>
         <div class="flex items-center gap-3">
-             <div class="relative group"><select id="snippetSelect" class="appearance-none bg-slate-800 border border-slate-700 hover:border-slate-600 text-xs text-slate-300 rounded pl-3 pr-8 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer w-48 truncate"><option value="" disabled selected>Load Example Code...</option><option value="structs">Grouping Test</option><option value="allFeatures">All Features Test</option><option value="linkedList">Linked List</option><option value="matrix">Matrix Mult</option><option value="funcStyle">Function Styles</option></select><div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></div></div><div class="h-6 w-px bg-slate-800 mx-1"></div><button id="resetBtn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300">Reset</button><button id="copyBtn" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold shadow-lg shadow-blue-900/20">Copy Output</button>
+             <div class="relative group"><select id="snippetSelect" class="appearance-none bg-slate-800 border border-slate-700 hover:border-slate-600 text-xs text-slate-300 rounded pl-3 pr-8 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer w-48 truncate"><option value="" disabled selected>Load Example Code...</option><option value="structs">Grouping & Structs</option><option value="allFeatures">All Features Test</option><option value="linkedList">Linked List</option><option value="matrix">Matrix Mult</option><option value="funcStyle">Function Arguments</option></select><div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></div></div><div class="h-6 w-px bg-slate-800 mx-1"></div><button id="resetBtn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300">Reset</button><button id="copyBtn" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold shadow-lg shadow-blue-900/20">Copy Output</button>
         </div>
     </header>
     <div class="flex flex-1 overflow-hidden">
         <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-20 shadow-xl overflow-hidden">
-            <div class="p-3 border-b border-slate-800 bg-slate-900 shrink-0 sticky top-0"><input type="text" id="searchInput" placeholder="Search options..." class="w-full bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-slate-600 transition-all"></div>
+            <div class="p-3 border-b border-slate-800 bg-slate-900 shrink-0 sticky top-0"><input type="text" id="searchInput" placeholder="Search settings..." class="w-full bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-slate-600 transition-all"></div>
             <div class="overflow-y-auto flex-1 custom-scrollbar p-2 space-y-1" id="settingsContainer"></div>
         </aside>
         <div class="flex-1 flex flex-col md:flex-row min-h-0 bg-[#0b1120]">
@@ -52,10 +52,10 @@
             indentWidth: 4, useTabs: false, indentCase: false, indentGoto: false, indentPP: false,
             breakAfterStructClosingBrace: false, groupTopLevelItems: true, topLevelEmptyLines: 1,
             groupIncludes: true, groupDefines: true, groupTypedefs: true, groupFuncProtos: true, groupVarDecls: true, groupPreproc: true,
-            emptyLineBeforeIncludes: false, emptyLineAfterIncludes: false, emptyLineBeforeDefines: false, emptyLineAfterDefines: false,
+            emptyLineBeforeIncludes: false, emptyLineAfterIncludes: true, emptyLineBeforeDefines: false, emptyLineAfterDefines: false,
             emptyLineBeforeTypedefs: false, emptyLineAfterTypedefs: false, emptyLineBeforeFuncProtos: false, emptyLineAfterFuncProtos: false,
-            emptyLineBeforeVarDecls: false, emptyLineAfterVarDecls: false,
-            breakAfterFuncReturnType: false, breakAfterFuncOpenParen: false, breakFuncArgsOnLimit: false, breakBeforeFuncCloseParen: false, funcParamStyle: 'Pack', columnLimit: 80, emptyLinesBetweenFunctions: 2,
+            emptyLineBeforeVarDecls: false, emptyLineAfterVarDecls: false, emptyLineBeforeStructs: false, emptyLineAfterStructs: false,
+            breakAfterFuncReturnType: false, breakAfterFuncOpenParen: false, breakFuncArgsOnLimit: true, breakBeforeFuncCloseParen: false, funcParamStyle: 'Pack', columnLimit: 80, emptyLinesBetweenFunctions: 2,
             breakBeforeFuncBrace: false, breakBeforeIfBrace: false, breakBeforeForBrace: false, breakBeforeWhileBrace: false, breakBeforeSwitchBrace: false, breakBeforeElse: false, breakBeforeWhile: false, oneLinerIf: false, oneLinerFunc: false, maxEmptyLines: 1,
             emptyLineBeforeIf: false, emptyLineBeforeFor: false, emptyLineBeforeWhile: false, emptyLineBeforeDo: false, emptyLineBeforeSwitch: false, emptyLineBeforeCase: false, emptyLineBeforeBreak: false, emptyLineBeforeReturn: false,
             emptyLineStartOfBlock: false, emptyLineEndOfBlock: false, braceStyle: 'K&R',
@@ -65,13 +65,11 @@
         const settingsGroups = [
             { title: "Indentation", items: [ { id: 'indentWidth', type: 'range', min: 2, max: 8, label: 'Indent Width' }, { id: 'useTabs', type: 'bool', label: 'Use Tabs' }, { id: 'indentCase', type: 'bool', label: 'Indent Case Labels' }, { id: 'indentGoto', type: 'bool', label: 'Indent Goto Labels' }, { id: 'indentPP', type: 'bool', label: 'Indent Preprocessor' } ] },
             { title: "Item Grouping (Logic)", items: [ { id: 'groupIncludes', type: 'bool', label: 'Group Includes' }, { id: 'groupDefines', type: 'bool', label: 'Group Defines' }, { id: 'groupTypedefs', type: 'bool', label: 'Group Typedefs' }, { id: 'groupFuncProtos', type: 'bool', label: 'Group Func Prototypes' }, { id: 'groupVarDecls', type: 'bool', label: 'Group Variable Decls' }, { id: 'groupPreproc', type: 'bool', label: 'Group Preprocessor Blocks' } ] },
-            { title: "Group Spacing (Add +1 Line)", items: [ { type: 'custom', html: `<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-slate-400"><div class="font-bold border-b border-slate-700 mb-1">Type</div><div class="font-bold border-b border-slate-700 mb-1 flex justify-between"><span>Before</span><span>After</span></div><span>Includes</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeIncludes" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterIncludes" class="custom-checkbox"></div><span>Defines</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeDefines" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterDefines" class="custom-checkbox"></div><span>Typedefs</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeTypedefs" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterTypedefs" class="custom-checkbox"></div><span>Prototypes</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeFuncProtos" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterFuncProtos" class="custom-checkbox"></div><span>Var Decls</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeVarDecls" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterVarDecls" class="custom-checkbox"></div></div>` } ] },
+            { title: "Group Spacing (Add +1 Line)", items: [ { type: 'custom', html: `<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-slate-400"><div class="font-bold border-b border-slate-700 mb-1">Type</div><div class="font-bold border-b border-slate-700 mb-1 flex justify-between"><span>Before</span><span>After</span></div><span>Includes</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeIncludes" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterIncludes" class="custom-checkbox"></div><span>Defines</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeDefines" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterDefines" class="custom-checkbox"></div><span>Typedefs</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeTypedefs" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterTypedefs" class="custom-checkbox"></div><span>Prototypes</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeFuncProtos" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterFuncProtos" class="custom-checkbox"></div><span>Var Decls</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeVarDecls" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterVarDecls" class="custom-checkbox"></div><span>Structs</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeStructs" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterStructs" class="custom-checkbox"></div></div>` } ] },
             { title: "Structure & Whitespace", items: [ { id: 'topLevelEmptyLines', type: 'range', min: 0, max: 4, label: 'Top Level Empty Lines' }, { id: 'emptyLinesBetweenFunctions', type: 'range', min: 0, max: 4, label: 'Lines Between Funcs' }, { id: 'maxEmptyLines', type: 'range', min: 0, max: 4, label: 'Max Preserved Empty Lines' }, { id: 'breakAfterStructClosingBrace', type: 'bool', label: 'Break After Struct Brace' }, { id: 'emptyLineStartOfBlock', type: 'bool', label: 'Empty Line After {' }, { id: 'emptyLineEndOfBlock', type: 'bool', label: 'Empty Line Before }' } ] },
-            { title: "Whitespace Before Keywords", items: [ { id: 'emptyLineBeforeIf', type: 'bool', label: 'Before If' }, { id: 'emptyLineBeforeFor', type: 'bool', label: 'Before For' }, { id: 'emptyLineBeforeWhile', type: 'bool', label: 'Before While' }, { id: 'emptyLineBeforeDo', type: 'bool', label: 'Before Do' }, { id: 'emptyLineBeforeSwitch', type: 'bool', label: 'Before Switch' }, { id: 'emptyLineBeforeCase', type: 'bool', label: 'Before Case' }, { id: 'emptyLineBeforeBreak', type: 'bool', label: 'Before Break' }, { id: 'emptyLineBeforeReturn', type: 'bool', label: 'Before Return' } ] },
             { title: "Function Formatting", items: [ { id: 'columnLimit', type: 'range', min: 40, max: 120, label: 'Column Limit' }, { id: 'breakAfterFuncReturnType', type: 'bool', label: 'Break After Return Type' }, { id: 'breakAfterFuncOpenParen', type: 'bool', label: 'Break After Open Paren' }, { id: 'breakFuncArgsOnLimit', type: 'bool', label: 'Only Break if > Limit' }, { id: 'breakBeforeFuncCloseParen', type: 'bool', label: 'Break Before Close Paren' }, { id: 'funcParamStyle', type: 'select', options: ['Pack', 'Vertical'], label: 'Parameter Style' }, { id: 'breakBeforeFuncBrace', type: 'bool', label: 'Break Before Body Brace' } ] },
             { title: "Brace Wrapping", items: [ { id: 'braceStyle', type: 'select', options: ['K&R', 'Allman', 'GNU'], label: 'Brace Style' }, { id: 'breakBeforeIfBrace', type: 'bool', label: 'Break Before If Brace' }, { id: 'breakBeforeForBrace', type: 'bool', label: 'Break Before For Brace' }, { id: 'breakBeforeWhileBrace', type: 'bool', label: 'Break Before While Brace' }, { id: 'breakBeforeSwitchBrace', type: 'bool', label: 'Break Before Switch Brace' }, { id: 'breakBeforeElse', type: 'bool', label: 'Break Before Else' } ] },
-            { title: "Spacing (General)", items: [ { id: 'spaceAfterKeywords', type: 'bool', label: 'Space After Keywords (if, for)' }, { id: 'spaceInParens', type: 'bool', label: 'Space In Parens ( a )' }, { id: 'spaceInBrackets', type: 'bool', label: 'Space In Brackets [ a ]' }, { id: 'spaceInBraces', type: 'bool', label: 'Space In Braces { a }' }, { id: 'spaceInEmptyBraces', type: 'bool', label: 'Space In Empty Braces { }' } ] },
-            { title: "Formatting", items: [ { id: 'oneLinerIf', type: 'bool', label: 'Allow Short If Statements' }, { id: 'pointerAlignment', type: 'select', options: ['Left', 'Middle', 'Right'], label: 'Pointer Alignment' } ] }
+            { title: "Formatting", items: [ { id: 'pointerAlignment', type: 'select', options: ['Left', 'Middle', 'Right'], label: 'Pointer Alignment' }, { id: 'spaceAfterKeywords', type: 'bool', label: 'Space After Keywords' } ] }
         ];
         function initUI() {
             const container = document.getElementById('settingsContainer'); container.innerHTML = '';
@@ -130,31 +128,46 @@
             const stmts = [];
             let currentTokens = [];
 
-            // Helper to classify statement type
+            // Classifier
             const classify = (toks) => {
                 let k = 0;
+                // Skip leading comments
                 while(k < toks.length && (toks[k].t === TokenType.CB || toks[k].t === TokenType.CL)) k++;
                 if (k >= toks.length) return 'COMMENT';
 
                 const first = toks[k];
+
                 if (first.t === TokenType.PP) {
                     if (first.v.startsWith('#include')) return 'INCLUDE';
                     if (first.v.startsWith('#define')) return 'DEFINE';
+                    if (first.v.startsWith('#if') || first.v.startsWith('#ifdef') || first.v.startsWith('#else') || first.v.startsWith('#endif')) return 'PREPROC_BLOCK';
                     return 'PREPROC';
                 }
                 if (first.v === 'typedef') return 'TYPEDEF';
 
+                // Scan for structure/enum defs
+                if (first.v === 'struct' || first.v === 'union' || first.v === 'enum') return 'STRUCT_DEF';
+
+                // Scan for function definition vs prototype
                 let hasParen = false, hasBrace = false;
                 for (let i = k; i < toks.length; i++) {
                     if (toks[i].t === TokenType.LPAR) hasParen = true;
                     if (toks[i].t === TokenType.LBR) hasBrace = true;
                 }
 
+                // If ends in }, it's a function body (unless it started with typedef/struct)
                 if (hasParen && hasBrace && toks[toks.length-1].t === TokenType.RBR) return 'FUNC_DEF';
+
+                // If ends in ; and has parens, likely proto
                 if (hasParen && toks[toks.length-1].t === TokenType.SEMI) {
+                    // Check if it's actually a variable decl with initialization: int a = (1+2);
                     let hasAssign = false;
-                    for (let i = k; i < toks.length; i++) if (OPS.assign.has(toks[i].v) || toks[i].v === '=') hasAssign = true;
+                    for (let i = k; i < toks.length; i++) {
+                        if (OPS.assign.has(toks[i].v) || toks[i].v === '=') hasAssign = true;
+                    }
                     if (hasAssign) return 'VAR_DECL';
+                    // Check if parens are function args or just grouping.
+                    // Heuristic: Type ID ( ... ) ;
                     return 'FUNC_PROTO';
                 }
 
@@ -177,11 +190,19 @@
                     if (t.t === TokenType.PP) pushStmt = true;
                     else if (t.t === TokenType.SEMI) pushStmt = true;
                     else if (t.t === TokenType.RBR) {
+                        // Check if this RBR closes a struct/enum or a function
                         let k = 0;
                         while(k < currentTokens.length && (currentTokens[k].t === TokenType.CB || currentTokens[k].t === TokenType.CL)) k++;
                         const first = currentTokens[k];
+                        // If it started with struct/enum/union, we expect a semicolon later, so DON'T push yet.
+                        // EXCEPT if it's an anonymous struct variable? "struct { } a;" -> waits for semi.
+                        // "struct S { };" -> waits for semi.
+                        // Functions: "void f() { }" -> ends at }.
                         const isDataStruct = first && (['struct','union','enum','typedef'].includes(first.v));
-                        if (!isDataStruct) pushStmt = true; // Function body
+
+                        if (!isDataStruct) {
+                            pushStmt = true; // Function definition end
+                        }
                     }
                 }
 
@@ -195,16 +216,16 @@
             return stmts;
         }
 
-        // --- REFACTORED FORMATTER ---
+        // --- FORMATTER ---
         function format(source) {
             const rawTokens = tokenize(source).filter(t => t.t !== TokenType.WS && t.t !== TokenType.NL);
             if (rawTokens.length === 0) return "";
 
             const stmts = parseStatements(rawTokens);
             let finalOutput = "";
-            let globalCol = 0; // Not strictly needed unless we wrap globally
+            let globalCol = 0;
 
-            // Inner Formatter (Statement Level)
+            // Inner Formatter
             const formatStatementTokens = (tokens) => {
                 let output = "";
                 let indent = 0;
@@ -248,7 +269,7 @@
 
                     if (t.t === TokenType.PP) {
                         if (!config.indentPP) { output = output.trimEnd() + '\n'; isStartOfLine = true; col=0; }
-                        append(t.v); // newline added by generator logic mostly, but internal PP needs newlines? No, PP is usually single line in statement
+                        append(t.v);
                         continue;
                     }
                     if (t.t === TokenType.CB || t.t === TokenType.CL) { space(); append(t.v); newline(); continue; }
@@ -328,14 +349,11 @@
             for (let i = 0; i < stmts.length; i++) {
                 const curr = stmts[i];
                 const prev = i > 0 ? stmts[i-1] : null;
-                const next = i < stmts.length - 1 ? stmts[i+1] : null;
 
-                // --- Padding Logic ---
                 if (prev) {
                     let newlines = config.topLevelEmptyLines + 1;
                     let grouping = false;
 
-                    // Grouping Check
                     if (prev.type === curr.type) {
                         if (curr.type === 'INCLUDE' && config.groupIncludes) grouping = true;
                         else if (curr.type === 'DEFINE' && config.groupDefines) grouping = true;
@@ -351,20 +369,27 @@
                     }
 
                     if (grouping) {
-                        newlines = 1; // Tight packing inside group
+                        newlines = 1; // Tight packing
                     } else {
-                        // Apply Overrides ADDITIVELY (Only at group boundaries)
-                        if (prev.type === 'INCLUDE' && config.emptyLineAfterIncludes) newlines++;
-                        if (prev.type === 'DEFINE' && config.emptyLineAfterDefines) newlines++;
-                        if (prev.type === 'TYPEDEF' && config.emptyLineAfterTypedefs) newlines++;
-                        if (prev.type === 'FUNC_PROTO' && config.emptyLineAfterFuncProtos) newlines++;
-                        if (prev.type === 'VAR_DECL' && config.emptyLineAfterVarDecls) newlines++;
+                        // Apply Overrides Additively when NOT grouping
+                        let extra = 0;
+                        // After Previous
+                        if (prev.type === 'INCLUDE' && config.emptyLineAfterIncludes) extra = 1;
+                        else if (prev.type === 'DEFINE' && config.emptyLineAfterDefines) extra = 1;
+                        else if (prev.type === 'TYPEDEF' && config.emptyLineAfterTypedefs) extra = 1;
+                        else if (prev.type === 'FUNC_PROTO' && config.emptyLineAfterFuncProtos) extra = 1;
+                        else if (prev.type === 'VAR_DECL' && config.emptyLineAfterVarDecls) extra = 1;
+                        else if (prev.type === 'STRUCT_DEF' && config.emptyLineAfterStructs) extra = 1;
 
-                        if (curr.type === 'INCLUDE' && config.emptyLineBeforeIncludes) newlines++;
-                        if (curr.type === 'DEFINE' && config.emptyLineBeforeDefines) newlines++;
-                        if (curr.type === 'TYPEDEF' && config.emptyLineBeforeTypedefs) newlines++;
-                        if (curr.type === 'FUNC_PROTO' && config.emptyLineBeforeFuncProtos) newlines++;
-                        if (curr.type === 'VAR_DECL' && config.emptyLineBeforeVarDecls) newlines++;
+                        // Before Current
+                        if (curr.type === 'INCLUDE' && config.emptyLineBeforeIncludes) extra = Math.max(extra, 1);
+                        else if (curr.type === 'DEFINE' && config.emptyLineBeforeDefines) extra = Math.max(extra, 1);
+                        else if (curr.type === 'TYPEDEF' && config.emptyLineBeforeTypedefs) extra = Math.max(extra, 1);
+                        else if (curr.type === 'FUNC_PROTO' && config.emptyLineBeforeFuncProtos) extra = Math.max(extra, 1);
+                        else if (curr.type === 'VAR_DECL' && config.emptyLineBeforeVarDecls) extra = Math.max(extra, 1);
+                        else if (curr.type === 'STRUCT_DEF' && config.emptyLineBeforeStructs) extra = Math.max(extra, 1);
+
+                        newlines += extra;
                     }
 
                     finalOutput += '\n'.repeat(newlines);
