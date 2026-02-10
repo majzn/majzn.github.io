@@ -11,754 +11,372 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
         .code-font { font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', 'Consolas', monospace; }
-
-        /* Range Slider Styling */
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #3b82f6; cursor: pointer; margin-top: -6px; box-shadow: 0 0 0 2px #1e293b; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px; }
-
-        /* Custom Checkbox */
         .custom-checkbox { appearance: none; width: 1rem; height: 1rem; border: 1px solid #475569; border-radius: 0.25rem; background-color: #020617; transition: all 0.2s; position: relative; cursor: pointer; }
         .custom-checkbox:checked { background-color: #3b82f6; border-color: #3b82f6; }
         .custom-checkbox:checked::after { content: ''; position: absolute; left: 5px; top: 1px; width: 4px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-
-        /* Syntax Highlighting */
-        .tok-kw { color: #c678dd; font-weight: bold; }
-        .tok-ty { color: #e5c07b; }
-        .tok-str { color: #98c379; }
-        .tok-num { color: #d19a66; }
-        .tok-cm { color: #5c6370; font-style: italic; }
-        .tok-pp { color: #e06c75; }
-        .tok-op { color: #56b6c2; }
-        .tok-id { color: #abb2bf; }
-        .tok-punc { color: #abb2bf; }
+        .tok-kw { color: #c678dd; font-weight: bold; } .tok-ty { color: #e5c07b; } .tok-str { color: #98c379; } .tok-num { color: #d19a66; } .tok-cm { color: #5c6370; font-style: italic; } .tok-pp { color: #e06c75; } .tok-op { color: #56b6c2; } .tok-id { color: #abb2bf; } .tok-punc { color: #abb2bf; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 flex flex-col h-screen overflow-hidden font-sans selection:bg-blue-500/30">
-
-    <!-- Header -->
     <header class="bg-slate-900 border-b border-slate-800 h-14 shrink-0 flex items-center justify-between px-4 z-30">
+        <div class="flex items-center gap-3"><div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-900/20">C</div><div><h1 class="text-sm font-bold text-slate-100 tracking-tight leading-tight">C89 Studio</h1><div class="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Formatter & Linter</div></div></div>
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-900/20">C</div>
-            <div>
-                <h1 class="text-sm font-bold text-slate-100 tracking-tight leading-tight">C89 Studio</h1>
-                <div class="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Formatter & Linter</div>
-            </div>
-        </div>
-
-        <div class="flex items-center gap-3">
-             <div class="relative group">
-                <select id="snippetSelect" class="appearance-none bg-slate-800 border border-slate-700 hover:border-slate-600 text-xs text-slate-300 rounded pl-3 pr-8 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer w-48 truncate">
-                    <option value="" disabled selected>Load Example Code...</option>
-                    <option value="allFeatures">All Features Test</option>
-                    <option value="linkedList">Linked List</option>
-                    <option value="matrix">Matrix Mult</option>
-                    <option value="funcStyle">Function Styles</option>
-                    <option value="operators">Operator Test</option>
-                </select>
-                <div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                </div>
-            </div>
-            <div class="h-6 w-px bg-slate-800 mx-1"></div>
-            <button id="resetBtn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300">Reset</button>
-            <button id="copyBtn" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold shadow-lg shadow-blue-900/20">Copy Output</button>
+             <div class="relative group"><select id="snippetSelect" class="appearance-none bg-slate-800 border border-slate-700 hover:border-slate-600 text-xs text-slate-300 rounded pl-3 pr-8 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer w-48 truncate"><option value="" disabled selected>Load Example Code...</option><option value="structs">Grouping Test</option><option value="allFeatures">All Features Test</option><option value="linkedList">Linked List</option><option value="matrix">Matrix Mult</option><option value="funcStyle">Function Styles</option></select><div class="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></div></div><div class="h-6 w-px bg-slate-800 mx-1"></div><button id="resetBtn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300">Reset</button><button id="copyBtn" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold shadow-lg shadow-blue-900/20">Copy Output</button>
         </div>
     </header>
-
     <div class="flex flex-1 overflow-hidden">
-
-        <!-- Sidebar Configuration -->
         <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-20 shadow-xl overflow-hidden">
-            <div class="p-3 border-b border-slate-800 bg-slate-900 shrink-0 sticky top-0">
-                <input type="text" id="searchInput" placeholder="Search options..." class="w-full bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-slate-600 transition-all">
-            </div>
-
-            <div class="overflow-y-auto flex-1 custom-scrollbar p-2 space-y-1" id="settingsContainer">
-                <!-- Configs generated by JS -->
-            </div>
+            <div class="p-3 border-b border-slate-800 bg-slate-900 shrink-0 sticky top-0"><input type="text" id="searchInput" placeholder="Search options..." class="w-full bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-slate-600 transition-all"></div>
+            <div class="overflow-y-auto flex-1 custom-scrollbar p-2 space-y-1" id="settingsContainer"></div>
         </aside>
-
-        <!-- Editors -->
         <div class="flex-1 flex flex-col md:flex-row min-h-0 bg-[#0b1120]">
-            <!-- Input -->
             <div class="flex-1 flex flex-col border-r border-slate-800 min-h-0 relative">
-                <div class="absolute top-0 left-0 right-0 bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 border-b border-slate-800 flex justify-between items-center z-10">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Input</span>
-                    <span id="inputCharCount" class="text-[10px] text-slate-600 font-mono">0 chars</span>
-                </div>
+                <div class="absolute top-0 left-0 right-0 bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 border-b border-slate-800 flex justify-between items-center z-10"><span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Input</span><span id="inputCharCount" class="text-[10px] text-slate-600 font-mono">0 chars</span></div>
                 <textarea id="inputArea" class="flex-1 bg-[#0b1120] pt-10 p-4 text-xs md:text-sm code-font text-slate-300 resize-none outline-none focus:bg-[#0f172a] selection:bg-blue-900/60 selection:text-white transition-colors" spellcheck="false" placeholder="// Paste your C code here..."></textarea>
             </div>
-
-            <!-- Output -->
             <div class="flex-1 flex flex-col min-h-0 relative">
-                 <div class="absolute top-0 left-0 right-0 bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 border-b border-slate-800 flex justify-between items-center z-10">
-                    <span class="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Formatted Output</span>
-                    <div id="statusIndicator" class="flex items-center gap-1.5 opacity-0 transition-opacity duration-300">
-                        <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                        <span class="text-[10px] text-green-500 font-medium">Ready</span>
-                    </div>
-                </div>
-                <div class="flex-1 overflow-auto bg-[#0b1120] relative cursor-text">
-                     <pre id="outputArea" class="absolute inset-0 pt-10 p-4 text-xs md:text-sm code-font text-slate-300 whitespace-pre select-text outline-none" tabindex="0"></pre>
-                </div>
+                 <div class="absolute top-0 left-0 right-0 bg-slate-900/95 backdrop-blur-sm px-4 py-1.5 border-b border-slate-800 flex justify-between items-center z-10"><span class="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Formatted Output</span><div id="statusIndicator" class="flex items-center gap-1.5 opacity-0 transition-opacity duration-300"><div class="w-1.5 h-1.5 rounded-full bg-green-500"></div><span class="text-[10px] text-green-500 font-medium">Ready</span></div></div>
+                <div class="flex-1 overflow-auto bg-[#0b1120] relative cursor-text"><pre id="outputArea" class="absolute inset-0 pt-10 p-4 text-xs md:text-sm code-font text-slate-300 whitespace-pre select-text outline-none" tabindex="0"></pre></div>
             </div>
         </div>
     </div>
-
-    <!-- Logic -->
     <script>
-        /* --- 1. Constants & Definitions --- */
-        const TokenType = {
-            WS: 'WS', NL: 'NL', CB: 'CB', CL: 'CL',
-            PP: 'PP', KW: 'KW', TY: 'TY', ID: 'ID',
-            STR: 'STR', CHR: 'CHR', NUM: 'NUM', OP: 'OP', PUNC: 'PUNC',
-            LBR: '{', RBR: '}', LPAR: '(', RPAR: ')',
-            LBRA: '[', RBRA: ']', SEMI: ';', COLON: ':', UNK: '?'
-        };
-
+        const TokenType = { WS: 'WS', NL: 'NL', CB: 'CB', CL: 'CL', PP: 'PP', KW: 'KW', TY: 'TY', ID: 'ID', STR: 'STR', CHR: 'CHR', NUM: 'NUM', OP: 'OP', PUNC: 'PUNC', LBR: '{', RBR: '}', LPAR: '(', RPAR: ')', LBRA: '[', RBRA: ']', SEMI: ';', COLON: ':', UNK: '?' };
         const KEYWORDS = new Set(['auto', 'break', 'case', 'const', 'continue', 'default', 'do', 'else', 'enum', 'extern', 'for', 'goto', 'if', 'register', 'return', 'sizeof', 'static', 'struct', 'switch', 'typedef', 'union', 'volatile', 'while', 'void']);
         const TYPES = new Set(['char', 'double', 'float', 'int', 'long', 'short', 'signed', 'unsigned', 'size_t', 'FILE', 'bool', 'int8_t', 'uint8_t', 'int16_t', 'uint16_t', 'int32_t', 'uint32_t', 'int64_t', 'uint64_t']);
-
-        // Operator Classification
-        const OPS = {
-            assign: new Set(['=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '&=', '|=', '^=']),
-            logical: new Set(['&&', '||']),
-            equality: new Set(['==', '!=']),
-            relational: new Set(['<', '>', '<=', '>=']),
-            bitwise: new Set(['&', '|', '^']),
-            additive: new Set(['+', '-']),
-            multiplicative: new Set(['*', '/', '%']),
-            shift: new Set(['<<', '>>']),
-            unary: new Set(['!', '~', '++', '--', 'sizeof'])
-        };
-
-        // --- 2. State & Config ---
+        const OPS = { assign: new Set(['=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '&=', '|=', '^=']), logical: new Set(['&&', '||']), equality: new Set(['==', '!=']), relational: new Set(['<', '>', '<=', '>=']), bitwise: new Set(['&', '|', '^']), additive: new Set(['+', '-']), multiplicative: new Set(['*', '/', '%']), shift: new Set(['<<', '>>']), unary: new Set(['!', '~', '++', '--', 'sizeof']) };
         let currentRawOutput = "";
-
         const DEFAULT_CONFIG = {
-            // Indentation
-            indentWidth: 4,
-            useTabs: false,
-            indentCase: false,
-            indentGoto: false,
-            indentPP: false,
-
-            // Function Formatting
-            breakAfterFuncReturnType: false,
-            breakAfterFuncOpenParen: false,
-            breakFuncArgsOnLimit: false,
-            breakBeforeFuncCloseParen: false,
-            funcParamStyle: 'Pack', // Pack, Vertical
-            columnLimit: 80,
-
-            // Newlines & Wrapping
-            breakBeforeFuncBrace: false,
-            breakBeforeIfBrace: false,
-            breakBeforeForBrace: false,
-            breakBeforeWhileBrace: false,
-            breakBeforeSwitchBrace: false,
-            breakBeforeElse: false,
-            breakBeforeWhile: false, // do-while
-            oneLinerIf: false,
-            oneLinerFunc: false,
-            maxEmptyLines: 1,
-
-            // Brace Style
-            braceStyle: 'K&R', // K&R, Allman, GNU
-
-            // Spacing - General
-            spaceAfterKeywords: true,
-            spaceAfterCast: false,
-            spaceBeforeFuncDefParen: false,
-            spaceBeforeFuncCallParen: false,
-
-            // Spacing - Inner
-            spaceInParens: false,
-            spaceInBrackets: false,
-            spaceInBraces: true,
-            spaceInEmptyBraces: false,
-
-            // Spacing - Operators
-            spaceAssign: true,
-            spaceLogical: true,
-            spaceEquality: true,
-            spaceRelational: true,
-            spaceBitwise: true,
-            spaceAdditive: true,
-            spaceMultiplicative: true,
-            spaceShift: true,
-            spaceUnary: false, // ! x
-            spaceTernary: true,
-            spaceComma: true,
-            spaceSemi: true, // in for loop
-
-            // Pointers
-            pointerAlignment: 'Right'
+            indentWidth: 4, useTabs: false, indentCase: false, indentGoto: false, indentPP: false,
+            breakAfterStructClosingBrace: false, groupTopLevelItems: true, topLevelEmptyLines: 1,
+            groupIncludes: true, groupDefines: true, groupTypedefs: true, groupFuncProtos: true, groupVarDecls: true, groupPreproc: true,
+            emptyLineBeforeIncludes: false, emptyLineAfterIncludes: false, emptyLineBeforeDefines: false, emptyLineAfterDefines: false,
+            emptyLineBeforeTypedefs: false, emptyLineAfterTypedefs: false, emptyLineBeforeFuncProtos: false, emptyLineAfterFuncProtos: false,
+            emptyLineBeforeVarDecls: false, emptyLineAfterVarDecls: false,
+            breakAfterFuncReturnType: false, breakAfterFuncOpenParen: false, breakFuncArgsOnLimit: false, breakBeforeFuncCloseParen: false, funcParamStyle: 'Pack', columnLimit: 80, emptyLinesBetweenFunctions: 2,
+            breakBeforeFuncBrace: false, breakBeforeIfBrace: false, breakBeforeForBrace: false, breakBeforeWhileBrace: false, breakBeforeSwitchBrace: false, breakBeforeElse: false, breakBeforeWhile: false, oneLinerIf: false, oneLinerFunc: false, maxEmptyLines: 1,
+            emptyLineBeforeIf: false, emptyLineBeforeFor: false, emptyLineBeforeWhile: false, emptyLineBeforeDo: false, emptyLineBeforeSwitch: false, emptyLineBeforeCase: false, emptyLineBeforeBreak: false, emptyLineBeforeReturn: false,
+            emptyLineStartOfBlock: false, emptyLineEndOfBlock: false, braceStyle: 'K&R',
+            spaceAfterKeywords: true, spaceAfterCast: false, spaceBeforeFuncDefParen: false, spaceBeforeFuncCallParen: false, spaceInParens: false, spaceInBrackets: false, spaceInBraces: true, spaceInEmptyBraces: false, spaceAssign: true, spaceLogical: true, spaceEquality: true, spaceRelational: true, spaceBitwise: true, spaceAdditive: true, spaceMultiplicative: true, spaceShift: true, spaceUnary: false, spaceTernary: true, spaceComma: true, spaceSemi: true, pointerAlignment: 'Right'
         };
-
         let config = { ...DEFAULT_CONFIG };
-
-        // --- 3. UI Generation ---
         const settingsGroups = [
-            {
-                title: "Indentation",
-                items: [
-                    { id: 'indentWidth', type: 'range', min: 2, max: 8, label: 'Indent Width' },
-                    { id: 'useTabs', type: 'bool', label: 'Use Tabs' },
-                    { id: 'indentCase', type: 'bool', label: 'Indent Case Labels' },
-                    { id: 'indentGoto', type: 'bool', label: 'Indent Goto Labels' },
-                    { id: 'indentPP', type: 'bool', label: 'Indent Preprocessor' }
-                ]
-            },
-            {
-                title: "Function Formatting",
-                items: [
-                     { id: 'columnLimit', type: 'range', min: 40, max: 120, label: 'Column Limit' },
-                     { id: 'breakAfterFuncReturnType', type: 'bool', label: 'Break After Return Type' },
-                     { id: 'breakAfterFuncOpenParen', type: 'bool', label: 'Break After Open Paren' },
-                     { id: 'breakFuncArgsOnLimit', type: 'bool', label: 'Only Break if > Limit' },
-                     { id: 'breakBeforeFuncCloseParen', type: 'bool', label: 'Break Before Close Paren' },
-                     { id: 'funcParamStyle', type: 'select', options: ['Pack', 'Vertical'], label: 'Parameter Style' },
-                     { id: 'breakBeforeFuncBrace', type: 'bool', label: 'Break Before Body Brace' }
-                ]
-            },
-            {
-                title: "Brace Wrapping",
-                items: [
-                    { id: 'braceStyle', type: 'select', options: ['K&R', 'Allman', 'GNU'], label: 'Brace Style' },
-                    { id: 'breakBeforeIfBrace', type: 'bool', label: 'Break Before If Brace' },
-                    { id: 'breakBeforeForBrace', type: 'bool', label: 'Break Before For Brace' },
-                    { id: 'breakBeforeWhileBrace', type: 'bool', label: 'Break Before While Brace' },
-                    { id: 'breakBeforeSwitchBrace', type: 'bool', label: 'Break Before Switch Brace' },
-                    { id: 'breakBeforeElse', type: 'bool', label: 'Break Before Else' },
-                ]
-            },
-            {
-                title: "Spacing (General)",
-                items: [
-                    { id: 'spaceAfterKeywords', type: 'bool', label: 'Space After Keywords (if, for)' },
-                    { id: 'spaceAfterCast', type: 'bool', label: 'Space After C-Style Cast' },
-                    { id: 'spaceBeforeFuncDefParen', type: 'bool', label: 'Space Before Def Paren' },
-                    { id: 'spaceBeforeFuncCallParen', type: 'bool', label: 'Space Before Call Paren' },
-                    { id: 'spaceInParens', type: 'bool', label: 'Space In Parens ( a )' },
-                    { id: 'spaceInBrackets', type: 'bool', label: 'Space In Brackets [ a ]' },
-                    { id: 'spaceInBraces', type: 'bool', label: 'Space In Braces { a }' },
-                    { id: 'spaceInEmptyBraces', type: 'bool', label: 'Space In Empty Braces { }' },
-                ]
-            },
-            {
-                title: "Spacing (Operators)",
-                items: [
-                    { id: 'spaceAssign', type: 'bool', label: 'Assignment (=, +=)' },
-                    { id: 'spaceLogical', type: 'bool', label: 'Logical (&&, ||)' },
-                    { id: 'spaceEquality', type: 'bool', label: 'Equality (==, !=)' },
-                    { id: 'spaceRelational', type: 'bool', label: 'Relational (<, >)' },
-                    { id: 'spaceBitwise', type: 'bool', label: 'Bitwise (&, |, ^)' },
-                    { id: 'spaceAdditive', type: 'bool', label: 'Additive (+, -)' },
-                    { id: 'spaceMultiplicative', type: 'bool', label: 'Multiplicative (*, /)' },
-                    { id: 'spaceShift', type: 'bool', label: 'Shift (<<, >>)' },
-                    { id: 'spaceUnary', type: 'bool', label: 'Unary (!, ~)' },
-                    { id: 'spaceTernary', type: 'bool', label: 'Ternary (?, :)' },
-                    { id: 'spaceComma', type: 'bool', label: 'After Comma' },
-                    { id: 'spaceSemi', type: 'bool', label: 'After Semicolon (for)' },
-                ]
-            },
-            {
-                title: "Formatting",
-                items: [
-                    { id: 'oneLinerIf', type: 'bool', label: 'Allow Short If Statements' },
-                    { id: 'oneLinerFunc', type: 'bool', label: 'Allow Short Functions' },
-                    { id: 'maxEmptyLines', type: 'range', min: 0, max: 4, label: 'Max Empty Lines' },
-                    { id: 'pointerAlignment', type: 'select', options: ['Left', 'Middle', 'Right'], label: 'Pointer Alignment' },
-                ]
-            }
+            { title: "Indentation", items: [ { id: 'indentWidth', type: 'range', min: 2, max: 8, label: 'Indent Width' }, { id: 'useTabs', type: 'bool', label: 'Use Tabs' }, { id: 'indentCase', type: 'bool', label: 'Indent Case Labels' }, { id: 'indentGoto', type: 'bool', label: 'Indent Goto Labels' }, { id: 'indentPP', type: 'bool', label: 'Indent Preprocessor' } ] },
+            { title: "Item Grouping (Logic)", items: [ { id: 'groupIncludes', type: 'bool', label: 'Group Includes' }, { id: 'groupDefines', type: 'bool', label: 'Group Defines' }, { id: 'groupTypedefs', type: 'bool', label: 'Group Typedefs' }, { id: 'groupFuncProtos', type: 'bool', label: 'Group Func Prototypes' }, { id: 'groupVarDecls', type: 'bool', label: 'Group Variable Decls' }, { id: 'groupPreproc', type: 'bool', label: 'Group Preprocessor Blocks' } ] },
+            { title: "Group Spacing (Add +1 Line)", items: [ { type: 'custom', html: `<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-slate-400"><div class="font-bold border-b border-slate-700 mb-1">Type</div><div class="font-bold border-b border-slate-700 mb-1 flex justify-between"><span>Before</span><span>After</span></div><span>Includes</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeIncludes" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterIncludes" class="custom-checkbox"></div><span>Defines</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeDefines" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterDefines" class="custom-checkbox"></div><span>Typedefs</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeTypedefs" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterTypedefs" class="custom-checkbox"></div><span>Prototypes</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeFuncProtos" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterFuncProtos" class="custom-checkbox"></div><span>Var Decls</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeVarDecls" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterVarDecls" class="custom-checkbox"></div></div>` } ] },
+            { title: "Structure & Whitespace", items: [ { id: 'topLevelEmptyLines', type: 'range', min: 0, max: 4, label: 'Top Level Empty Lines' }, { id: 'emptyLinesBetweenFunctions', type: 'range', min: 0, max: 4, label: 'Lines Between Funcs' }, { id: 'maxEmptyLines', type: 'range', min: 0, max: 4, label: 'Max Preserved Empty Lines' }, { id: 'breakAfterStructClosingBrace', type: 'bool', label: 'Break After Struct Brace' }, { id: 'emptyLineStartOfBlock', type: 'bool', label: 'Empty Line After {' }, { id: 'emptyLineEndOfBlock', type: 'bool', label: 'Empty Line Before }' } ] },
+            { title: "Whitespace Before Keywords", items: [ { id: 'emptyLineBeforeIf', type: 'bool', label: 'Before If' }, { id: 'emptyLineBeforeFor', type: 'bool', label: 'Before For' }, { id: 'emptyLineBeforeWhile', type: 'bool', label: 'Before While' }, { id: 'emptyLineBeforeDo', type: 'bool', label: 'Before Do' }, { id: 'emptyLineBeforeSwitch', type: 'bool', label: 'Before Switch' }, { id: 'emptyLineBeforeCase', type: 'bool', label: 'Before Case' }, { id: 'emptyLineBeforeBreak', type: 'bool', label: 'Before Break' }, { id: 'emptyLineBeforeReturn', type: 'bool', label: 'Before Return' } ] },
+            { title: "Function Formatting", items: [ { id: 'columnLimit', type: 'range', min: 40, max: 120, label: 'Column Limit' }, { id: 'breakAfterFuncReturnType', type: 'bool', label: 'Break After Return Type' }, { id: 'breakAfterFuncOpenParen', type: 'bool', label: 'Break After Open Paren' }, { id: 'breakFuncArgsOnLimit', type: 'bool', label: 'Only Break if > Limit' }, { id: 'breakBeforeFuncCloseParen', type: 'bool', label: 'Break Before Close Paren' }, { id: 'funcParamStyle', type: 'select', options: ['Pack', 'Vertical'], label: 'Parameter Style' }, { id: 'breakBeforeFuncBrace', type: 'bool', label: 'Break Before Body Brace' } ] },
+            { title: "Brace Wrapping", items: [ { id: 'braceStyle', type: 'select', options: ['K&R', 'Allman', 'GNU'], label: 'Brace Style' }, { id: 'breakBeforeIfBrace', type: 'bool', label: 'Break Before If Brace' }, { id: 'breakBeforeForBrace', type: 'bool', label: 'Break Before For Brace' }, { id: 'breakBeforeWhileBrace', type: 'bool', label: 'Break Before While Brace' }, { id: 'breakBeforeSwitchBrace', type: 'bool', label: 'Break Before Switch Brace' }, { id: 'breakBeforeElse', type: 'bool', label: 'Break Before Else' } ] },
+            { title: "Spacing (General)", items: [ { id: 'spaceAfterKeywords', type: 'bool', label: 'Space After Keywords (if, for)' }, { id: 'spaceInParens', type: 'bool', label: 'Space In Parens ( a )' }, { id: 'spaceInBrackets', type: 'bool', label: 'Space In Brackets [ a ]' }, { id: 'spaceInBraces', type: 'bool', label: 'Space In Braces { a }' }, { id: 'spaceInEmptyBraces', type: 'bool', label: 'Space In Empty Braces { }' } ] },
+            { title: "Formatting", items: [ { id: 'oneLinerIf', type: 'bool', label: 'Allow Short If Statements' }, { id: 'pointerAlignment', type: 'select', options: ['Left', 'Middle', 'Right'], label: 'Pointer Alignment' } ] }
         ];
-
         function initUI() {
-            const container = document.getElementById('settingsContainer');
-            container.innerHTML = '';
-
+            const container = document.getElementById('settingsContainer'); container.innerHTML = '';
             settingsGroups.forEach(group => {
-                const groupEl = document.createElement('div');
-                groupEl.className = 'mb-4';
+                const groupEl = document.createElement('div'); groupEl.className = 'mb-4';
                 groupEl.innerHTML = `<h3 class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2 px-2 border-l-2 border-blue-500/50">${group.title}</h3>`;
-
-                const itemsDiv = document.createElement('div');
-                itemsDiv.className = 'space-y-1';
-
+                const itemsDiv = document.createElement('div'); itemsDiv.className = 'space-y-1';
                 group.items.forEach(item => {
                     const row = document.createElement('div');
-                    row.className = 'flex items-center justify-between px-2 py-1 hover:bg-slate-800/50 rounded group';
-
-                    if (item.type === 'bool') {
-                        row.innerHTML = `
-                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">${item.label}</span>
-                            <input type="checkbox" id="opt-${item.id}" ${config[item.id] ? 'checked' : ''} class="custom-checkbox">
-                        `;
-                    } else if (item.type === 'range') {
-                        row.className = 'flex flex-col items-stretch px-2 py-1.5 hover:bg-slate-800/50 rounded group gap-1';
-                        row.innerHTML = `
-                            <div class="flex justify-between w-full">
-                                <span class="text-xs text-slate-400 group-hover:text-slate-200">${item.label}</span>
-                                <span id="val-${item.id}" class="text-[10px] text-blue-400 font-mono">${config[item.id]}</span>
-                            </div>
-                            <input type="range" id="opt-${item.id}" min="${item.min}" max="${item.max}" value="${config[item.id]}" class="w-full h-1">
-                        `;
-                    } else if (item.type === 'select') {
-                        row.innerHTML = `
-                            <span class="text-xs text-slate-400 group-hover:text-slate-200">${item.label}</span>
-                            <select id="opt-${item.id}" class="bg-slate-950 border border-slate-700 text-[10px] text-slate-300 rounded px-1 py-0.5 outline-none focus:border-blue-500">
-                                ${item.options.map(o => `<option value="${o}" ${config[item.id] === o ? 'selected' : ''}>${o}</option>`).join('')}
-                            </select>
-                        `;
+                    if (item.type === 'custom') row.innerHTML = item.html;
+                    else {
+                        row.className = 'flex items-center justify-between px-2 py-1 hover:bg-slate-800/50 rounded group';
+                        if (item.type === 'bool') row.innerHTML = `<span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">${item.label}</span><input type="checkbox" id="opt-${item.id}" ${config[item.id] ? 'checked' : ''} class="custom-checkbox">`;
+                        else if (item.type === 'range') row.innerHTML = `<div class="flex flex-col w-full"><div class="flex justify-between w-full"><span class="text-xs text-slate-400 group-hover:text-slate-200">${item.label}</span><span id="val-${item.id}" class="text-[10px] text-blue-400 font-mono">${config[item.id]}</span></div><input type="range" id="opt-${item.id}" min="${item.min}" max="${item.max}" value="${config[item.id]}" class="w-full h-1"></div>`;
+                        else if (item.type === 'select') row.innerHTML = `<span class="text-xs text-slate-400 group-hover:text-slate-200">${item.label}</span><select id="opt-${item.id}" class="bg-slate-950 border border-slate-700 text-[10px] text-slate-300 rounded px-1 py-0.5 outline-none focus:border-blue-500">${item.options.map(o => `<option value="${o}" ${config[item.id] === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
                     }
                     itemsDiv.appendChild(row);
                 });
-
-                groupEl.appendChild(itemsDiv);
-                container.appendChild(groupEl);
+                groupEl.appendChild(itemsDiv); container.appendChild(groupEl);
             });
-
-            // Bind Events
             document.querySelectorAll('[id^="opt-"]').forEach(el => {
                 el.addEventListener('change', (e) => {
                     const key = el.id.replace('opt-', '');
                     if (el.type === 'checkbox') config[key] = el.checked;
-                    else if (el.type === 'range') {
-                        config[key] = parseInt(el.value);
-                        document.getElementById(`val-${key}`).textContent = el.value;
-                    }
+                    else if (el.type === 'range') { config[key] = parseInt(el.value); document.getElementById(`val-${key}`).textContent = el.value; }
                     else config[key] = el.value;
                     runFormat();
                 });
-                if(el.type === 'range') {
-                    el.addEventListener('input', (e) => {
-                         const key = el.id.replace('opt-', '');
-                         document.getElementById(`val-${key}`).textContent = el.value;
-                    });
-                }
+                if(el.type === 'range') el.addEventListener('input', (e) => document.getElementById(`val-${el.id.replace('opt-', '')}`).textContent = e.target.value);
             });
         }
-
-        // --- 4. Tokenizer & Parser ---
         function tokenize(src) {
-            const tokens = [];
-            let i = 0, len = src.length;
+            const tokens = []; let i = 0, len = src.length;
             const push = (t, v) => tokens.push({ t, v });
-
             while (i < len) {
                 const c = src[i];
                 if (c === '\n') { push(TokenType.NL, '\n'); i++; continue; }
-                if (/\s/.test(c)) {
-                    let v = c; i++;
-                    while(i < len && /\s/.test(src[i]) && src[i] !== '\n') { v += src[i]; i++; }
-                    push(TokenType.WS, v); continue;
-                }
-                if (c === '/' && src[i+1] === '*') {
-                    let v = '/*'; i += 2;
-                    while (i < len && !(src[i] === '*' && src[i+1] === '/')) { v += src[i]; i++; }
-                    if (i < len) { v += '*/'; i += 2; }
-                    push(TokenType.CB, v); continue;
-                }
-                if (c === '/' && src[i+1] === '/') {
-                    let v = '//'; i += 2;
-                    while (i < len && src[i] !== '\n') { v += src[i]; i++; }
-                    push(TokenType.CL, v); continue;
-                }
-                if (c === '#') {
-                    let v = '#'; i++;
-                    while (i < len) {
-                        if (src[i] === '\n' && src[i-1] !== '\\') break;
-                        v += src[i]; i++;
-                    }
-                    push(TokenType.PP, v.trim()); continue;
-                }
-                if (c === '"' || c === "'") {
-                    let v = c; const q = c; i++;
-                    while (i < len) {
-                        if (src[i] === q && src[i-1] !== '\\') { v += q; i++; break; }
-                        v += src[i]; i++;
-                    }
-                    push(c === '"' ? TokenType.STR : TokenType.CHR, v); continue;
-                }
-                if (/[a-zA-Z_]/.test(c)) {
-                    let v = c; i++;
-                    while (i < len && /[a-zA-Z0-9_]/.test(src[i])) { v += src[i]; i++; }
-                    if (KEYWORDS.has(v)) push(TokenType.KW, v);
-                    else if (TYPES.has(v) || v.endsWith('_t')) push(TokenType.TY, v);
-                    else push(TokenType.ID, v);
-                    continue;
-                }
-                if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i+1]))) {
-                    let v = c; i++;
-                    while (i < len && /[0-9a-fA-FxX.uUlL]/.test(src[i])) { v += src[i]; i++; }
-                    push(TokenType.NUM, v); continue;
-                }
-                const s3 = src.substr(i, 3);
-                if (OPS.assign.has(s3) || OPS.shift.has(s3)) { push(TokenType.OP, s3); i+=3; continue; }
-                const s2 = src.substr(i, 2);
-                if (['++', '--', '==', '!=', '<=', '>=', '&&', '||', '<<', '>>', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '->'].includes(s2)) {
-                    push(TokenType.OP, s2); i+=2; continue;
-                }
+                if (/\s/.test(c)) { let v = c; i++; while(i < len && /\s/.test(src[i]) && src[i] !== '\n') { v += src[i]; i++; } push(TokenType.WS, v); continue; }
+                if (c === '/' && src[i+1] === '*') { let v = '/*'; i += 2; while (i < len && !(src[i] === '*' && src[i+1] === '/')) { v += src[i]; i++; } if (i < len) { v += '*/'; i += 2; } push(TokenType.CB, v); continue; }
+                if (c === '/' && src[i+1] === '/') { let v = '//'; i += 2; while (i < len && src[i] !== '\n') { v += src[i]; i++; } push(TokenType.CL, v); continue; }
+                if (c === '#') { let v = '#'; i++; while (i < len) { if (src[i] === '\n' && src[i-1] !== '\\') break; v += src[i]; i++; } push(TokenType.PP, v.trim()); continue; }
+                if (c === '"' || c === "'") { let v = c; const q = c; i++; while (i < len) { if (src[i] === q && src[i-1] !== '\\') { v += q; i++; break; } v += src[i]; i++; } push(c === '"' ? TokenType.STR : TokenType.CHR, v); continue; }
+                if (/[a-zA-Z_]/.test(c)) { let v = c; i++; while (i < len && /[a-zA-Z0-9_]/.test(src[i])) { v += src[i]; i++; } if (KEYWORDS.has(v)) push(TokenType.KW, v); else if (TYPES.has(v) || v.endsWith('_t')) push(TokenType.TY, v); else push(TokenType.ID, v); continue; }
+                if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i+1]))) { let v = c; i++; while (i < len && /[0-9a-fA-FxX.uUlL]/.test(src[i])) { v += src[i]; i++; } push(TokenType.NUM, v); continue; }
+                const s3 = src.substr(i, 3); if (OPS.assign.has(s3) || OPS.shift.has(s3)) { push(TokenType.OP, s3); i+=3; continue; }
+                const s2 = src.substr(i, 2); if (['++', '--', '==', '!=', '<=', '>=', '&&', '||', '<<', '>>', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '->'].includes(s2)) { push(TokenType.OP, s2); i+=2; continue; }
                 if ('+-*/%=!&|^~<>?.'.includes(c)) { push(TokenType.OP, c); i++; continue; }
-                if (c === '{') { push(TokenType.LBR, c); i++; continue; }
-                if (c === '}') { push(TokenType.RBR, c); i++; continue; }
-                if (c === '(') { push(TokenType.LPAR, c); i++; continue; }
-                if (c === ')') { push(TokenType.RPAR, c); i++; continue; }
-                if (c === '[') { push(TokenType.LBRA, c); i++; continue; }
-                if (c === ']') { push(TokenType.RBRA, c); i++; continue; }
-                if (c === ';') { push(TokenType.SEMI, c); i++; continue; }
-                if (c === ':') { push(TokenType.COLON, c); i++; continue; }
-                if (c === ',') { push(TokenType.PUNC, c); i++; continue; }
+                if (c === '{') { push(TokenType.LBR, c); i++; continue; } else if (c === '}') { push(TokenType.RBR, c); i++; continue; } else if (c === '(') { push(TokenType.LPAR, c); i++; continue; } else if (c === ')') { push(TokenType.RPAR, c); i++; continue; } else if (c === '[') { push(TokenType.LBRA, c); i++; continue; } else if (c === ']') { push(TokenType.RBRA, c); i++; continue; } else if (c === ';') { push(TokenType.SEMI, c); i++; continue; } else if (c === ':') { push(TokenType.COLON, c); i++; continue; } else if (c === ',') { push(TokenType.PUNC, c); i++; continue; }
                 push(TokenType.UNK, c); i++;
             }
             return tokens;
         }
 
-        // --- 5. Formatting Logic ---
-        function format(source) {
-            const tokens = tokenize(source).filter(t => t.t !== TokenType.WS);
-            if (tokens.length === 0) return "";
+        // --- PARTITIONER ---
+        function parseStatements(tokens) {
+            const stmts = [];
+            let currentTokens = [];
 
-            let output = "";
+            // Helper to classify statement type
+            const classify = (toks) => {
+                let k = 0;
+                while(k < toks.length && (toks[k].t === TokenType.CB || toks[k].t === TokenType.CL)) k++;
+                if (k >= toks.length) return 'COMMENT';
+
+                const first = toks[k];
+                if (first.t === TokenType.PP) {
+                    if (first.v.startsWith('#include')) return 'INCLUDE';
+                    if (first.v.startsWith('#define')) return 'DEFINE';
+                    return 'PREPROC';
+                }
+                if (first.v === 'typedef') return 'TYPEDEF';
+
+                let hasParen = false, hasBrace = false;
+                for (let i = k; i < toks.length; i++) {
+                    if (toks[i].t === TokenType.LPAR) hasParen = true;
+                    if (toks[i].t === TokenType.LBR) hasBrace = true;
+                }
+
+                if (hasParen && hasBrace && toks[toks.length-1].t === TokenType.RBR) return 'FUNC_DEF';
+                if (hasParen && toks[toks.length-1].t === TokenType.SEMI) {
+                    let hasAssign = false;
+                    for (let i = k; i < toks.length; i++) if (OPS.assign.has(toks[i].v) || toks[i].v === '=') hasAssign = true;
+                    if (hasAssign) return 'VAR_DECL';
+                    return 'FUNC_PROTO';
+                }
+
+                return 'VAR_DECL';
+            };
+
             let indent = 0;
-            let isStartOfLine = true;
-            let parenDepth = 0;
-            let inFuncArgs = false;
-            let col = 0; // Current column tracker
+            let i = 0;
 
-            const append = (s) => {
-                output += s;
-                col += s.length;
-                isStartOfLine = false;
-            };
-            const newline = () => {
-                output = output.trimEnd() + '\n';
-                col = 0;
-                isStartOfLine = true;
-            };
-            const space = () => {
-                if (!isStartOfLine && !output.endsWith(' ')) {
-                    output += ' ';
-                    col++;
-                }
-            };
-
-            const writeIndent = (offset = 0) => {
-                if (isStartOfLine) {
-                    const lvl = Math.max(0, indent + offset);
-                    const char = config.useTabs ? '\t' : ' ';
-                    const mult = config.useTabs ? 1 : config.indentWidth;
-                    const str = char.repeat(lvl * mult);
-                    output += str;
-                    // Tab is 1 char in DOM usually, but visually adjustable.
-                    // For column counting we assume tab=indentWidth.
-                    col += config.useTabs ? (lvl * config.indentWidth) : (lvl * config.indentWidth);
-                    isStartOfLine = false;
-                }
-            };
-
-            // Helper to predict if function args will fit
-            const predictLineLength = (startIdx) => {
-                let len = col;
-                let j = startIdx;
-                let balance = 0;
-                while (j < tokens.length) {
-                    const t = tokens[j];
-                    len += t.v.length;
-                    if (t.t === TokenType.LPAR) balance++;
-                    if (t.t === TokenType.RPAR) {
-                         balance--;
-                         if (balance < 0) break;
-                    }
-                    if (t.t === TokenType.LBR || t.t === TokenType.SEMI) break;
-                    // Rough approximation of spaces
-                    if ([TokenType.KW, TokenType.TY, TokenType.ID, TokenType.NUM, TokenType.PUNC].includes(t.t)) len += 1;
-                    j++;
-                }
-                return len;
-            };
-
-            const isPointer = (idx) => {
-                if (tokens[idx].v !== '*') return false;
-                const p = tokens[idx-1];
-                if (!p) return false;
-                if (p.t === TokenType.TY) return true;
-                if (p.t === TokenType.ID && tokens[idx-2] && ['struct','union'].includes(tokens[idx-2].v)) return true;
-                if (p.v === 'void' || (p.t === TokenType.ID && tokens[idx+1] && tokens[idx+1].t === TokenType.RPAR)) return true;
-                return false;
-            };
-
-            const isUnary = (idx) => {
-                const t = tokens[idx].v;
-                if (!['+','-','*','&'].includes(t)) return false;
-                const p = tokens[idx-1];
-                if (!p) return true;
-                if (p.t === TokenType.OP || p.t === TokenType.LPAR || p.t === TokenType.LBRA || p.t === TokenType.SEMI || p.t === TokenType.KW || p.t === TokenType.COLON || p.t === TokenType.LBR || p.t === TokenType.PUNC) return true;
-                return false;
-            };
-
-            // Heuristic for "Control" vs "Function" parens
-            const isControlParen = (idx) => {
-                const prev = tokens[idx-1];
-                return prev && ['if','for','while','switch'].includes(prev.v);
-            };
-
-            for (let i = 0; i < tokens.length; i++) {
+            while (i < tokens.length) {
                 const t = tokens[i];
-                const prev = tokens[i-1];
-                const next = tokens[i+1];
+                currentTokens.push(t);
 
-                if (t.t === TokenType.NL) {
-                    if (prev && prev.t !== TokenType.NL) newline();
-                    continue;
-                }
+                if (t.t === TokenType.LBR) indent++;
+                else if (t.t === TokenType.RBR) indent--;
 
-                if (t.t === TokenType.RBR) {
-                    indent = Math.max(0, indent - 1);
-                    newline();
-                }
+                let pushStmt = false;
 
-                writeIndent(inFuncArgs ? 1 : 0);
-
-                if (t.t === TokenType.PP) {
-                    if (config.indentPP) { } else { output = output.trimEnd() + '\n'; isStartOfLine = true; col=0; }
-                    append(t.v); newline(); continue;
-                }
-
-                if (t.t === TokenType.CB || t.t === TokenType.CL) {
-                    space(); append(t.v); newline(); continue;
-                }
-
-                // Braces
-                if (t.t === TokenType.LBR) {
-                    if (prev && (prev.v === '=' || prev.t === TokenType.LBRA)) {
-                        space(); append('{');
-                        if (next && next.t === TokenType.RBR) {
-                            if (config.spaceInEmptyBraces) space();
-                        } else if (config.spaceInBraces) space();
-                    } else {
-                        // Logic for Break Before Brace
-                        let breakBrace = false;
-                        if (config.braceStyle === 'Allman' || config.braceStyle === 'GNU') breakBrace = true;
-
-                        if (prev && prev.t === TokenType.RPAR) {
-                            // Find prev context
-                            let j = i - 1; let bal = 0;
-                            while (j >= 0) {
-                                if (tokens[j].t === TokenType.RPAR) bal++; else if (tokens[j].t === TokenType.LPAR) bal--;
-                                if (bal === 0) break;
-                                j--;
-                            }
-                            const kw = tokens[j-1];
-                            if (kw) {
-                                if (kw.v === 'if' && config.breakBeforeIfBrace) breakBrace = true;
-                                else if (kw.v === 'for' && config.breakBeforeForBrace) breakBrace = true;
-                                else if (kw.v === 'while' && config.breakBeforeWhileBrace) breakBrace = true;
-                                else if (kw.v === 'switch' && config.breakBeforeSwitchBrace) breakBrace = true;
-                                else if (kw.t === TokenType.ID && config.breakBeforeFuncBrace) breakBrace = true;
-                            }
-                        } else if (prev && prev.v === 'else' && config.breakBeforeElse) breakBrace = true;
-
-                        if (breakBrace) {
-                            newline(); writeIndent(); append('{');
-                        } else {
-                            space(); append('{');
-                        }
-                        indent++; newline();
+                if (indent === 0) {
+                    if (t.t === TokenType.PP) pushStmt = true;
+                    else if (t.t === TokenType.SEMI) pushStmt = true;
+                    else if (t.t === TokenType.RBR) {
+                        let k = 0;
+                        while(k < currentTokens.length && (currentTokens[k].t === TokenType.CB || currentTokens[k].t === TokenType.CL)) k++;
+                        const first = currentTokens[k];
+                        const isDataStruct = first && (['struct','union','enum','typedef'].includes(first.v));
+                        if (!isDataStruct) pushStmt = true; // Function body
                     }
                 }
-                else if (t.t === TokenType.RBR) {
-                    append('}');
-                    if (next) {
-                        if (next.v === 'else' || next.v === 'while') {
-                            if (config.braceStyle === 'K&R' && !config.breakBeforeElse && !(next.v==='while' && config.breakBeforeWhile)) space();
-                            else newline();
-                        } else if (next.t !== TokenType.SEMI && next.t !== TokenType.PUNC && next.t !== TokenType.RPAR) {
-                            newline();
-                        }
-                    }
-                }
-                else if (t.t === TokenType.SEMI) {
-                    append(';');
-                    if (config.spaceSemi && next && next.t !== TokenType.NL && next.t !== TokenType.RBR) space();
-                    else if (next && next.t !== TokenType.NL && next.t !== TokenType.RBR) newline();
-                }
-                // Keywords
-                else if (t.t === TokenType.KW) {
-                    if (t.v === 'case' || t.v === 'default') {
-                        const saved = indent;
-                        if (!config.indentCase) indent = Math.max(0, indent - 1);
-                        if (!isStartOfLine) newline();
-                        isStartOfLine = true; writeIndent(); append(t.v);
-                        indent = saved;
-                    } else if (t.v === 'return') {
-                         append(t.v);
-                         if (next && (next.t === TokenType.ID || next.t === TokenType.NUM || next.t === TokenType.STR || next.t === TokenType.CHR || next.t === TokenType.TY || next.t === TokenType.KW || next.t === TokenType.OP)) {
-                             space();
-                         }
-                    } else {
-                        append(t.v);
-                        if (['if', 'for', 'while', 'switch'].includes(t.v)) {
-                            if (config.spaceAfterKeywords) space();
-                        } else {
-                             if (next && (next.t===TokenType.ID || next.t===TokenType.KW || next.t===TokenType.TY)) space();
-                        }
-                    }
-                }
-                // IDs and Types
-                else if (t.t === TokenType.TY || t.t === TokenType.ID || t.t === TokenType.NUM) {
-                    // Check for Function Return Type Break
-                    if (t.t === TokenType.ID && next && next.t === TokenType.LPAR && config.breakAfterFuncReturnType) {
-                        if (prev && (prev.t === TokenType.TY || (prev.t === TokenType.OP && prev.v === '*') || prev.v === 'void')) {
-                             newline(); writeIndent();
-                        }
-                    }
 
-                    append(t.v);
-                    if (next && (next.t===TokenType.TY || next.t===TokenType.ID || next.t===TokenType.KW || next.t===TokenType.NUM)) space();
+                if (pushStmt) {
+                    stmts.push({ type: classify(currentTokens), tokens: [...currentTokens] });
+                    currentTokens = [];
                 }
-                // Operators
-                else if (t.t === TokenType.OP) {
-                    const v = t.v;
-                    if (v === '*') {
-                        if (isPointer(i)) {
-                             // Modified Logic for Left: No trailing space
-                             if (config.pointerAlignment === 'Left') append('*');
-                             else if (config.pointerAlignment === 'Right') { space(); append('*'); }
-                             else { space(); append('* '); }
-                        } else if (isUnary(i)) {
-                            if (config.spaceUnary) space(); append('*');
-                        } else {
-                            if (config.spaceMultiplicative) { space(); append('*'); space(); } else append('*');
-                        }
-                    } else if (v === '&') {
-                         if (isUnary(i)) {
-                             if (config.spaceUnary) space(); append('&');
-                         } else {
-                             if (config.spaceBitwise) { space(); append('&'); space(); } else append('&');
-                         }
-                    } else if (['+','-'].includes(v)) {
-                        if (isUnary(i)) {
-                            if (config.spaceUnary) space(); append(v);
-                        } else {
-                            if (config.spaceAdditive) { space(); append(v); space(); } else append(v);
-                        }
-                    } else if (OPS.assign.has(v)) {
-                        if (config.spaceAssign) { space(); append(v); space(); } else append(v);
-                    } else if (OPS.equality.has(v)) {
-                        if (config.spaceEquality) { space(); append(v); space(); } else append(v);
-                    } else if (OPS.relational.has(v)) {
-                        if (config.spaceRelational) { space(); append(v); space(); } else append(v);
-                    } else if (OPS.logical.has(v)) {
-                        if (config.spaceLogical) { space(); append(v); space(); } else append(v);
-                    } else if (OPS.shift.has(v)) {
-                        if (config.spaceShift) { space(); append(v); space(); } else append(v);
-                    } else if (OPS.unary.has(v)) {
-                         if (v.length===2 && prev && (prev.t===TokenType.ID||prev.t===TokenType.RPAR||prev.t===TokenType.RBRA)) {
-                             append(v);
-                         } else {
-                             append(v); if(config.spaceUnary) space();
-                         }
-                    } else if (['.', '->'].includes(v)) {
-                        append(v);
-                    } else {
-                         space(); append(v); space();
-                    }
-                }
-                else if (t.t === TokenType.COLON) {
-                    if (prev && prev.v === '?') {
-                         if (config.spaceTernary) { space(); append(':'); space(); } else append(':');
-                    } else if (next && next.t !== TokenType.NL) {
-                         append(':'); space();
-                    } else {
-                        append(':'); newline();
-                    }
-                }
-                else if (t.t === TokenType.PUNC) { // Comma
-                    append(',');
-                    if (inFuncArgs) {
-                        if (config.funcParamStyle === 'Vertical') {
-                            newline();
-                        } else {
-                            if (config.spaceComma) space();
-                        }
-                    } else {
-                        if (config.spaceComma) space();
-                    }
-                }
-                // Parentheses
-                else if (t.t === TokenType.LPAR) {
-                    const isCtrl = isControlParen(i);
-                    // Handle space before parens
-                    if (prev && prev.t === TokenType.ID) {
-                        if (isCtrl) { /* handled by keyword spacing */ }
-                        else if (config.spaceBeforeFuncCallParen) space();
-                    }
-
-                    append('(');
-                    parenDepth++;
-
-                    // Function Definition/Declaration Handling
-                    if (!isCtrl && prev && prev.t === TokenType.ID) {
-                        inFuncArgs = true;
-
-                        let shouldBreak = config.breakAfterFuncOpenParen;
-
-                        // Check Conditional Break
-                        if (shouldBreak && config.breakFuncArgsOnLimit) {
-                            const predicted = predictLineLength(i + 1);
-                            if (predicted <= config.columnLimit) {
-                                shouldBreak = false; // Fit in line, don't break
-                            }
-                        }
-
-                        if (shouldBreak) {
-                            newline();
-                        } else if (config.spaceInParens) {
-                            space();
-                        }
-                    } else {
-                         if (config.spaceInParens) space();
-                    }
-                }
-                else if (t.t === TokenType.RPAR) {
-                    parenDepth--;
-                    if (inFuncArgs && parenDepth === 0) {
-                        inFuncArgs = false;
-                        if (config.breakBeforeFuncCloseParen) {
-                             newline(); writeIndent();
-                        }
-                    }
-
-                    if (!config.breakBeforeFuncCloseParen && config.spaceInParens) {
-                        if (output.endsWith(' ')) output = output.slice(0, -1);
-                        if (!prev || prev.t !== TokenType.LPAR) append(' ');
-                    }
-                    append(')');
-                }
-                else if (t.t === TokenType.LBRA) {
-                     append('[');
-                     if (config.spaceInBrackets) space();
-                }
-                else if (t.t === TokenType.RBRA) {
-                    if (config.spaceInBrackets) {
-                        if (output.endsWith(' ')) output = output.slice(0, -1);
-                        if (!prev || prev.t !== TokenType.LBRA) append(' ');
-                    }
-                    append(']');
-                }
-                else {
-                    append(t.v);
-                }
+                i++;
             }
-            return output;
+            if (currentTokens.length > 0) stmts.push({ type: classify(currentTokens), tokens: currentTokens });
+            return stmts;
         }
 
-        // --- 6. Highlighter ---
+        // --- REFACTORED FORMATTER ---
+        function format(source) {
+            const rawTokens = tokenize(source).filter(t => t.t !== TokenType.WS && t.t !== TokenType.NL);
+            if (rawTokens.length === 0) return "";
+
+            const stmts = parseStatements(rawTokens);
+            let finalOutput = "";
+            let globalCol = 0; // Not strictly needed unless we wrap globally
+
+            // Inner Formatter (Statement Level)
+            const formatStatementTokens = (tokens) => {
+                let output = "";
+                let indent = 0;
+                let isStartOfLine = true;
+                let parenDepth = 0;
+                let inFuncArgs = false;
+                let col = 0;
+                const blockStack = [];
+
+                const append = (s) => { output += s; col += s.length; isStartOfLine = false; };
+                const newline = () => { output = output.trimEnd() + '\n'; col = 0; isStartOfLine = true; };
+                const space = () => { if (!isStartOfLine && !output.endsWith(' ')) { output += ' '; col++; } };
+                const writeIndent = () => {
+                    if (isStartOfLine) {
+                        const lvl = Math.max(0, indent);
+                        const char = config.useTabs ? '\t' : ' ';
+                        const mult = config.useTabs ? 1 : config.indentWidth;
+                        output += char.repeat(lvl * mult);
+                        col += config.useTabs ? (lvl * config.indentWidth) : (lvl * config.indentWidth);
+                        isStartOfLine = false;
+                    }
+                };
+                const ensureEmptyLine = () => {
+                    output = output.trimEnd();
+                    if (output.length > 0 && !output.endsWith('\n\n')) { if (!output.endsWith('\n')) output += '\n'; output += '\n'; }
+                    isStartOfLine = true; col = 0; writeIndent();
+                };
+                const isPointer = (idx) => { if (tokens[idx].v !== '*') return false; const p = tokens[idx-1]; if (!p) return false; if (p.t === TokenType.TY) return true; if (p.t === TokenType.ID && tokens[idx-2] && ['struct','union'].includes(tokens[idx-2].v)) return true; if (p.v === 'void' || (p.t === TokenType.ID && tokens[idx+1] && tokens[idx+1].t === TokenType.RPAR)) return true; return false; };
+                const isUnary = (idx) => { const t = tokens[idx].v; if (!['+','-','*','&'].includes(t)) return false; const p = tokens[idx-1]; if (!p) return true; if (p.t === TokenType.OP || p.t === TokenType.LPAR || p.t === TokenType.LBRA || p.t === TokenType.SEMI || p.t === TokenType.KW || p.t === TokenType.COLON || p.t === TokenType.LBR || p.t === TokenType.PUNC) return true; return false; };
+                const isControlParen = (idx) => { const prev = tokens[idx-1]; return prev && ['if','for','while','switch'].includes(prev.v); };
+                const predictLineLength = (startIdx) => { let len = col; let j = startIdx; let balance = 0; while (j < tokens.length) { const t = tokens[j]; len += t.v.length; if (t.t === TokenType.LPAR) balance++; if (t.t === TokenType.RPAR) { balance--; if (balance < 0) break; } if (t.t === TokenType.LBR || t.t === TokenType.SEMI) break; if ([TokenType.KW, TokenType.TY, TokenType.ID, TokenType.NUM, TokenType.PUNC].includes(t.t)) len += 1; j++; } return len; };
+                const isStructDef = (idx) => { let k = idx - 1; while (k >= 0 && k > idx - 5) { if (['struct','union','enum'].includes(tokens[k].v)) return true; if (tokens[k].t === TokenType.SEMI || tokens[k].t === TokenType.LBR || tokens[k].t === TokenType.RBR) break; k--; } return false; };
+
+                for (let i = 0; i < tokens.length; i++) {
+                    const t = tokens[i];
+                    const prev = tokens[i-1];
+                    const next = tokens[i+1];
+
+                    if (t.t === TokenType.RBR) { indent = Math.max(0, indent - 1); newline(); }
+                    writeIndent();
+
+                    if (t.t === TokenType.PP) {
+                        if (!config.indentPP) { output = output.trimEnd() + '\n'; isStartOfLine = true; col=0; }
+                        append(t.v); // newline added by generator logic mostly, but internal PP needs newlines? No, PP is usually single line in statement
+                        continue;
+                    }
+                    if (t.t === TokenType.CB || t.t === TokenType.CL) { space(); append(t.v); newline(); continue; }
+
+                    if (t.t === TokenType.LBR) {
+                        if (isStructDef(i)) blockStack.push('STRUCT'); else blockStack.push('BLOCK');
+                        if (prev && (prev.v === '=' || prev.t === TokenType.LBRA)) {
+                            space(); append('{');
+                            if (next && next.t === TokenType.RBR) { if (config.spaceInEmptyBraces) space(); } else if (config.spaceInBraces) space();
+                        } else {
+                            let breakBrace = false;
+                            if (config.braceStyle === 'Allman' || config.braceStyle === 'GNU') breakBrace = true;
+                            if (prev && prev.t === TokenType.RPAR) {
+                                let j = i - 1; let bal = 0; while (j >= 0) { if (tokens[j].t === TokenType.RPAR) bal++; else if (tokens[j].t === TokenType.LPAR) bal--; if (bal === 0) break; j--; }
+                                const kw = tokens[j-1];
+                                if (kw) { if (kw.v === 'if' && config.breakBeforeIfBrace) breakBrace = true; else if (kw.v === 'for' && config.breakBeforeForBrace) breakBrace = true; else if (kw.v === 'while' && config.breakBeforeWhileBrace) breakBrace = true; else if (kw.v === 'switch' && config.breakBeforeSwitchBrace) breakBrace = true; else if (kw.t === TokenType.ID && config.breakBeforeFuncBrace) breakBrace = true; }
+                            } else if (prev && prev.v === 'else' && config.breakBeforeElse) breakBrace = true;
+                            if (breakBrace) { newline(); writeIndent(); append('{'); } else { space(); append('{'); }
+                            indent++; newline();
+                            if (config.emptyLineStartOfBlock) ensureEmptyLine();
+                        }
+                    }
+                    else if (t.t === TokenType.RBR) {
+                        const blockType = blockStack.pop();
+                        if (config.emptyLineEndOfBlock && prev && prev.t !== TokenType.LBR) { output = output.trimEnd(); if(!output.endsWith('\n\n')) { if(!output.endsWith('\n')) output += '\n'; output += '\n'; } writeIndent(); }
+                        append('}');
+                        if (blockType === 'STRUCT') { if (next && next.t !== TokenType.SEMI) { if (config.breakAfterStructClosingBrace) newline(); else space(); } }
+                        else if (next) { if (next.v === 'else' || next.v === 'while') { if (config.braceStyle === 'K&R' && !config.breakBeforeElse && !(next.v==='while' && config.breakBeforeWhile)) space(); else newline(); } else if (next.t !== TokenType.SEMI && next.t !== TokenType.PUNC && next.t !== TokenType.RPAR) { newline(); } }
+                    }
+                    else if (t.t === TokenType.SEMI) {
+                        append(';');
+                        if (config.spaceSemi && next && next.t !== TokenType.NL && next.t !== TokenType.RBR) space(); else if (next && next.t !== TokenType.NL && next.t !== TokenType.RBR) newline();
+                    }
+                    else if (t.t === TokenType.KW) {
+                        if (t.v === 'if' && config.emptyLineBeforeIf) { if(!prev || prev.v !== 'else') ensureEmptyLine(); }
+                        else if (t.v === 'for' && config.emptyLineBeforeFor) ensureEmptyLine();
+                        else if (t.v === 'while' && config.emptyLineBeforeWhile) { if(!prev || prev.t !== TokenType.RBR) ensureEmptyLine(); }
+                        else if (t.v === 'do' && config.emptyLineBeforeDo) ensureEmptyLine();
+                        else if (t.v === 'switch' && config.emptyLineBeforeSwitch) ensureEmptyLine();
+                        else if (t.v === 'case' && config.emptyLineBeforeCase) ensureEmptyLine();
+                        else if (t.v === 'default' && config.emptyLineBeforeCase) ensureEmptyLine();
+                        else if (t.v === 'break' && config.emptyLineBeforeBreak) ensureEmptyLine();
+                        else if (t.v === 'return' && config.emptyLineBeforeReturn) ensureEmptyLine();
+
+                        if (t.v === 'case' || t.v === 'default') { const saved = indent; if (!config.indentCase) indent = Math.max(0, indent - 1); if (!isStartOfLine) newline(); isStartOfLine = true; writeIndent(); append(t.v); indent = saved; }
+                        else if (t.v === 'return') { append(t.v); if (next && (next.t === TokenType.ID || next.t === TokenType.NUM || next.t === TokenType.STR || next.t === TokenType.CHR || next.t === TokenType.TY || next.t === TokenType.KW || next.t === TokenType.OP)) { space(); } }
+                        else { append(t.v); if (['if', 'for', 'while', 'switch'].includes(t.v)) { if (config.spaceAfterKeywords) space(); } else { if (next && (next.t===TokenType.ID || next.t===TokenType.KW || next.t===TokenType.TY)) space(); } }
+                    }
+                    else if (t.t === TokenType.TY || t.t === TokenType.ID || t.t === TokenType.NUM) {
+                        if (t.t === TokenType.ID && next && next.t === TokenType.LPAR && config.breakAfterFuncReturnType) { if (prev && (prev.t === TokenType.TY || (prev.t === TokenType.OP && prev.v === '*') || prev.v === 'void')) { newline(); writeIndent(); } }
+                        append(t.v); if (next && (next.t===TokenType.TY || next.t===TokenType.ID || next.t===TokenType.KW || next.t===TokenType.NUM)) space();
+                    }
+                    else if (t.t === TokenType.OP) {
+                        const v = t.v;
+                        if (v === '*') { if (isPointer(i)) { if (config.pointerAlignment === 'Left') append('*'); else if (config.pointerAlignment === 'Right') { space(); append('*'); } else { space(); append('* '); } } else if (isUnary(i)) { if (config.spaceUnary) space(); append('*'); } else { if (config.spaceMultiplicative) { space(); append('*'); space(); } else append('*'); } }
+                        else if (v === '&') { if (isUnary(i)) { if (config.spaceUnary) space(); append('&'); } else { if (config.spaceBitwise) { space(); append('&'); space(); } else append('&'); } }
+                        else if (['+','-'].includes(v)) { if (isUnary(i)) { if (config.spaceUnary) space(); append(v); } else { if (config.spaceAdditive) { space(); append(v); space(); } else append(v); } }
+                        else if (OPS.assign.has(v)) { if (config.spaceAssign) { space(); append(v); space(); } else append(v); }
+                        else if (OPS.equality.has(v)) { if (config.spaceEquality) { space(); append(v); space(); } else append(v); }
+                        else if (OPS.relational.has(v)) { if (config.spaceRelational) { space(); append(v); space(); } else append(v); }
+                        else if (OPS.logical.has(v)) { if (config.spaceLogical) { space(); append(v); space(); } else append(v); }
+                        else if (OPS.shift.has(v)) { if (config.spaceShift) { space(); append(v); space(); } else append(v); }
+                        else if (OPS.unary.has(v)) { if (v.length===2 && prev && (prev.t===TokenType.ID||prev.t===TokenType.RPAR||prev.t===TokenType.RBRA)) { append(v); } else { append(v); if(config.spaceUnary) space(); } }
+                        else if (['.', '->'].includes(v)) { append(v); } else { space(); append(v); space(); }
+                    }
+                    else if (t.t === TokenType.COLON) { if (prev && prev.v === '?') { if (config.spaceTernary) { space(); append(':'); space(); } else append(':'); } else if (next && next.t !== TokenType.NL) { append(':'); space(); } else { append(':'); newline(); } }
+                    else if (t.t === TokenType.PUNC) { append(','); if (inFuncArgs) { if (config.funcParamStyle === 'Vertical') { newline(); } else { if (config.spaceComma) space(); } } else { if (config.spaceComma) space(); } }
+                    else if (t.t === TokenType.LPAR) { const isCtrl = isControlParen(i); if (prev && prev.t === TokenType.ID) { if (isCtrl) { } else if (config.spaceBeforeFuncCallParen) space(); } append('('); parenDepth++; if (!isCtrl && prev && prev.t === TokenType.ID) { inFuncArgs = true; let shouldBreak = config.breakAfterFuncOpenParen; if (shouldBreak && config.breakFuncArgsOnLimit) { const predicted = predictLineLength(i + 1); if (predicted <= config.columnLimit) shouldBreak = false; } if (shouldBreak) newline(); else if (config.spaceInParens) space(); } else { if (config.spaceInParens) space(); } }
+                    else if (t.t === TokenType.RPAR) { parenDepth--; if (inFuncArgs && parenDepth === 0) { inFuncArgs = false; if (config.breakBeforeFuncCloseParen) { newline(); writeIndent(); } } if (!config.breakBeforeFuncCloseParen && config.spaceInParens) { if (output.endsWith(' ')) output = output.slice(0, -1); if (!prev || prev.t !== TokenType.LPAR) append(' '); } append(')'); }
+                    else if (t.t === TokenType.LBRA) { append('['); if (config.spaceInBrackets) space(); }
+                    else if (t.t === TokenType.RBRA) { if (config.spaceInBrackets) { if (output.endsWith(' ')) output = output.slice(0, -1); if (!prev || prev.t !== TokenType.LBRA) append(' '); } append(']'); }
+                    else { append(t.v); }
+                }
+                return output.trim();
+            };
+
+            for (let i = 0; i < stmts.length; i++) {
+                const curr = stmts[i];
+                const prev = i > 0 ? stmts[i-1] : null;
+                const next = i < stmts.length - 1 ? stmts[i+1] : null;
+
+                // --- Padding Logic ---
+                if (prev) {
+                    let newlines = config.topLevelEmptyLines + 1;
+                    let grouping = false;
+
+                    // Grouping Check
+                    if (prev.type === curr.type) {
+                        if (curr.type === 'INCLUDE' && config.groupIncludes) grouping = true;
+                        else if (curr.type === 'DEFINE' && config.groupDefines) grouping = true;
+                        else if (curr.type === 'TYPEDEF' && config.groupTypedefs) grouping = true;
+                        else if (curr.type === 'FUNC_PROTO' && config.groupFuncProtos) grouping = true;
+                        else if (curr.type === 'VAR_DECL' && config.groupVarDecls) grouping = true;
+                        else if (curr.type === 'PREPROC' && config.groupPreproc) grouping = true;
+                    }
+
+                    if (prev.type === 'FUNC_DEF' || curr.type === 'FUNC_DEF') {
+                        newlines = config.emptyLinesBetweenFunctions + 1;
+                        grouping = false;
+                    }
+
+                    if (grouping) {
+                        newlines = 1; // Tight packing inside group
+                    } else {
+                        // Apply Overrides ADDITIVELY (Only at group boundaries)
+                        if (prev.type === 'INCLUDE' && config.emptyLineAfterIncludes) newlines++;
+                        if (prev.type === 'DEFINE' && config.emptyLineAfterDefines) newlines++;
+                        if (prev.type === 'TYPEDEF' && config.emptyLineAfterTypedefs) newlines++;
+                        if (prev.type === 'FUNC_PROTO' && config.emptyLineAfterFuncProtos) newlines++;
+                        if (prev.type === 'VAR_DECL' && config.emptyLineAfterVarDecls) newlines++;
+
+                        if (curr.type === 'INCLUDE' && config.emptyLineBeforeIncludes) newlines++;
+                        if (curr.type === 'DEFINE' && config.emptyLineBeforeDefines) newlines++;
+                        if (curr.type === 'TYPEDEF' && config.emptyLineBeforeTypedefs) newlines++;
+                        if (curr.type === 'FUNC_PROTO' && config.emptyLineBeforeFuncProtos) newlines++;
+                        if (curr.type === 'VAR_DECL' && config.emptyLineBeforeVarDecls) newlines++;
+                    }
+
+                    finalOutput += '\n'.repeat(newlines);
+                }
+
+                finalOutput += formatStatementTokens(curr.tokens);
+            }
+            return finalOutput;
+        }
+
         function highlight(code) {
-            const tokens = tokenize(code);
-            let html = "";
+            const tokens = tokenize(code); let html = "";
             const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             for (const t of tokens) {
                 const v = esc(t.v);
@@ -775,32 +393,51 @@
             }
             return html;
         }
-
-        // --- 7. Main Execution ---
         const inputArea = document.getElementById('inputArea');
         const outputArea = document.getElementById('outputArea');
         const status = document.getElementById('statusIndicator');
         const charCount = document.getElementById('inputCharCount');
-
         function runFormat() {
-            const code = inputArea.value;
-            charCount.textContent = code.length + " chars";
+            const code = inputArea.value; charCount.textContent = code.length + " chars";
             try {
-                const start = performance.now();
-                const formatted = format(code);
-                currentRawOutput = formatted;
-                outputArea.innerHTML = highlight(formatted);
+                const start = performance.now(); const formatted = format(code);
+                currentRawOutput = formatted; outputArea.innerHTML = highlight(formatted);
                 const time = (performance.now() - start).toFixed(1);
                 status.innerHTML = `<div class="w-1.5 h-1.5 rounded-full bg-green-500"></div><span class="text-[10px] text-green-500 font-medium">Ready (${time}ms)</span>`;
                 status.style.opacity = '1';
             } catch (e) {
-                console.error(e);
-                outputArea.innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`;
+                console.error(e); outputArea.innerHTML = `<span class="text-red-400">Error: ${e.message}</span>`;
             }
         }
-
-        // Snippets
         const SNIPPETS = {
+            structs: `typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef float real32;
+typedef double real64;
+
+#if defined(REICH_PLATFORM_WIN32)
+
+typedef __int64 int64;
+typedef unsigned __int64 uint64;
+
+#else
+
+typedef long long int64;
+typedef unsigned long long uint64;
+
+#endif
+
+typedef unsigned long reichSize;
+
+#define REICH_FILE_READ  1
+#define REICH_FILE_WRITE 2
+#define REICH_SEEK_SET   0
+#define REICH_SEEK_CUR   1
+#define REICH_SEEK_END   2
+#define REICH_LOG_DEBUG 0
+#define REICH_LOG_INFO  1
+#define REICH_LOG_WARN  2
+#define REICH_LOG_ERROR 3`,
             allFeatures: `/* Comprehensive C89 Formatting Test */
 #include <stdlib.h>
 #define SCALE(x) ((x) * 2)
@@ -856,41 +493,16 @@ void complexFunction(int param1, int param2, char *name, Node *list, int flags) 
 }`,
             linkedList: `#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct Node {\n    int data;\n    struct Node *next;\n} Node;\n\nNode *createNode(int data) {\n    Node *newNode = (Node *)malloc(sizeof(Node));\n    if (!newNode) return NULL;\n    newNode->data = data;\n    newNode->next = NULL;\n    return newNode;\n}\n\nint main() {\n    Node *head = createNode(1);\n    head->next = createNode(2);\n    \n    Node *curr = head;\n    while(curr) {\n        printf("%d -> ", curr->data);\n        curr = curr->next;\n    }\n    printf("NULL\\n");\n    return 0;\n}`,
             funcStyle: `// Test Function Styles\nvoid longFunctionName(int param1, int param2, int param3) {\n    return;\n}\n\nint calculate(int a, int b) {\n    return a + b;\n}`,
-            operators: `int main() {\n    int a = 1, b = 2, c = 3;\n    int *ptr = &a;\n    a += b * c;\n    if (a > 10 && b < 5) {\n        return (a | b) ^ c;\n    }\n    return -1;\n}`,
             matrix: `#define SIZE 3\n\nvoid multiply(int A[SIZE][SIZE], int B[SIZE][SIZE], int C[SIZE][SIZE]) {\n    int i, j, k;\n    for (i = 0; i < SIZE; i++) {\n        for (j = 0; j < SIZE; j++) {\n            C[i][j] = 0;\n            for (k = 0; k < SIZE; k++)\n                C[i][j] += A[i][k] * B[k][j];\n        }\n    }\n}`
         };
-
-        // Init
         initUI();
-        document.getElementById('snippetSelect').addEventListener('change', (e) => {
-            if (SNIPPETS[e.target.value]) { inputArea.value = SNIPPETS[e.target.value]; runFormat(); e.target.value=""; }
-        });
+        document.getElementById('snippetSelect').addEventListener('change', (e) => { if (SNIPPETS[e.target.value]) { inputArea.value = SNIPPETS[e.target.value]; runFormat(); e.target.value=""; } });
         document.getElementById('resetBtn').onclick = () => { config = { ...DEFAULT_CONFIG }; initUI(); runFormat(); };
-        document.getElementById('copyBtn').onclick = () => {
-            navigator.clipboard.writeText(currentRawOutput);
-            const btn = document.getElementById('copyBtn');
-            const orig = btn.innerText;
-            btn.innerText = 'Copied!';
-            btn.classList.add('bg-green-600');
-            setTimeout(() => { btn.innerText = orig; btn.classList.remove('bg-green-600'); }, 1000);
-        };
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            document.querySelectorAll('#settingsContainer > div').forEach(grp => {
-                const visibleItems = Array.from(grp.querySelectorAll('.group')).filter(row => {
-                    const txt = row.textContent.toLowerCase();
-                    const visible = txt.includes(term);
-                    row.style.display = visible ? '' : 'none';
-                    return visible;
-                });
-                grp.style.display = visibleItems.length > 0 ? '' : 'none';
-            });
-        });
-
+        document.getElementById('copyBtn').onclick = () => { navigator.clipboard.writeText(currentRawOutput); const btn = document.getElementById('copyBtn'); const orig = btn.innerText; btn.innerText = 'Copied!'; btn.classList.add('bg-green-600'); setTimeout(() => { btn.innerText = orig; btn.classList.remove('bg-green-600'); }, 1000); };
+        document.getElementById('searchInput').addEventListener('input', (e) => { const term = e.target.value.toLowerCase(); document.querySelectorAll('#settingsContainer > div').forEach(grp => { const visibleItems = Array.from(grp.querySelectorAll('.group')).filter(row => { const txt = row.textContent.toLowerCase(); const visible = txt.includes(term); row.style.display = visible ? '' : 'none'; return visible; }); grp.style.display = visibleItems.length > 0 ? '' : 'none'; }); });
         inputArea.addEventListener('input', runFormat);
-        inputArea.value = SNIPPETS.allFeatures;
+        inputArea.value = SNIPPETS.structs;
         runFormat();
-
     </script>
 </body>
 </html>
