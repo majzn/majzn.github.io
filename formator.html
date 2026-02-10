@@ -48,29 +48,38 @@
         const TYPES = new Set(['char', 'double', 'float', 'int', 'long', 'short', 'signed', 'unsigned', 'size_t', 'FILE', 'bool', 'int8_t', 'uint8_t', 'int16_t', 'uint16_t', 'int32_t', 'uint32_t', 'int64_t', 'uint64_t']);
         const OPS = { assign: new Set(['=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '&=', '|=', '^=']), logical: new Set(['&&', '||']), equality: new Set(['==', '!=']), relational: new Set(['<', '>', '<=', '>=']), bitwise: new Set(['&', '|', '^']), additive: new Set(['+', '-']), multiplicative: new Set(['*', '/', '%']), shift: new Set(['<<', '>>']), unary: new Set(['!', '~', '++', '--', 'sizeof']) };
         let currentRawOutput = "";
+
         const DEFAULT_CONFIG = {
             indentWidth: 4, useTabs: false, indentCase: false, indentGoto: false, indentPP: false,
             breakAfterStructClosingBrace: false, groupTopLevelItems: true, topLevelEmptyLines: 1,
-            groupIncludes: true, groupDefines: true, groupTypedefs: true, groupFuncProtos: true, groupVarDecls: true, groupPreproc: true,
+            groupIncludes: true, groupDefines: true, groupTypedefs: true, groupStructs: false, groupFuncProtos: true, groupVarDecls: true, groupPreproc: true,
             emptyLineBeforeIncludes: false, emptyLineAfterIncludes: true, emptyLineBeforeDefines: false, emptyLineAfterDefines: false,
             emptyLineBeforeTypedefs: false, emptyLineAfterTypedefs: false, emptyLineBeforeFuncProtos: false, emptyLineAfterFuncProtos: false,
             emptyLineBeforeVarDecls: false, emptyLineAfterVarDecls: false, emptyLineBeforeStructs: false, emptyLineAfterStructs: false,
             breakAfterFuncReturnType: false, breakAfterFuncOpenParen: false, breakFuncArgsOnLimit: true, breakBeforeFuncCloseParen: false, funcParamStyle: 'Pack', columnLimit: 80, emptyLinesBetweenFunctions: 2,
-            breakBeforeFuncBrace: false, breakBeforeIfBrace: false, breakBeforeForBrace: false, breakBeforeWhileBrace: false, breakBeforeSwitchBrace: false, breakBeforeElse: false, breakBeforeWhile: false, oneLinerIf: false, oneLinerFunc: false, maxEmptyLines: 1,
+            breakBeforeFuncBrace: false, breakBeforeIfBrace: false, breakBeforeForBrace: false, breakBeforeWhileBrace: false, breakBeforeSwitchBrace: false, breakBeforeElse: false, breakBeforeWhile: false, oneLinerIf: false, oneLinerFunc: false,
+
+            // New / Updated Features
+            preserveEmptyLines: true, maxEmptyLines: 1,
+            structMemberOnePerLine: true,
+
             emptyLineBeforeIf: false, emptyLineBeforeFor: false, emptyLineBeforeWhile: false, emptyLineBeforeDo: false, emptyLineBeforeSwitch: false, emptyLineBeforeCase: false, emptyLineBeforeBreak: false, emptyLineBeforeReturn: false,
             emptyLineStartOfBlock: false, emptyLineEndOfBlock: false, braceStyle: 'K&R',
             spaceAfterKeywords: true, spaceAfterCast: false, spaceBeforeFuncDefParen: false, spaceBeforeFuncCallParen: false, spaceInParens: false, spaceInBrackets: false, spaceInBraces: true, spaceInEmptyBraces: false, spaceAssign: true, spaceLogical: true, spaceEquality: true, spaceRelational: true, spaceBitwise: true, spaceAdditive: true, spaceMultiplicative: true, spaceShift: true, spaceUnary: false, spaceTernary: true, spaceComma: true, spaceSemi: true, pointerAlignment: 'Right'
         };
+
         let config = { ...DEFAULT_CONFIG };
         const settingsGroups = [
             { title: "Indentation", items: [ { id: 'indentWidth', type: 'range', min: 2, max: 8, label: 'Indent Width' }, { id: 'useTabs', type: 'bool', label: 'Use Tabs' }, { id: 'indentCase', type: 'bool', label: 'Indent Case Labels' }, { id: 'indentGoto', type: 'bool', label: 'Indent Goto Labels' }, { id: 'indentPP', type: 'bool', label: 'Indent Preprocessor' } ] },
-            { title: "Item Grouping (Logic)", items: [ { id: 'groupIncludes', type: 'bool', label: 'Group Includes' }, { id: 'groupDefines', type: 'bool', label: 'Group Defines' }, { id: 'groupTypedefs', type: 'bool', label: 'Group Typedefs' }, { id: 'groupFuncProtos', type: 'bool', label: 'Group Func Prototypes' }, { id: 'groupVarDecls', type: 'bool', label: 'Group Variable Decls' }, { id: 'groupPreproc', type: 'bool', label: 'Group Preprocessor Blocks' } ] },
+            { title: "Structs & Data", items: [ { id: 'structMemberOnePerLine', type: 'bool', label: 'One Member Per Line' }, { id: 'breakAfterStructClosingBrace', type: 'bool', label: 'Break After Struct Brace' } ] },
+            { title: "Item Grouping (Logic)", items: [ { id: 'groupIncludes', type: 'bool', label: 'Group Includes' }, { id: 'groupDefines', type: 'bool', label: 'Group Defines' }, { id: 'groupTypedefs', type: 'bool', label: 'Group Typedefs' }, { id: 'groupStructs', type: 'bool', label: 'Group Structs' }, { id: 'groupFuncProtos', type: 'bool', label: 'Group Func Prototypes' }, { id: 'groupVarDecls', type: 'bool', label: 'Group Variable Decls' }, { id: 'groupPreproc', type: 'bool', label: 'Group Preprocessor Blocks' } ] },
             { title: "Group Spacing (Add +1 Line)", items: [ { type: 'custom', html: `<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-slate-400"><div class="font-bold border-b border-slate-700 mb-1">Type</div><div class="font-bold border-b border-slate-700 mb-1 flex justify-between"><span>Before</span><span>After</span></div><span>Includes</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeIncludes" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterIncludes" class="custom-checkbox"></div><span>Defines</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeDefines" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterDefines" class="custom-checkbox"></div><span>Typedefs</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeTypedefs" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterTypedefs" class="custom-checkbox"></div><span>Prototypes</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeFuncProtos" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterFuncProtos" class="custom-checkbox"></div><span>Var Decls</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeVarDecls" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterVarDecls" class="custom-checkbox"></div><span>Structs</span><div class="flex justify-between px-1"><input type="checkbox" id="opt-emptyLineBeforeStructs" class="custom-checkbox"><input type="checkbox" id="opt-emptyLineAfterStructs" class="custom-checkbox"></div></div>` } ] },
-            { title: "Structure & Whitespace", items: [ { id: 'topLevelEmptyLines', type: 'range', min: 0, max: 4, label: 'Top Level Empty Lines' }, { id: 'emptyLinesBetweenFunctions', type: 'range', min: 0, max: 4, label: 'Lines Between Funcs' }, { id: 'maxEmptyLines', type: 'range', min: 0, max: 4, label: 'Max Preserved Empty Lines' }, { id: 'breakAfterStructClosingBrace', type: 'bool', label: 'Break After Struct Brace' }, { id: 'emptyLineStartOfBlock', type: 'bool', label: 'Empty Line After {' }, { id: 'emptyLineEndOfBlock', type: 'bool', label: 'Empty Line Before }' } ] },
+            { title: "Structure & Whitespace", items: [ { id: 'preserveEmptyLines', type: 'bool', label: 'Preserve Empty Lines' }, { id: 'topLevelEmptyLines', type: 'range', min: 0, max: 4, label: 'Top Level Empty Lines' }, { id: 'emptyLinesBetweenFunctions', type: 'range', min: 0, max: 4, label: 'Lines Between Funcs' }, { id: 'maxEmptyLines', type: 'range', min: 0, max: 4, label: 'Max Preserved Empty Lines' }, { id: 'emptyLineStartOfBlock', type: 'bool', label: 'Empty Line After {' }, { id: 'emptyLineEndOfBlock', type: 'bool', label: 'Empty Line Before }' } ] },
             { title: "Function Formatting", items: [ { id: 'columnLimit', type: 'range', min: 40, max: 120, label: 'Column Limit' }, { id: 'breakAfterFuncReturnType', type: 'bool', label: 'Break After Return Type' }, { id: 'breakAfterFuncOpenParen', type: 'bool', label: 'Break After Open Paren' }, { id: 'breakFuncArgsOnLimit', type: 'bool', label: 'Only Break if > Limit' }, { id: 'breakBeforeFuncCloseParen', type: 'bool', label: 'Break Before Close Paren' }, { id: 'funcParamStyle', type: 'select', options: ['Pack', 'Vertical'], label: 'Parameter Style' }, { id: 'breakBeforeFuncBrace', type: 'bool', label: 'Break Before Body Brace' } ] },
             { title: "Brace Wrapping", items: [ { id: 'braceStyle', type: 'select', options: ['K&R', 'Allman', 'GNU'], label: 'Brace Style' }, { id: 'breakBeforeIfBrace', type: 'bool', label: 'Break Before If Brace' }, { id: 'breakBeforeForBrace', type: 'bool', label: 'Break Before For Brace' }, { id: 'breakBeforeWhileBrace', type: 'bool', label: 'Break Before While Brace' }, { id: 'breakBeforeSwitchBrace', type: 'bool', label: 'Break Before Switch Brace' }, { id: 'breakBeforeElse', type: 'bool', label: 'Break Before Else' } ] },
             { title: "Formatting", items: [ { id: 'pointerAlignment', type: 'select', options: ['Left', 'Middle', 'Right'], label: 'Pointer Alignment' }, { id: 'spaceAfterKeywords', type: 'bool', label: 'Space After Keywords' } ] }
         ];
+
         function initUI() {
             const container = document.getElementById('settingsContainer'); container.innerHTML = '';
             settingsGroups.forEach(group => {
@@ -143,7 +152,15 @@
                     if (first.v.startsWith('#if') || first.v.startsWith('#ifdef') || first.v.startsWith('#else') || first.v.startsWith('#endif')) return 'PREPROC_BLOCK';
                     return 'PREPROC';
                 }
-                if (first.v === 'typedef') return 'TYPEDEF';
+
+                if (first.v === 'typedef') {
+                    // Check if this typedef defines a struct/union/enum with a body
+                    // Look for an opening brace '{'
+                    for (let j = k + 1; j < toks.length; j++) {
+                        if (toks[j].t === TokenType.LBR) return 'STRUCT_DEF';
+                    }
+                    return 'TYPEDEF';
+                }
 
                 // Scan for structure/enum defs
                 if (first.v === 'struct' || first.v === 'union' || first.v === 'enum') return 'STRUCT_DEF';
@@ -218,10 +235,26 @@
 
         // --- FORMATTER ---
         function format(source) {
-            const rawTokens = tokenize(source).filter(t => t.t !== TokenType.WS && t.t !== TokenType.NL);
-            if (rawTokens.length === 0) return "";
+            // Pre-process tokens to capture newline counts before filtering
+            const rawTokensWithNL = tokenize(source);
+            const procTokens = [];
+            let nlCount = 0;
 
-            const stmts = parseStatements(rawTokens);
+            for (const t of rawTokensWithNL) {
+                if (t.t === TokenType.NL) {
+                    nlCount++;
+                } else if (t.t === TokenType.WS) {
+                    // ignore generic whitespace
+                } else {
+                    t.nlBefore = nlCount;
+                    nlCount = 0;
+                    procTokens.push(t);
+                }
+            }
+
+            if (procTokens.length === 0) return "";
+
+            const stmts = parseStatements(procTokens);
             let finalOutput = "";
             let globalCol = 0;
 
@@ -233,7 +266,12 @@
                 let parenDepth = 0;
                 let inFuncArgs = false;
                 let col = 0;
+
+                // Stack to track blocks ({...}) and parenthesis contexts ((...))
+                // blockStack types: 'BLOCK', 'STRUCT'
+                // parenStack types: 'GENERIC', 'FOR_HEADER'
                 const blockStack = [];
+                const parenStack = [];
 
                 const append = (s) => { output += s; col += s.length; isStartOfLine = false; };
                 const newline = () => { output = output.trimEnd() + '\n'; col = 0; isStartOfLine = true; };
@@ -248,11 +286,14 @@
                         isStartOfLine = false;
                     }
                 };
+
                 const ensureEmptyLine = () => {
                     output = output.trimEnd();
                     if (output.length > 0 && !output.endsWith('\n\n')) { if (!output.endsWith('\n')) output += '\n'; output += '\n'; }
                     isStartOfLine = true; col = 0; writeIndent();
                 };
+
+                // --- Helpers ---
                 const isPointer = (idx) => { if (tokens[idx].v !== '*') return false; const p = tokens[idx-1]; if (!p) return false; if (p.t === TokenType.TY) return true; if (p.t === TokenType.ID && tokens[idx-2] && ['struct','union'].includes(tokens[idx-2].v)) return true; if (p.v === 'void' || (p.t === TokenType.ID && tokens[idx+1] && tokens[idx+1].t === TokenType.RPAR)) return true; return false; };
                 const isUnary = (idx) => { const t = tokens[idx].v; if (!['+','-','*','&'].includes(t)) return false; const p = tokens[idx-1]; if (!p) return true; if (p.t === TokenType.OP || p.t === TokenType.LPAR || p.t === TokenType.LBRA || p.t === TokenType.SEMI || p.t === TokenType.KW || p.t === TokenType.COLON || p.t === TokenType.LBR || p.t === TokenType.PUNC) return true; return false; };
                 const isControlParen = (idx) => { const prev = tokens[idx-1]; return prev && ['if','for','while','switch'].includes(prev.v); };
@@ -263,6 +304,31 @@
                     const t = tokens[i];
                     const prev = tokens[i-1];
                     const next = tokens[i+1];
+
+                    // --- Manual Empty Line Preservation ---
+                    if (config.preserveEmptyLines && t.nlBefore > 1) {
+                         // Only insert lines if we aren't already at start of file or already spaced
+                         if (output.trim().length > 0) {
+                             // Determine how many lines to insert.
+                             // If the previous token logic forced a newline (like ; or }), we might already be on a new line.
+                             // We essentially want to ensure 'maxEmptyLines' blank lines exist.
+                             const limit = config.maxEmptyLines;
+                             const requested = t.nlBefore - 1; // 2 NLs in source = 1 blank line
+                             const toAdd = Math.min(requested, limit);
+
+                             if (toAdd > 0) {
+                                 output = output.trimEnd(); // remove spaces from current line end
+                                 // Add existing newline for the previous line completion if needed
+                                 if (!output.endsWith('\n')) output += '\n';
+
+                                 // Add blank lines
+                                 for(let k=0; k<toAdd; k++) output += '\n';
+
+                                 // Prepare for next content
+                                 isStartOfLine = true; col = 0;
+                             }
+                         }
+                    }
 
                     if (t.t === TokenType.RBR) { indent = Math.max(0, indent - 1); newline(); }
                     writeIndent();
@@ -301,7 +367,26 @@
                     }
                     else if (t.t === TokenType.SEMI) {
                         append(';');
-                        if (config.spaceSemi && next && next.t !== TokenType.NL && next.t !== TokenType.RBR) space(); else if (next && next.t !== TokenType.NL && next.t !== TokenType.RBR) newline();
+
+                        // Smart Semicolon Logic
+                        let forceNewline = true;
+
+                        // 1. Inside a 'for' loop header?
+                        if (parenStack.length > 0 && parenStack[parenStack.length-1] === 'FOR_HEADER') {
+                            forceNewline = false;
+                        }
+
+                        // 2. Inside a struct definition?
+                        if (blockStack.length > 0 && blockStack[blockStack.length-1] === 'STRUCT') {
+                            if (config.structMemberOnePerLine) forceNewline = true;
+                            else forceNewline = false;
+                        }
+
+                        if (forceNewline) {
+                             if (next && next.t !== TokenType.NL && next.t !== TokenType.RBR) newline();
+                        } else {
+                            if (config.spaceSemi && next && next.t !== TokenType.NL && next.t !== TokenType.RBR) space();
+                        }
                     }
                     else if (t.t === TokenType.KW) {
                         if (t.v === 'if' && config.emptyLineBeforeIf) { if(!prev || prev.v !== 'else') ensureEmptyLine(); }
@@ -336,9 +421,46 @@
                         else if (['.', '->'].includes(v)) { append(v); } else { space(); append(v); space(); }
                     }
                     else if (t.t === TokenType.COLON) { if (prev && prev.v === '?') { if (config.spaceTernary) { space(); append(':'); space(); } else append(':'); } else if (next && next.t !== TokenType.NL) { append(':'); space(); } else { append(':'); newline(); } }
-                    else if (t.t === TokenType.PUNC) { append(','); if (inFuncArgs) { if (config.funcParamStyle === 'Vertical') { newline(); } else { if (config.spaceComma) space(); } } else { if (config.spaceComma) space(); } }
-                    else if (t.t === TokenType.LPAR) { const isCtrl = isControlParen(i); if (prev && prev.t === TokenType.ID) { if (isCtrl) { } else if (config.spaceBeforeFuncCallParen) space(); } append('('); parenDepth++; if (!isCtrl && prev && prev.t === TokenType.ID) { inFuncArgs = true; let shouldBreak = config.breakAfterFuncOpenParen; if (shouldBreak && config.breakFuncArgsOnLimit) { const predicted = predictLineLength(i + 1); if (predicted <= config.columnLimit) shouldBreak = false; } if (shouldBreak) newline(); else if (config.spaceInParens) space(); } else { if (config.spaceInParens) space(); } }
-                    else if (t.t === TokenType.RPAR) { parenDepth--; if (inFuncArgs && parenDepth === 0) { inFuncArgs = false; if (config.breakBeforeFuncCloseParen) { newline(); writeIndent(); } } if (!config.breakBeforeFuncCloseParen && config.spaceInParens) { if (output.endsWith(' ')) output = output.slice(0, -1); if (!prev || prev.t !== TokenType.LPAR) append(' '); } append(')'); }
+                    else if (t.t === TokenType.PUNC) {
+                        append(',');
+                        if (inFuncArgs) {
+                            if (config.funcParamStyle === 'Vertical') { newline(); } else { if (config.spaceComma) space(); }
+                        } else if (blockStack.length > 0 && blockStack[blockStack.length-1] === 'STRUCT') {
+                            // Enum list or struct member list
+                            if (config.structMemberOnePerLine) newline(); else if (config.spaceComma) space();
+                        } else {
+                            if (config.spaceComma) space();
+                        }
+                    }
+                    else if (t.t === TokenType.LPAR) {
+                        const isCtrl = isControlParen(i);
+
+                        // Push context
+                        if (prev && prev.v === 'for') parenStack.push('FOR_HEADER');
+                        else parenStack.push('GENERIC');
+
+                        if (prev && prev.t === TokenType.ID) { if (isCtrl) { } else if (config.spaceBeforeFuncCallParen) space(); }
+                        append('(');
+                        parenDepth++;
+                        if (!isCtrl && prev && prev.t === TokenType.ID) {
+                            inFuncArgs = true;
+                            let shouldBreak = config.breakAfterFuncOpenParen;
+                            if (shouldBreak && config.breakFuncArgsOnLimit) { const predicted = predictLineLength(i + 1); if (predicted <= config.columnLimit) shouldBreak = false; }
+                            if (shouldBreak) newline(); else if (config.spaceInParens) space();
+                        } else {
+                            if (config.spaceInParens) space();
+                        }
+                    }
+                    else if (t.t === TokenType.RPAR) {
+                        parenStack.pop();
+                        parenDepth--;
+                        if (inFuncArgs && parenDepth === 0) {
+                            inFuncArgs = false;
+                            if (config.breakBeforeFuncCloseParen) { newline(); writeIndent(); }
+                        }
+                        if (!config.breakBeforeFuncCloseParen && config.spaceInParens) { if (output.endsWith(' ')) output = output.slice(0, -1); if (!prev || prev.t !== TokenType.LPAR) append(' '); }
+                        append(')');
+                    }
                     else if (t.t === TokenType.LBRA) { append('['); if (config.spaceInBrackets) space(); }
                     else if (t.t === TokenType.RBRA) { if (config.spaceInBrackets) { if (output.endsWith(' ')) output = output.slice(0, -1); if (!prev || prev.t !== TokenType.LBRA) append(' '); } append(']'); }
                     else { append(t.v); }
@@ -358,6 +480,7 @@
                         if (curr.type === 'INCLUDE' && config.groupIncludes) grouping = true;
                         else if (curr.type === 'DEFINE' && config.groupDefines) grouping = true;
                         else if (curr.type === 'TYPEDEF' && config.groupTypedefs) grouping = true;
+                        else if (curr.type === 'STRUCT_DEF' && config.groupStructs) grouping = true;
                         else if (curr.type === 'FUNC_PROTO' && config.groupFuncProtos) grouping = true;
                         else if (curr.type === 'VAR_DECL' && config.groupVarDecls) grouping = true;
                         else if (curr.type === 'PREPROC' && config.groupPreproc) grouping = true;
@@ -454,15 +577,17 @@ typedef unsigned long long uint64;
 
 typedef unsigned long reichSize;
 
+typedef struct Vector3 {
+    real32 x; real32 y; real32 z;
+} Vector3;
+
+typedef struct Matrix4 {
+    real32 m[4][4];
+} Matrix4;
+
 #define REICH_FILE_READ  1
 #define REICH_FILE_WRITE 2
-#define REICH_SEEK_SET   0
-#define REICH_SEEK_CUR   1
-#define REICH_SEEK_END   2
-#define REICH_LOG_DEBUG 0
-#define REICH_LOG_INFO  1
-#define REICH_LOG_WARN  2
-#define REICH_LOG_ERROR 3`,
+#define REICH_SEEK_SET   0`,
             allFeatures: `/* Comprehensive C89 Formatting Test */
 #include <stdlib.h>
 #define SCALE(x) ((x) * 2)
