@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genetic Architect v7.0 - Kinetic Layers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root { --accent: #3b82f6; --bg: #030712; }
+        body, html { margin: 0; padding: 0; background: var(--bg); overflow: hidden; height: 100%; width: 100%; color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; user-select: none; }
+        canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+        
+        .glass { background: rgba(8, 12, 24, 0.95); backdrop-filter: blur(24px); border-left: 1px solid rgba(255, 255, 255, 0.08); }
+        .panel-shadow { box-shadow: -20px 0 80px rgba(0,0,0,1); }
+        
+        input[type="range"] { accent-color: var(--accent); height: 4px; border-radius: 2px; -webkit-appearance: none; background: #1e293b; width: 100%; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid white; }
+        
+        .tab-btn { font-size: 10px; letter-spacing: 0.1em; font-weight: 800; color: #475569; transition: all 0.2s; border-bottom: 2px solid transparent; text-transform: uppercase; }
+        .tab-active { border-color: var(--accent); color: white; background: rgba(59, 130, 246, 0.05); }
+        
+        .section-header { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.25em; color: #64748b; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px; }
+        
+        #gui { pointer-events: auto; }
+        #hud { pointer-events: none; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .layer-card { border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.02); border-radius: 12px; transition: all 0.2s; }
+        .layer-card.active { border-color: var(--accent); background: rgba(59, 130, 246, 0.03); }
+        
+        .btn-icon { p-2 hover:bg-white/10 rounded-lg transition-all flex items-center justify-center; }
+        
+        .camera-hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 900; letter-spacing: 0.2em; color: #475569; text-transform: uppercase; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="hud" class="fixed top-8 left-8 space-y-3 z-50">
+        <div class="flex items-center gap-4">
+            <div class="relative">
+                <div class="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_25px_rgba(59,130,246,1)]"></div>
+                <div class="absolute inset-0 w-3 h-3 rounded-full bg-blue-500 animate-ping opacity-40"></div>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-[10px] tracking-[0.4em] font-black uppercase text-blue-400">Architect Core v7.0</span>
+                <span id="cam-stats" class="text-[9px] text-slate-500 font-bold uppercase">Zoom: 1.0x</span>
+            </div>
+        </div>
+        <div class="text-[10px] font-mono text-slate-400 bg-black/60 p-4 rounded-xl border border-white/5 backdrop-blur-md">
+            TPS: <span id="ui-fps" class="text-white">--</span> | CELLS: 1.0M<br>
+            LAYERS: <span id="ui-layers" class="text-blue-400">--</span>
+        </div>
+    </div>
+
+    <div class="camera-hint">Wheel: Zoom | Drag (Space): Pan | Mouse: Attract</div>
+
+    <div id="gui" class="fixed top-0 right-0 h-full w-[440px] glass panel-shadow z-40 flex flex-col transition-transform duration-500 translate-x-0" onmousedown="event.stopPropagation()">
+        <div class="p-6 bg-slate-900/60 flex justify-between items-center border-b border-white/5">
+            <div>
+                <h1 class="text-sm font-black tracking-tighter text-white uppercase">Layer <span class="text-blue-500">Editor</span></h1>
+                <p class="text-[9px] text-slate-500 uppercase tracking-widest font-bold">Manage Species Genetics</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="window.Architect.toggleGui()" class="btn-icon text-slate-400"><i data-lucide="chevron-right"></i></button>
+            </div>
+        </div>
+
+        <div class="flex border-b border-white/5 bg-slate-900/20">
+            <button onclick="window.Architect.setTab('world')" id="tab-world" class="flex-1 py-4 tab-btn tab-active">Simulation</button>
+            <button onclick="window.Architect.setTab('layers')" id="tab-layers" class="flex-1 py-4 tab-btn">Layers</button>
+            <button onclick="window.Architect.setTab('archive')" id="tab-archive" class="flex-1 py-4 tab-btn">Archive</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-10 custom-scroll">
+            <!-- WORLD SETTINGS -->
+            <div id="pane-world" class="space-y-8 animate-in fade-in duration-300">
+                <div class="space-y-6">
+                    <div class="section-header">Global Constants</div>
+                    <div class="group">
+                        <label class="flex justify-between text-[10px] text-slate-400 uppercase font-black mb-2">Scent Persistence <span id="val-trails" class="text-blue-400"></span></label>
+                        <input type="range" id="param-trails" min="0.5" max="0.99" step="0.001">
+                    </div>
+                    <div class="group">
+                        <label class="flex justify-between text-[10px] text-slate-400 uppercase font-black mb-2">Kinetic Intensity <span id="val-force" class="text-blue-400"></span></label>
+                        <input type="range" id="param-force" min="0" max="15" step="0.1">
+                    </div>
+                </div>
+                <div class="space-y-6">
+                    <div class="section-header">Engine Visualization</div>
+                    <div class="group">
+                        <label class="flex justify-between text-[10px] text-slate-400 uppercase font-black mb-2">Luminosity <span id="val-opacity" class="text-blue-400"></span></label>
+                        <input type="range" id="param-opacity" min="0.01" max="1" step="0.01">
+                    </div>
+                    <div class="group">
+                        <label class="flex justify-between text-[10px] text-slate-400 uppercase font-black mb-2">Particle Scale <span id="val-size" class="text-blue-400"></span></label>
+                        <input type="range" id="param-size" min="0.1" max="15" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- LAYER SETTINGS -->
+            <div id="pane-layers" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="flex justify-between items-center px-2">
+                    <span class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Active Species</span>
+                    <button onclick="window.Architect.addLayer()" class="text-[9px] bg-blue-600 px-3 py-1 rounded-full font-black uppercase tracking-tighter hover:bg-blue-500">+ New Layer</button>
+                </div>
+                <div id="layer-list" class="space-y-4"></div>
+            </div>
+
+            <!-- ARCHIVE SETTINGS -->
+            <div id="pane-archive" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="section-header">Browser Storage</div>
+                <div id="archive-list" class="space-y-2"></div>
+                <div class="pt-6 border-t border-white/5">
+                     <input type="text" id="archive-name" placeholder="Name preset..." class="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs mb-3 focus:outline-none focus:border-blue-500 text-white">
+                     <button onclick="window.Architect.saveToArchive()" class="w-full bg-slate-700 hover:bg-slate-600 py-4 rounded-xl text-[10px] font-black tracking-[0.2em] transition-all">SAVE UNIVERSE</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6 bg-slate-950 border-t border-white/5">
+            <button onclick="window.Architect.engine.reset()" class="w-full bg-white/5 hover:bg-white/10 border border-white/10 py-4 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all">Hard Reset Core</button>
+        </div>
+    </div>
+
+    <button id="gui-toggle" onclick="window.Architect.toggleGui()" class="fixed top-8 right-8 z-30 p-4 glass rounded-2xl opacity-0 pointer-events-none transition-all hover:scale-110 shadow-2xl">
+        <i data-lucide="settings" class="w-6 h-6 text-blue-400"></i>
+    </button>
+
+    <canvas id="canvas"></canvas>
+
+    <script type="module">
+        const SHADERS = {
+            quadVS: `#version 300 es
+                layout(location = 0) in vec2 a_pos;
+                void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`,
+
+            decayFS: `#version 300 es
+                precision highp float;
+                uniform sampler2D u_tex;
+                uniform float u_decay;
+                out vec4 o_col;
+                void main() {
+                    o_col = texture(u_tex, gl_FragCoord.xy / vec2(textureSize(u_tex, 0))) * u_decay;
+                }`,
+
+            sensVS: `#version 300 es
+                layout(location = 0) in float a_idx;
+                uniform sampler2D u_posTex;
+                uniform float u_texSize;
+                uniform vec2 u_res;
+                out vec4 v_color;
+                void main() {
+                    float y = floor(a_idx / u_texSize);
+                    float x = mod(a_idx, u_texSize);
+                    vec4 p = texelFetch(u_posTex, ivec2(x, y), 0);
+                    // Species scent output: Map index 0-3 to RGBA channels
+                    int s = int(p.z * 4.0 + 0.1);
+                    if(s == 0) v_color = vec4(1,0,0,0);
+                    else if(s == 1) v_color = vec4(0,1,0,0);
+                    else if(s == 2) v_color = vec4(0,0,1,0);
+                    else v_color = vec4(0,0,0,1);
+                    gl_Position = vec4((p.xy / u_res) * 2.0 - 1.0, 0.0, 1.0);
+                    gl_PointSize = 4.0;
+                }`,
+
+            sensFS: `#version 300 es
+                precision highp float;
+                in vec4 v_color;
+                out vec4 o_col;
+                void main() { o_col = v_color * smoothstep(0.5, 0.0, length(gl_PointCoord - 0.5)); }`,
+
+            simFS: `#version 300 es
+                precision highp float;
+                uniform sampler2D u_posTex, u_velTex, u_densityTex;
+                uniform vec2 u_res, u_mouse;
+                uniform float u_time, u_dt, u_forceMag;
+                uniform mat4 u_weights, u_phys;
+                uniform int u_click;
+                layout(location = 0) out vec4 o_pos;
+                layout(location = 1) out vec4 o_vel;
+
+                float hash(vec2 p) { return fract(sin(dot(p, vec2(12.7, 31.7))) * 43758.5); }
+
+                vec4 sampleField(vec2 uv) {
+                    vec2 ts = vec2(textureSize(u_densityTex, 0));
+                    vec2 f = uv * ts - 0.5;
+                    vec2 i = floor(f);
+                    vec2 fr = fract(f);
+                    vec4 c00 = texelFetch(u_densityTex, ivec2(i), 0);
+                    vec4 c10 = texelFetch(u_densityTex, ivec2(i) + ivec2(1,0), 0);
+                    vec4 c01 = texelFetch(u_densityTex, ivec2(i) + ivec2(0,1), 0);
+                    vec4 c11 = texelFetch(u_densityTex, ivec2(i) + ivec2(1,1), 0);
+                    return mix(mix(c00, c10, fr.x), mix(c01, c11, fr.x), fr.y);
+                }
+
+                void main() {
+                    ivec2 uv = ivec2(gl_FragCoord.xy);
+                    vec4 posData = texelFetch(u_posTex, uv, 0);
+                    vec2 pos = posData.xy;
+                    vec2 vel = texelFetch(u_velTex, uv, 0).xy;
+                    int sIdx = int(posData.z * 4.0 + 0.1);
+
+                    vec4 traits = u_phys[sIdx];
+                    float mass = traits.x;
+                    float radius = traits.y / u_res.x;
+                    float thermal = traits.z;
+                    float friction = 1.0 - traits.w * 0.1;
+
+                    vec2 acc = vec2(0.0);
+                    if(u_click == 1) {
+                        vec2 mDiff = u_mouse - pos;
+                        acc += normalize(mDiff) * 3000.0 / (length(mDiff) + 60.0);
+                    }
+
+                    vec2 dCoord = pos / u_res;
+                    vec2 grad = vec2(0.0);
+                    for(int i=0; i<8; i++) {
+                        float a = float(i) * 0.78539;
+                        vec2 off = vec2(cos(a), sin(a)) * radius;
+                        grad += vec2(cos(a), sin(a)) * dot(sampleField(dCoord + off), u_weights[sIdx]);
+                    }
+                    acc += grad * u_forceMag * 400.0;
+                    acc += vec2(cos(hash(pos+u_time)*6.28), sin(hash(pos+u_time)*6.28)) * thermal * 100.0;
+
+                    vel = (vel + (acc / mass) * u_dt) * friction;
+                    pos += vel * u_dt;
+
+                    if(pos.x < 0.0) pos.x += u_res.x; else if(pos.x > u_res.x) pos.x -= u_res.x;
+                    if(pos.y < 0.0) pos.y += u_res.y; else if(pos.y > u_res.y) pos.y -= u_res.y;
+
+                    o_pos = vec4(pos, posData.z, 1.0);
+                    o_vel = vec4(vel, 0.0, 1.0);
+                }`,
+
+            renderVS: `#version 300 es
+                precision highp float;
+                layout(location = 0) in float a_idx;
+                uniform sampler2D u_posTex, u_velTex;
+                uniform vec2 u_res, u_camPos;
+                uniform float u_zoom, u_texSize, u_pointSize;
+                out vec3 v_col;
+                void main() {
+                    float y = floor(a_idx / u_texSize);
+                    float x = mod(a_idx, u_texSize);
+                    vec4 p = texelFetch(u_posTex, ivec2(x, y), 0);
+                    
+                    vec2 worldPos = p.xy;
+                    vec2 screenPos = (worldPos - u_camPos) * u_zoom;
+                    gl_Position = vec4((screenPos / u_res) * 2.0 - 1.0, 0.0, 1.0);
+                    
+                    gl_PointSize = u_pointSize * u_zoom;
+                    if(p.z < 0.2) v_col = vec3(1.0, 0.3, 0.4);
+                    else if(p.z < 0.45) v_col = vec3(0.2, 0.9, 0.5);
+                    else if(p.z < 0.7) v_col = vec3(0.3, 0.6, 1.0);
+                    else v_col = vec3(1.0, 1.0, 1.0);
+                }`,
+
+            renderFS: `#version 300 es
+                precision highp float;
+                uniform float u_opacity;
+                in vec3 v_col;
+                out vec4 o_col;
+                void main() {
+                    float d = length(gl_PointCoord - 0.5);
+                    if(d > 0.5) discard;
+                    o_col = vec4(v_col, u_opacity * (1.0 - d * 2.0));
+                }`
+        };
+
+        class Engine {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.gl = canvas.getContext('webgl2', { antialias: false });
+                this.gl.getExtension('EXT_color_buffer_float');
+                this.texSize = 1024; this.count = this.texSize * this.texSize;
+                this.pingPong = 0; this.densePingPong = 0;
+                this.state = { width: 0, height: 0, mx: 0, my: 0, click: 0, zoom: 1.0, camX: 0, camY: 0 };
+                this.init();
+            }
+
+            init() {
+                this.resize();
+                const gl = this.gl;
+                const mkProg = (vs, fs) => {
+                    const s = (t, src) => {
+                        const sh = gl.createShader(t); gl.shaderSource(sh, src.trim()); gl.compileShader(sh);
+                        if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(sh)); return sh;
+                    };
+                    const p = gl.createProgram(); gl.attachShader(p, s(gl.VERTEX_SHADER, vs)); gl.attachShader(p, s(gl.FRAGMENT_SHADER, fs));
+                    gl.linkProgram(p); return p;
+                };
+                this.progs = { sim: mkProg(SHADERS.quadVS, SHADERS.simFS), render: mkProg(SHADERS.renderVS, SHADERS.renderFS), decay: mkProg(SHADERS.quadVS, SHADERS.decayFS), sens: mkProg(SHADERS.sensVS, SHADERS.sensFS) };
+                this.locs = {
+                    sim: this.getLocs(this.progs.sim, ['u_posTex', 'u_velTex', 'u_densityTex', 'u_res', 'u_mouse', 'u_time', 'u_dt', 'u_forceMag', 'u_weights', 'u_phys', 'u_click']),
+                    render: this.getLocs(this.progs.render, ['u_posTex', 'u_velTex', 'u_res', 'u_texSize', 'u_pointSize', 'u_opacity', 'u_camPos', 'u_zoom']),
+                    sens: this.getLocs(this.progs.sens, ['u_posTex', 'u_texSize', 'u_res']),
+                    decay: this.getLocs(this.progs.decay, ['u_tex', 'u_decay'])
+                };
+                this.reset();
+                this.vaos = { sim: this.createVAO([-1,-1,1,-1,-1,1,1,-1,1,1,-1,1], 2), render: this.createVAO(new Float32Array(this.count).map((_,i)=>i), 1) };
+            }
+
+            getLocs(p, ns) { const r={}; ns.forEach(n=>r[n]=this.gl.getUniformLocation(p,n)); return r; }
+            createVAO(data, size) {
+                const gl=this.gl; const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+                const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+                gl.bufferData(gl.ARRAY_BUFFER, data instanceof Float32Array ? data : new Float32Array(data), gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, size, gl.FLOAT, false, 0, 0); return vao;
+            }
+
+            reset() {
+                const gl=this.gl; const pData=new Float32Array(this.count*4), vData=new Float32Array(this.count*4);
+                for(let i=0; i<this.count*4; i+=4) {
+                    pData[i]=Math.random()*this.state.width; pData[i+1]=Math.random()*this.state.height;
+                    pData[i+2]=[0.0, 0.25, 0.5, 0.75][Math.floor(Math.random()*4)];
+                }
+                const mk=(w,h,d)=>{
+                    const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, d);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); return t;
+                };
+                if(this.texs) this.texs.forEach(t=>{ gl.deleteTexture(t.pos); gl.deleteTexture(t.vel); });
+                this.texs = [{pos:mk(this.texSize,this.texSize,pData), vel:mk(this.texSize,this.texSize,vData)}, {pos:mk(this.texSize,this.texSize,null), vel:mk(this.texSize,this.texSize,null)}];
+                this.fbs = this.texs.map(t=>{ const fb=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fb); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t.pos,0); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT1,gl.TEXTURE_2D,t.vel,0); return fb; });
+                this.densitySize = 512;
+                if(this.denseTexs) this.denseTexs.forEach(t=>gl.deleteTexture(t));
+                this.denseTexs = [mk(this.densitySize,this.densitySize,null), mk(this.densitySize,this.densitySize,null)];
+                this.denseFbs = this.denseTexs.map(t=>{ const fb=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fb); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0); return fb; });
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth; this.canvas.height = window.innerHeight;
+                this.state.width = this.canvas.width; this.state.height = this.canvas.height;
+            }
+
+            run(now) {
+                const gl=this.gl; const r=this.pingPong, w=1-r, dr=this.densePingPong, dw=1-dr, p=window.Architect.params;
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this.denseFbs[dw]); gl.viewport(0,0,this.densitySize,this.densitySize);
+                gl.disable(gl.BLEND); gl.useProgram(this.progs.decay); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.denseTexs[dr]);
+                gl.uniform1i(this.locs.decay.u_tex, 0); gl.uniform1f(this.locs.decay.u_decay, p.trails); gl.bindVertexArray(this.vaos.sim); gl.drawArrays(gl.TRIANGLES, 0, 6);
+                gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.useProgram(this.progs.sens); gl.bindVertexArray(this.vaos.render);
+                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texs[r].pos);
+                gl.uniform1i(this.locs.sens.u_posTex, 0); gl.uniform1f(this.locs.sens.u_texSize, this.texSize); gl.uniform2f(this.locs.sens.u_res, this.state.width, this.state.height); gl.drawArrays(gl.POINTS, 0, this.count);
+                this.densePingPong = dw;
+                gl.disable(gl.BLEND); gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbs[w]); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+                gl.viewport(0,0,this.texSize,this.texSize); gl.useProgram(this.progs.sim);
+                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texs[r].pos);
+                gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texs[r].vel);
+                gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.denseTexs[dw]);
+                gl.uniform1i(this.locs.sim.u_posTex, 0); gl.uniform1i(this.locs.sim.u_velTex, 1); gl.uniform1i(this.locs.sim.u_densityTex, 2);
+                gl.uniform2f(this.locs.sim.u_res, this.state.width, this.state.height); gl.uniform2f(this.locs.sim.u_mouse, this.state.mx, this.state.my);
+                gl.uniform1f(this.locs.sim.u_time, now*0.001); gl.uniform1f(this.locs.sim.u_dt, 0.016); gl.uniform1f(this.locs.sim.u_forceMag, p.force); gl.uniform1i(this.locs.sim.u_click, this.state.click);
+                const wFlat = []; p.species.forEach(s => wFlat.push(...s.weights)); gl.uniformMatrix4fv(this.locs.sim.u_weights, false, new Float32Array(wFlat));
+                const pFlat = []; p.species.forEach(s => pFlat.push(...s.phys)); gl.uniformMatrix4fv(this.locs.sim.u_phys, false, new Float32Array(pFlat));
+                gl.bindVertexArray(this.vaos.sim); gl.drawArrays(gl.TRIANGLES, 0, 6);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0,0,this.state.width,this.state.height);
+                gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); gl.useProgram(this.progs.render);
+                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texs[w].pos);
+                gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texs[w].vel);
+                gl.uniform1i(this.locs.render.u_posTex, 0); gl.uniform2f(this.locs.render.u_res, this.state.width, this.state.height);
+                gl.uniform1f(this.locs.render.u_texSize, this.texSize); gl.uniform1f(this.locs.render.u_pointSize, p.pointSize); gl.uniform1f(this.locs.render.u_opacity, p.opacity);
+                gl.uniform2f(this.locs.render.u_camPos, this.state.camX, this.state.camY); gl.uniform1f(this.locs.render.u_zoom, this.state.zoom);
+                gl.bindVertexArray(this.vaos.render); gl.drawArrays(gl.POINTS, 0, this.count); this.pingPong = w;
+            }
+        }
+
+        window.Architect = {
+            params: { trails: 0.95, force: 4.0, pointSize: 1.2, opacity: 0.6, species: [
+                { name: 'Alpha', weights: [1.0, -0.5, 0.0, 0.0], phys: [1.0, 35.0, 0.2, 0.9], hidden: false },
+                { name: 'Beta', weights: [0.5, 1.0, -0.5, 0.0], phys: [1.2, 45.0, 0.4, 0.8], hidden: false },
+                { name: 'Gamma', weights: [0.0, 0.5, 1.0, -0.5], phys: [0.8, 25.0, 0.1, 0.95], hidden: false },
+                { name: 'Delta', weights: [-0.5, 0.0, 0.5, 1.0], phys: [1.5, 55.0, 0.8, 0.7], hidden: false }
+            ]},
+            toggleGui: () => {
+                const g = document.getElementById('gui'); const t = document.getElementById('gui-toggle');
+                const h = g.classList.toggle('translate-x-full'); t.classList.toggle('opacity-0', !h); t.classList.toggle('pointer-events-none', !h);
+            },
+            setTab: (n) => {
+                ['world', 'layers', 'archive'].forEach(t => { document.getElementById('pane-'+t).classList.add('hidden'); document.getElementById('tab-'+t).classList.remove('tab-active'); });
+                document.getElementById('pane-'+n).classList.remove('hidden'); document.getElementById('tab-'+n).classList.add('tab-active');
+            },
+            renderLayers: () => {
+                const container = document.getElementById('layer-list');
+                document.getElementById('ui-layers').innerText = window.Architect.params.species.length;
+                let html = '';
+                window.Architect.params.species.forEach((s, i) => {
+                    html += `<div class="layer-card p-5 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <div class="w-1.5 h-6 rounded-full bg-blue-500"></div>
+                                <span class="text-[10px] font-black uppercase text-white">${s.name}</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="window.Architect.deleteLayer(${i})" class="text-slate-500 hover:text-red-400 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div class="flex flex-col gap-3">
+                                <div class="flex justify-between text-[8px] font-bold text-slate-500 uppercase"><span>Attraction Matrix</span></div>
+                                <div class="grid grid-cols-4 gap-2">
+                                    ${s.weights.map((w, j) => `<input type="number" step="0.1" value="${w}" onchange="window.Architect.params.species[${i}].weights[${j}]=parseFloat(this.value)" class="bg-black/40 border border-white/5 text-[9px] p-2 rounded text-center">`).join('')}
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex justify-between text-[8px] font-bold text-slate-500 uppercase"><span>Mass / Radius</span></div>
+                                <input type="range" min="0.1" max="5" step="0.1" value="${s.phys[0]}" oninput="window.Architect.params.species[${i}].phys[0]=parseFloat(this.value)">
+                                <input type="range" min="5" max="150" step="1" value="${s.phys[1]}" oninput="window.Architect.params.species[${i}].phys[1]=parseFloat(this.value)">
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                container.innerHTML = html; lucide.createIcons();
+            },
+            addLayer: () => {
+                if(window.Architect.params.species.length >= 4) return;
+                window.Architect.params.species.push({ name: 'L'+(window.Architect.params.species.length+1), weights:[1,0,0,0], phys:[1,40,0.2,0.9], hidden:false });
+                window.Architect.renderLayers();
+            },
+            deleteLayer: (i) => {
+                window.Architect.params.species.splice(i, 1);
+                window.Architect.renderLayers();
+            },
+            saveToArchive: () => {
+                const name = document.getElementById('archive-name').value || 'New Universe';
+                const archive = JSON.parse(localStorage.getItem('genetic_archive') || '[]');
+                archive.push({ name, params: window.Architect.params, date: new Date().toISOString() });
+                localStorage.setItem('genetic_archive', JSON.stringify(archive));
+                window.Architect.renderArchive();
+            },
+            renderArchive: () => {
+                const list = document.getElementById('archive-list');
+                const archive = JSON.parse(localStorage.getItem('genetic_archive') || '[]');
+                list.innerHTML = archive.map((item, i) => `<button onclick="window.Architect.loadFromArchive(${i})" class="w-full text-left p-4 rounded-xl bg-white/5 border border-white/5 text-[10px] uppercase font-black tracking-widest hover:bg-white/10 flex justify-between"><span>${item.name}</span><i data-lucide="download" class="w-3 h-3"></i></button>`).join('');
+                lucide.createIcons();
+            },
+            loadFromArchive: (i) => {
+                const archive = JSON.parse(localStorage.getItem('genetic_archive') || '[]');
+                window.Architect.params = archive[i].params;
+                window.Architect.renderLayers();
+                location.reload(); // Refresh for clean buffer reset
+            }
+        };
+
+        const engine = new Engine(document.getElementById('canvas'));
+        window.Architect.engine = engine;
+
+        const bind = (id, k) => {
+            const el = document.getElementById(id); const val = document.getElementById('val-'+id.split('-')[1]);
+            el.value = window.Architect.params[k]; if(val) val.innerText = el.value;
+            el.oninput = () => { window.Architect.params[k]=parseFloat(el.value); if(val) val.innerText = el.value; };
+        };
+        bind('param-trails', 'trails'); bind('param-force', 'force'); bind('param-size', 'pointSize'); bind('param-opacity', 'opacity');
+
+        window.Architect.renderLayers();
+        window.Architect.renderArchive();
+        lucide.createIcons();
+
+        // Camera Logic
+        let isPanning = false, lastX=0, lastY=0;
+        window.addEventListener('wheel', e => {
+            const zoomSpeed = 0.001;
+            const newZoom = Math.max(0.1, Math.min(20, engine.state.zoom - e.deltaY * zoomSpeed * engine.state.zoom));
+            engine.state.zoom = newZoom;
+            document.getElementById('cam-stats').innerText = `Zoom: ${newZoom.toFixed(1)}x`;
+        });
+        window.addEventListener('mousedown', e => { if(e.target.id === 'canvas' && (e.button === 1 || e.shiftKey)) { isPanning=true; lastX=e.clientX; lastY=e.clientY; } else if(e.target.id === 'canvas') { engine.state.click=1; } });
+        window.addEventListener('mousemove', e => {
+            if(isPanning) {
+                engine.state.camX -= (e.clientX - lastX) / engine.state.zoom;
+                engine.state.camY -= (e.clientY - lastY) / engine.state.zoom;
+                lastX=e.clientX; lastY=e.clientY;
+            }
+            engine.state.mx = (e.clientX - engine.state.width/2)/engine.state.zoom + engine.state.camX + engine.state.width/2;
+            engine.state.my = (engine.state.height - e.clientY - engine.state.height/2)/engine.state.zoom + (engine.state.height - engine.state.camY - engine.state.height/2);
+        });
+        window.addEventListener('mouseup', () => { isPanning=false; engine.state.click=0; });
+
+        let frames = 0, last = performance.now();
+        function loop(t) {
+            engine.run(t); frames++;
+            if(t - last >= 1000) { document.getElementById('ui-fps').innerText = frames; frames = 0; last = t; }
+            requestAnimationFrame(loop);
+        }
+        window.addEventListener('resize', () => engine.resize());
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>

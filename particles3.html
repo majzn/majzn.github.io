@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genetic Architect v15.0 - Phenotypic Expression</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root { --accent: #3b82f6; --bg: #09090b; --panel: #0c0c0e; --border: #27272a; --text: #a1a1aa; --active: #ffffff; }
+        body, html { margin: 0; padding: 0; background: var(--bg); overflow: hidden; height: 100%; width: 100%; color: var(--text); font-family: 'JetBrains Mono', 'Inter', monospace; }
+        canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+        
+        .ui-panel { background: var(--panel); border-left: 1px solid var(--border); }
+        .ui-border { border: 1px solid var(--border); }
+        .ui-border-b { border-bottom: 1px solid var(--border); }
+        
+        input[type="range"] { accent-color: var(--accent); height: 2px; -webkit-appearance: none; background: #18181b; width: 100%; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; background: #fff; cursor: pointer; border: 1px solid #000; }
+        
+        .tab-btn { font-size: 11px; font-weight: 700; color: #52525b; transition: all 0.1s; border-bottom: 2px solid transparent; text-transform: uppercase; padding: 10px 0; }
+        .tab-active { border-color: var(--accent); color: var(--active); background: rgba(59, 130, 246, 0.03); }
+        
+        .section-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #71717a; padding: 6px 10px; background: #121214; border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); }
+        
+        .custom-scroll::-webkit-scrollbar { width: 2px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #3f3f46; }
+
+        .editor-input { background: #000; border: 1px solid var(--border); color: #fff; font-size: 11px; padding: 3px 6px; outline: none; font-family: inherit; }
+        .editor-input:focus { border-color: var(--accent); }
+
+        .btn-action { padding: 4px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; border: 1px solid var(--border); background: #121214; color: #71717a; transition: all 0.1s; }
+        .btn-action:hover { background: #18181b; color: #fff; }
+        .btn-action.active { border-color: var(--accent); color: var(--accent); background: rgba(59, 130, 246, 0.05); }
+        
+        .label-text { font-size: 11px; font-weight: 600; color: #52525b; text-transform: uppercase; }
+        .value-text { font-size: 11px; color: var(--accent); font-weight: 700; }
+
+        .graph-container { background: #000; border: 1px solid var(--border); height: 80px; width: 100%; position: relative; overflow: hidden; }
+
+        .color-dot { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(255,255,255,0.2); }
+
+        * { border-radius: 0 !important; border-collapse: collapse; }
+    </style>
+</head>
+<body>
+
+    <div id="hud" class="fixed top-0 left-0 right-0 h-10 bg-black border-b border-zinc-800 flex items-center px-4 z-50">
+        <div class="flex items-center gap-6 divide-x divide-zinc-800 h-full">
+            <div class="flex items-center gap-2 pr-2">
+                <div class="w-2 h-2 bg-blue-500"></div>
+                <span class="text-[11px] font-black tracking-tighter">ARCHITECT_V15.0_PHENO</span>
+            </div>
+            <div class="px-6 flex items-center gap-4">
+                <div class="flex flex-col">
+                    <span class="text-[8px] text-zinc-600 font-bold uppercase">Epoch</span>
+                    <span id="ui-epoch" class="text-[11px] font-bold text-white leading-none">00000</span>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-[8px] text-zinc-600 font-bold uppercase">Biomass</span>
+                    <span id="ui-biomass" class="text-[11px] font-bold text-white leading-none">0.0</span>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-[8px] text-zinc-600 font-bold uppercase">Freq</span>
+                    <span id="ui-fps" class="text-[11px] font-bold text-emerald-500 leading-none">-- Hz</span>
+                </div>
+            </div>
+        </div>
+        <div class="ml-auto flex items-center gap-4">
+            <button onclick="window.Architect.randomizeSystem()" class="btn-action !border-blue-900 !text-blue-400 hover:!bg-blue-900/30">
+                <i data-lucide="shuffle" class="w-3 h-3 inline-block mr-1"></i> RE-ROLL GENOME
+            </button>
+            <span class="text-[9px] font-bold text-zinc-700 uppercase">
+                SIM_STATE: <span id="ui-evo-status" class="text-zinc-500">STABLE</span>
+            </span>
+        </div>
+    </div>
+
+    <div id="gui" class="fixed top-10 right-0 h-[calc(100%-2.5rem)] w-[420px] ui-panel z-40 flex flex-col border-l border-zinc-800 shadow-2xl">
+        <div class="flex bg-black border-b border-zinc-800">
+            <button onclick="window.Architect.setTab('world')" id="tab-world" class="flex-1 tab-btn tab-active">World</button>
+            <button onclick="window.Architect.setTab('gen')" id="tab-gen" class="flex-1 tab-btn">Genome</button>
+            <button onclick="window.Architect.setTab('sim')" id="tab-sim" class="flex-1 tab-btn">Settings</button>
+            <button onclick="window.Architect.setTab('viz')" id="tab-viz" class="flex-1 tab-btn">Renderer</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scroll divide-y divide-zinc-800/30">
+            <!-- World Tab -->
+            <div id="pane-world" class="">
+                <div class="section-header">Atmospheric Simulation</div>
+                <div class="p-5 space-y-6">
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Noise Scale <span id="val-envScale" class="value-text"></span></label>
+                        <input type="range" id="param-envScale" min="1" max="10" step="0.1">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Change Rate <span id="val-envSpeed" class="value-text"></span></label>
+                        <input type="range" id="param-envSpeed" min="0" max="2" step="0.01">
+                    </div>
+                </div>
+                <div class="section-header">Layer Intensity</div>
+                <div class="p-5 space-y-6">
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text text-red-400">Temperature (Metabolism) <span id="val-envTemp" class="value-text text-red-500"></span></label>
+                        <input type="range" id="param-envTemp" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text text-emerald-400">Density (Drag) <span id="val-envDense" class="value-text text-emerald-500"></span></label>
+                        <input type="range" id="param-envDense" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text text-blue-400">Nutrition (Energy) <span id="val-envFood" class="value-text text-blue-500"></span></label>
+                        <input type="range" id="param-envFood" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text text-purple-400">Entropy (Decay/Mut) <span id="val-envFlux" class="value-text text-purple-500"></span></label>
+                        <input type="range" id="param-envFlux" min="0" max="1" step="0.01">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Genome Tab -->
+            <div id="pane-gen" class="hidden">
+                <div class="p-3 bg-black flex justify-between items-center border-b border-zinc-800">
+                    <span class="label-text">Bio-Diversity</span>
+                    <button onclick="window.Architect.addSpecies()" class="btn-action !text-blue-500">+ NEW SPECIES</button>
+                </div>
+                <div id="gen-container"></div>
+            </div>
+
+            <!-- Settings / Analytics -->
+            <div id="pane-sim" class="hidden">
+                <div class="section-header">Live Telemetry</div>
+                <div class="p-4 space-y-4">
+                    <div class="space-y-2">
+                        <span class="text-[9px] font-bold text-zinc-600 uppercase">Population Dynamics</span>
+                        <div class="graph-container"><canvas id="graph-pop"></canvas></div>
+                    </div>
+                    <div class="space-y-2">
+                        <span class="text-[9px] font-bold text-zinc-600 uppercase">System Energy</span>
+                        <div class="graph-container"><canvas id="graph-energy"></canvas></div>
+                    </div>
+                </div>
+                <div class="section-header">Physics Constants</div>
+                <div class="p-5 space-y-6">
+                    <div class="flex items-center justify-between p-3 bg-black border border-zinc-800">
+                        <span class="label-text">Enable Evolution</span>
+                        <input type="checkbox" id="param-evo-toggle" class="w-4 h-4 accent-blue-600" onchange="window.Architect.toggleEvo(this.checked)">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Time Warp <span id="val-warp" class="value-text"></span></label>
+                        <input type="range" id="param-warp" min="0.1" max="10" step="0.1">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Attraction Force <span id="val-force" class="value-text"></span></label>
+                        <input type="range" id="param-force" min="0" max="1" step="0.001">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Repulsion Force <span id="val-repel" class="value-text"></span></label>
+                        <input type="range" id="param-repel" min="0" max="1" step="0.001">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Global Pressure <span id="val-pressure" class="value-text"></span></label>
+                        <input type="range" id="param-pressure" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Pheromone Decay <span id="val-trails" class="value-text"></span></label>
+                        <input type="range" id="param-trails" min="0" max="1" step="0.0001">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Viz Tab -->
+            <div id="pane-viz" class="hidden">
+                <div class="section-header">Render Pipeline</div>
+                <div class="p-4 grid grid-cols-1 gap-1">
+                    <button onclick="window.Architect.setViz(0)" id="viz-0" class="btn-action active">01: PHENOTYPES</button>
+                    <button onclick="window.Architect.setViz(1)" id="viz-1" class="btn-action">02: METABOLISM</button>
+                    <button onclick="window.Architect.setViz(2)" id="viz-2" class="btn-action">03: VELOCITY</button>
+                    <button onclick="window.Architect.setViz(3)" id="viz-3" class="btn-action">04: PHEROMONES</button>
+                    <button onclick="window.Architect.setViz(4)" id="viz-4" class="btn-action text-purple-400">05: ENVIRONMENT MAP</button>
+                </div>
+                <div class="section-header">Optical Config</div>
+                <div class="p-5 space-y-6">
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Base Size <span id="val-size" class="value-text"></span></label>
+                        <input type="range" id="param-size" min="0.1" max="8" step="0.1">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="flex justify-between label-text">Alpha <span id="val-opacity" class="value-text"></span></label>
+                        <input type="range" id="param-opacity" min="0.01" max="1" step="0.01">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 bg-black border-t border-zinc-800">
+            <button onclick="window.Architect.engine.reset()" class="w-full bg-blue-600 hover:bg-blue-700 py-4 text-[11px] font-bold uppercase tracking-widest text-white transition-all">RE-SEED ENVIRONMENT</button>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script type="module">
+        const SHADERS = {
+            quadVS: `#version 300 es
+                layout(location = 0) in vec2 a_pos;
+                void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`,
+
+            envFS: `#version 300 es
+                precision highp float;
+                uniform float u_time;
+                uniform float u_scale;
+                uniform vec2 u_res;
+                out vec4 o_col;
+                float hash(vec2 p) { return fract(sin(dot(p, vec2(12.7, 31.7))) * 43758.5); }
+                float noise(vec2 p) {
+                    vec2 i = floor(p); vec2 f = fract(p);
+                    f = f*f*(3.0-2.0*f);
+                    return mix(mix(hash(i), hash(i + vec2(1.0,0.0)), f.x),
+                               mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), f.x), f.y);
+                }
+                void main() {
+                    vec2 uv = gl_FragCoord.xy / u_res.y * u_scale;
+                    float t = u_time * 0.1;
+                    float temp = noise(uv + t);
+                    float dense = noise(uv * 1.5 - t * 0.5);
+                    float food = noise(uv * 2.0 + vec2(t, -t));
+                    float entropy = noise(uv * 3.0 + t * 0.2);
+                    food = smoothstep(0.4, 0.8, food);
+                    o_col = vec4(temp, dense, food, entropy);
+                }`,
+
+            decayFS: `#version 300 es
+                precision highp float;
+                uniform sampler2D u_tex; 
+                uniform sampler2D u_env; 
+                uniform float u_decay;
+                uniform float u_fluxStr;
+                out vec4 o_col;
+                void main() {
+                    vec4 ph = texture(u_tex, gl_FragCoord.xy / vec2(textureSize(u_tex, 0)));
+                    vec4 env = texture(u_env, gl_FragCoord.xy / vec2(textureSize(u_env, 0)));
+                    float localDecay = u_decay * (1.0 - (env.a * u_fluxStr * 0.1));
+                    o_col = ph * localDecay;
+                }`,
+
+            sensVS: `#version 300 es
+                layout(location = 0) in float a_idx;
+                uniform sampler2D u_posTex;
+                uniform float u_texSize, u_resX, u_resY;
+                out float v_species;
+                out float v_energy;
+                void main() {
+                    float y = floor(a_idx / u_texSize);
+                    float x = mod(a_idx, u_texSize);
+                    vec4 p = texelFetch(u_posTex, ivec2(x, y), 0);
+                    v_species = p.z;
+                    v_energy = p.w;
+                    gl_Position = vec4((p.xy / vec2(u_resX, u_resY)) * 2.0 - 1.0, 0.0, 1.0);
+                    gl_PointSize = 3.0;
+                }`,
+
+            sensFS: `#version 300 es
+                precision highp float;
+                in float v_species;
+                in float v_energy;
+                out vec4 o_col;
+                void main() { 
+                    float d = length(gl_PointCoord - 0.5);
+                    if(d > 0.5 || v_energy <= 0.0) discard;
+                    int s = int(v_species * 4.0);
+                    o_col = vec4(0.0);
+                    if(s == 0) o_col.r = 1.0;
+                    else if(s == 1) o_col.g = 1.0;
+                    else if(s == 2) o_col.b = 1.0;
+                    else o_col.a = 1.0;
+                    o_col *= (1.0 - d * 2.0);
+                }`,
+
+            simFS: `#version 300 es
+                precision highp float;
+                uniform sampler2D u_posTex, u_velTex, u_densityTex, u_envTex;
+                uniform vec2 u_res;
+                uniform float u_time, u_dt, u_forceMag, u_repelMag, u_evoEnabled, u_pressure;
+                uniform mat4 u_weights; 
+                uniform mat4 u_phys;
+                uniform mat4 u_bio;
+                uniform mat4 u_eco;
+                uniform vec4 u_envParams;
+                uniform vec2 u_mouse;
+                uniform int u_click;
+                layout(location = 0) out vec4 o_pos;
+                layout(location = 1) out vec4 o_vel;
+
+                float hash(vec2 p) { return fract(sin(dot(p, vec2(12.7, 31.7))) * 43758.5); }
+
+                void main() {
+                    ivec2 uv = ivec2(gl_FragCoord.xy);
+                    vec4 posData = texelFetch(u_posTex, uv, 0);
+                    vec4 velData = texelFetch(u_velTex, uv, 0);
+                    vec2 pos = posData.xy;
+                    float energy = posData.w;
+                    vec2 vel = velData.xy;
+                    float geneMass = velData.z; 
+                    float geneMetabolism = velData.w;
+
+                    vec4 env = texture(u_envTex, pos / u_res);
+                    float localTemp = env.r * u_envParams.x;
+                    float localDense = env.g * u_envParams.y;
+                    float localFood = env.b * u_envParams.z;
+                    float localFlux = env.a * u_envParams.w;
+
+                    int sIdx = clamp(int(posData.z * 4.0), 0, 3);
+
+                    if (energy <= 0.001) { 
+                        vec2 seed = pos + u_time;
+                        if (hash(seed + 9.0) < 0.0001) {
+                             float rSpec = floor(hash(seed + 10.0) * 4.0) / 4.0;
+                             o_pos = vec4(hash(seed)*u_res.x, hash(seed.yx)*u_res.y, rSpec, 0.5);
+                             o_vel = vec4(0.0, 0.0, 1.0, 1.0);
+                             return;
+                        }
+                        vec2 samplePos = pos + (vec2(hash(seed), hash(seed.yx)) - 0.5) * 40.0;
+                        samplePos = mod(samplePos + u_res, u_res);
+                        vec4 parentPos = texture(u_posTex, samplePos / u_res);
+                        vec4 parentVel = texture(u_velTex, samplePos / u_res); 
+                        int pIdx = clamp(int(parentPos.z * 4.0), 0, 3);
+                        vec4 pBio = u_bio[pIdx];
+                        float fluxMutMod = 1.0 + localFlux * 2.0;
+
+                        if (parentPos.w > pBio.y && hash(seed + 5.0) < pBio.w) {
+                            float mutRate = pBio.z * fluxMutMod;
+                            float newMassGene = clamp(parentVel.z + (hash(seed + 1.0)-0.5)*mutRate, 0.5, 2.0);
+                            float newMetaGene = clamp(parentVel.w + (hash(seed + 2.0)-0.5)*mutRate, 0.5, 2.0);
+                            vec2 spawnOffset = (vec2(hash(seed+3.0), hash(seed+4.0)) - 0.5) * 8.0;
+                            o_pos = vec4(mod(parentPos.xy + spawnOffset + u_res, u_res), parentPos.z, 0.6);
+                            o_vel = vec4(0.0, 0.0, newMassGene, newMetaGene);
+                        } else {
+                            o_pos = vec4(-1000.0, -1000.0, posData.z, 0.0);
+                            o_vel = velData;
+                        }
+                        return;
+                    }
+
+                    vec4 pTraits = u_phys[sIdx];
+                    vec4 bTraits = u_bio[sIdx];
+                    vec4 eTraits = u_eco[sIdx];
+                    
+                    float mass = pTraits.x * geneMass; 
+                    float radius = pTraits.y / u_res.x;
+                    float heatStress = max(0.0, localTemp - eTraits.x);
+                    float thermal = pTraits.z + heatStress * 2.0; 
+                    float dragEffect = max(0.0, localDense - eTraits.y);
+                    float friction = (1.0 - pTraits.w * 0.1) * (1.0 - dragEffect * 0.5);
+                    float metabolism = bTraits.x * u_pressure * geneMetabolism + heatStress * 0.5;
+
+                    vec2 dCoord = pos / u_res;
+                    vec2 gradAttract = vec2(0.0);
+                    vec2 gradRepel = vec2(0.0);
+                    float feedFactor = 0.0;
+                    float predationGain = 0.0;
+                    
+                    float angleOffset = hash(vec2(float(uv.x), float(uv.y))) * 6.28;
+                    for(int i=0; i<8; i++) {
+                        float a = angleOffset + float(i) * 0.78539; 
+                        vec2 dir = vec2(cos(a), sin(a));
+                        vec4 scents = texture(u_densityTex, dCoord + dir * radius);
+                        gradAttract += dir * dot(scents, u_weights[sIdx]);
+                        gradRepel -= dir * scents[sIdx];
+                        feedFactor += dot(scents, max(u_weights[sIdx], 0.0));
+                        predationGain += dot(scents, max(u_weights[sIdx], 0.0)) * eTraits.w;
+                    }
+                    
+                    vec2 acc = gradAttract * u_forceMag * 1000.0;
+                    acc += gradRepel * u_repelMag * 1000.0;
+                    acc += vec2(cos(hash(pos + u_time)*6.28), sin(hash(pos + u_time)*6.28)) * thermal * 200.0;
+
+                    if(u_click == 1) {
+                        vec2 mDiff = u_mouse - pos;
+                        acc += normalize(mDiff) * 6000.0 / (length(mDiff) + 80.0);
+                    }
+
+                    vel = (vel + (acc / mass) * u_dt) * friction;
+                    pos = mod(pos + vel * u_dt + u_res, u_res);
+
+                    if (u_evoEnabled > 0.5) {
+                        float cost = metabolism + (length(vel) * 0.002 * mass); 
+                        energy -= cost * u_dt;
+                        energy += feedFactor * 0.05 * u_dt;
+                        energy += localFood * eTraits.z * 0.2 * u_dt;
+                        energy += predationGain * 0.1 * u_dt;
+                    }
+
+                    o_pos = vec4(pos, posData.z, clamp(energy, 0.0, 1.0));
+                    o_vel = vec4(vel, geneMass, geneMetabolism);
+                }`,
+
+            // Updated Render Shader: Procedural Coloring
+            renderVS: `#version 300 es
+                precision highp float;
+                layout(location = 0) in float a_idx;
+                uniform sampler2D u_posTex, u_velTex;
+                uniform vec2 u_res;
+                uniform float u_texSize, u_pointSize;
+                uniform mat4 u_phys; // For color calc
+                uniform mat4 u_bio;  // For color calc
+                uniform mat4 u_eco;  // For color calc
+                uniform int u_vizMode;
+                out vec4 v_col;
+                void main() {
+                    float y = floor(a_idx / u_texSize);
+                    float x = mod(a_idx, u_texSize);
+                    vec4 p = texelFetch(u_posTex, ivec2(x, y), 0);
+                    vec4 v = texelFetch(u_velTex, ivec2(x, y), 0); 
+                    
+                    if (p.w <= 0.001) { gl_Position = vec4(-2.0); return; }
+
+                    gl_Position = vec4((p.xy / u_res) * 2.0 - 1.0, 0.0, 1.0);
+                    
+                    float massMod = v.z; 
+                    gl_PointSize = u_pointSize * massMod; 
+                    
+                    int sIdx = clamp(int(p.z * 4.0), 0, 3);
+                    
+                    if (u_vizMode == 0) {
+                        // Procedural Color Calculation
+                        vec4 phys = u_phys[sIdx];
+                        vec4 bio = u_bio[sIdx];
+                        vec4 eco = u_eco[sIdx];
+                        
+                        // Red: Aggression (Mass + Predator Gain)
+                        float r = (phys.x / 5.0) * 0.5 + eco.w * 0.5;
+                        // Green: Efficiency (Metabolism + Graze)
+                        float g = (bio.x / 2.0) * 0.5 + eco.z * 0.5;
+                        // Blue: Resilience (Heat Resist + Drag Resist)
+                        float b = eco.x * 0.5 + eco.y * 0.5;
+                        
+                        // Modulate by individual genes (Mass + Metabolism)
+                        vec3 geneTint = vec3(v.z * 0.8, v.w * 0.8, 1.0);
+                        
+                        vec3 baseCol = normalize(vec3(r, g, b) + 0.1); // Add base so not black
+                        v_col = vec4(baseCol * geneTint, 1.0);
+                        
+                    } else if (u_vizMode == 1) v_col = vec4(p.w, p.w * 0.2, 0.4, 1.0); 
+                    else if (u_vizMode == 2) v_col = vec4(normalize(abs(v.xy)), 0.6, 1.0); 
+                    else if (u_vizMode == 3) v_col = vec4(0.8);
+                    else v_col = vec4(1.0);
+                }`,
+
+            renderFS: `#version 300 es
+                precision highp float;
+                uniform float u_opacity;
+                in vec4 v_col;
+                out vec4 o_col;
+                void main() {
+                    float d = length(gl_PointCoord - 0.5);
+                    if(d > 0.5) discard;
+                    o_col = vec4(v_col.rgb, u_opacity * (1.0 - d * 2.0));
+                }`,
+            
+            densityVizFS: `#version 300 es
+                precision highp float;
+                uniform sampler2D u_tex;
+                uniform vec4 u_colors[4];
+                out vec4 o_col;
+                void main() {
+                    vec4 density = texture(u_tex, gl_FragCoord.xy / vec2(textureSize(u_tex, 0)));
+                    vec3 col = vec3(0.0);
+                    col += u_colors[0].rgb * density.r;
+                    col += u_colors[1].rgb * density.g;
+                    col += u_colors[2].rgb * density.b;
+                    col += u_colors[3].rgb * density.a;
+                    o_col = vec4(col, 1.0);
+                }`
+        };
+
+        class Engine {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.gl = canvas.getContext('webgl2', { antialias: false });
+                this.gl.getExtension('EXT_color_buffer_float');
+                this.gl.getExtension('OES_texture_float_linear');
+                this.texSize = 1024; this.count = this.texSize * this.texSize;
+                this.pingPong = 0; this.densePingPong = 0;
+                this.vizMode = 0; this.epoch = 0.0;
+                this.stats = { pop: [], energy: [] };
+                this.state = { width: 0, height: 0, mx: 0, my: 0, click: 0 };
+                this.init();
+            }
+
+            init() {
+                this.resize();
+                const gl = this.gl;
+                const link = (vs, fs) => {
+                    const s = (t, src) => {
+                        if (!src) { console.error("Shader missing for type " + t); return null; }
+                        const sh = gl.createShader(t); gl.shaderSource(sh, src.trim()); gl.compileShader(sh);
+                        if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(sh)); return sh;
+                    };
+                    const p = gl.createProgram(); gl.attachShader(p, s(gl.VERTEX_SHADER, vs)); gl.attachShader(p, s(gl.FRAGMENT_SHADER, fs));
+                    gl.linkProgram(p); return p;
+                };
+
+                this.progs = {
+                    sim: link(SHADERS.quadVS, SHADERS.simFS),
+                    render: link(SHADERS.renderVS, SHADERS.renderFS),
+                    decay: link(SHADERS.quadVS, SHADERS.decayFS),
+                    sens: link(SHADERS.sensVS, SHADERS.sensFS),
+                    vizDensity: link(SHADERS.quadVS, SHADERS.densityVizFS),
+                    env: link(SHADERS.quadVS, SHADERS.envFS)
+                };
+
+                this.locs = {
+                    sim: this.getLocs(this.progs.sim, ['u_posTex', 'u_velTex', 'u_densityTex', 'u_envTex', 'u_res', 'u_mouse', 'u_time', 'u_dt', 'u_forceMag', 'u_repelMag', 'u_weights', 'u_phys', 'u_bio', 'u_eco', 'u_click', 'u_evoEnabled', 'u_pressure', 'u_envParams']),
+                    render: this.getLocs(this.progs.render, ['u_posTex', 'u_velTex', 'u_res', 'u_texSize', 'u_pointSize', 'u_opacity', 'u_vizMode', 'u_phys', 'u_bio', 'u_eco']),
+                    sens: this.getLocs(this.progs.sens, ['u_posTex', 'u_texSize', 'u_resX', 'u_resY']),
+                    decay: this.getLocs(this.progs.decay, ['u_tex', 'u_env', 'u_decay', 'u_fluxStr']),
+                    vizDensity: this.getLocs(this.progs.vizDensity, ['u_tex', 'u_colors']),
+                    env: this.getLocs(this.progs.env, ['u_time', 'u_scale', 'u_res'])
+                };
+
+                this.vaos = {
+                    sim: this.createVAO([-1,-1,1,-1,-1,1,1,-1,1,1,-1,1], 2),
+                    render: this.createVAO(new Float32Array(this.count).map((_, i) => i), 1)
+                };
+                this.reset();
+            }
+
+            getLocs(p, ns) { const r = {}; ns.forEach(n => r[n] = this.gl.getUniformLocation(p, n)); return r; }
+            createVAO(data, size) {
+                const gl = this.gl; const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+                const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+                gl.bufferData(gl.ARRAY_BUFFER, data instanceof Float32Array ? data : new Float32Array(data), gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, size, gl.FLOAT, false, 0, 0); return vao;
+            }
+
+            reset() {
+                const gl = this.gl;
+                const pData = new Float32Array(this.count * 4);
+                const vData = new Float32Array(this.count * 4); 
+                const speciesCount = window.Architect.params.species.length;
+                
+                for(let i=0; i<this.count*4; i+=4) {
+                    pData[i] = Math.random() * this.state.width;
+                    pData[i+1] = Math.random() * this.state.height;
+                    pData[i+2] = (Math.floor(Math.random() * speciesCount) / 4.0);
+                    pData[i+3] = 0.5 + Math.random() * 0.5; 
+                    vData[i] = 0; vData[i+1] = 0; 
+                    vData[i+2] = 0.8 + Math.random()*0.4; 
+                    vData[i+3] = 0.8 + Math.random()*0.4; 
+                }
+                const mk = (w, h, d, filter) => {
+                    const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, d);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter || gl.NEAREST);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter || gl.NEAREST);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); return t;
+                };
+                
+                this.texs = [{pos: mk(this.texSize, this.texSize, pData), vel: mk(this.texSize, this.texSize, vData)}, {pos: mk(this.texSize, this.texSize, null), vel: mk(this.texSize, this.texSize, null)}];
+                
+                this.fbs = this.texs.map(t => {
+                    const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.pos, 0);
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, t.vel, 0); return fb;
+                });
+                
+                this.densitySize = 512;
+                this.denseTexs = [mk(this.densitySize, this.densitySize, null, gl.LINEAR), mk(this.densitySize, this.densitySize, null, gl.LINEAR)];
+                this.denseFbs = this.denseTexs.map(t => {
+                    const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); return fb;
+                });
+
+                this.envTex = mk(512, 512, null, gl.LINEAR);
+                this.envFb = gl.createFramebuffer();
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this.envFb);
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.envTex, 0);
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth; this.canvas.height = window.innerHeight;
+                this.state.width = this.canvas.width; this.state.height = this.canvas.height;
+            }
+
+            run(now) {
+                const gl = this.gl; const r = this.pingPong, w = 1 - r;
+                const dr = this.densePingPong, dw = 1 - dr;
+                const p = window.Architect.params;
+                const dt = 0.016 * p.warp;
+
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this.envFb);
+                gl.viewport(0, 0, 512, 512);
+                gl.useProgram(this.progs.env);
+                gl.uniform1f(this.locs.env.u_time, now * 0.001 * p.env.speed);
+                gl.uniform1f(this.locs.env.u_scale, p.env.scale);
+                gl.uniform2f(this.locs.env.u_res, 512, 512);
+                gl.bindVertexArray(this.vaos.sim); gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this.denseFbs[dw]);
+                gl.viewport(0, 0, this.densitySize, this.densitySize);
+                gl.disable(gl.BLEND); gl.useProgram(this.progs.decay);
+                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.denseTexs[dr]);
+                gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.envTex);
+                gl.uniform1i(this.locs.decay.u_tex, 0); gl.uniform1i(this.locs.decay.u_env, 1);
+                gl.uniform1f(this.locs.decay.u_decay, Math.pow(p.trails, 0.04));
+                gl.uniform1f(this.locs.decay.u_fluxStr, p.env.flux);
+                gl.bindVertexArray(this.vaos.sim); gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+                gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.useProgram(this.progs.sens);
+                gl.bindVertexArray(this.vaos.render); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texs[r].pos);
+                gl.uniform1i(this.locs.sens.u_posTex, 0); gl.uniform1f(this.locs.sens.u_texSize, this.texSize);
+                gl.uniform1f(this.locs.sens.u_resX, this.state.width); gl.uniform1f(this.locs.sens.u_resY, this.state.height);
+                gl.drawArrays(gl.POINTS, 0, this.count);
+                this.densePingPong = dw;
+
+                gl.disable(gl.BLEND); gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbs[w]);
+                gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+                gl.viewport(0, 0, this.texSize, this.texSize); gl.useProgram(this.progs.sim);
+                gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texs[r].pos);
+                gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texs[r].vel);
+                gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.denseTexs[dw]);
+                gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.envTex);
+                gl.uniform1i(this.locs.sim.u_posTex, 0); gl.uniform1i(this.locs.sim.u_velTex, 1);
+                gl.uniform1i(this.locs.sim.u_densityTex, 2); gl.uniform1i(this.locs.sim.u_envTex, 3);
+                gl.uniform2f(this.locs.sim.u_res, this.state.width, this.state.height);
+                gl.uniform2f(this.locs.sim.u_mouse, this.state.mx, this.state.my); gl.uniform1f(this.locs.sim.u_time, now*0.001);
+                gl.uniform1f(this.locs.sim.u_dt, dt); 
+                gl.uniform1f(this.locs.sim.u_forceMag, Math.pow(p.force, 2) * 15.0); 
+                gl.uniform1f(this.locs.sim.u_repelMag, Math.pow(p.repel, 2) * 15.0); 
+                gl.uniform1f(this.locs.sim.u_pressure, p.evolution.pressure);
+                gl.uniform1f(this.locs.sim.u_evoEnabled, p.evoEnabled ? 1.0 : 0.0);
+                gl.uniform4f(this.locs.sim.u_envParams, p.env.temp, p.env.dense, p.env.food, p.env.flux);
+                gl.uniform1i(this.locs.sim.u_click, this.state.click);
+                
+                const wFlat = Array(16).fill(0);
+                p.species.forEach((s, idx) => s.interactions.forEach(inter => { if(inter.targetId < 4) wFlat[idx * 4 + inter.targetId] = inter.weight; }));
+                gl.uniformMatrix4fv(this.locs.sim.u_weights, false, new Float32Array(wFlat));
+                
+                const pFlat = Array(16).fill(0);
+                const bFlat = Array(16).fill(0);
+                const eFlat = Array(16).fill(0);
+                p.species.forEach((s, idx) => { 
+                    pFlat[idx*4+0] = s.phys[0]; pFlat[idx*4+1] = s.phys[1]; pFlat[idx*4+2] = s.phys[2]; pFlat[idx*4+3] = s.phys[3]; 
+                    bFlat[idx*4+0] = s.bio[0]; bFlat[idx*4+1] = s.bio[1]; bFlat[idx*4+2] = s.bio[2]; bFlat[idx*4+3] = s.bio[3];
+                    eFlat[idx*4+0] = s.eco[0]; eFlat[idx*4+1] = s.eco[1]; eFlat[idx*4+2] = s.eco[2]; eFlat[idx*4+3] = s.eco[3];
+                });
+                gl.uniformMatrix4fv(this.locs.sim.u_phys, false, new Float32Array(pFlat));
+                gl.uniformMatrix4fv(this.locs.sim.u_bio, false, new Float32Array(bFlat));
+                gl.uniformMatrix4fv(this.locs.sim.u_eco, false, new Float32Array(eFlat));
+                gl.bindVertexArray(this.vaos.sim); gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, this.state.width, this.state.height);
+                gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+                
+                // Color calc for vizDensity
+                const cFlat = Array(16).fill(0);
+                // We use the procedural logic in JS to approximate for density viz colors
+                p.species.forEach((s, idx) => { 
+                    const c = window.Architect.getSpeciesColorVec(s);
+                    cFlat[idx*4+0] = c[0]; cFlat[idx*4+1] = c[1]; cFlat[idx*4+2] = c[2]; cFlat[idx*4+3] = 1.0; 
+                });
+
+                if (this.vizMode === 4) {
+                    gl.disable(gl.BLEND); gl.useProgram(this.progs.decay);
+                    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.envTex);
+                    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.envTex);
+                    gl.uniform1i(this.locs.decay.u_tex, 0); 
+                    gl.uniform1f(this.locs.decay.u_decay, 1.0); 
+                    gl.uniform1f(this.locs.decay.u_fluxStr, 0.0);
+                    gl.bindVertexArray(this.vaos.sim); gl.drawArrays(gl.TRIANGLES, 0, 6);
+                } else if (this.vizMode === 3) {
+                     gl.disable(gl.BLEND); gl.useProgram(this.progs.vizDensity);
+                    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.denseTexs[dw]);
+                    gl.uniform1i(this.locs.vizDensity.u_tex, 0);
+                    gl.uniform4fv(this.locs.vizDensity.u_colors, new Float32Array(cFlat));
+                    gl.bindVertexArray(this.vaos.sim); gl.drawArrays(gl.TRIANGLES, 0, 6);
+                }
+
+                if (this.vizMode !== 4) {
+                    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE); gl.useProgram(this.progs.render);
+                    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texs[w].pos);
+                    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texs[w].vel);
+                    gl.uniform1i(this.locs.render.u_posTex, 0); gl.uniform1i(this.locs.render.u_velTex, 1);
+                    gl.uniform2f(this.locs.render.u_res, this.state.width, this.state.height);
+                    gl.uniform1f(this.locs.render.u_texSize, this.texSize); gl.uniform1f(this.locs.render.u_pointSize, p.pointSize);
+                    gl.uniform1f(this.locs.render.u_opacity, p.opacity); gl.uniform1i(this.locs.render.u_vizMode, this.vizMode);
+                    
+                    // Pass arrays for procedural coloring in shader
+                    gl.uniformMatrix4fv(this.locs.render.u_phys, false, new Float32Array(pFlat));
+                    gl.uniformMatrix4fv(this.locs.render.u_bio, false, new Float32Array(bFlat));
+                    gl.uniformMatrix4fv(this.locs.render.u_eco, false, new Float32Array(eFlat));
+                    
+                    gl.bindVertexArray(this.vaos.render); gl.drawArrays(gl.POINTS, 0, this.count);
+                }
+                this.pingPong = w;
+                if (now % 1000 < 16 && p.evoEnabled) this.fetchStats();
+            }
+
+            fetchStats() {
+                const mockPop = 0.5 + Math.random() * 0.3;
+                const mockEnergy = 0.3 + Math.random() * 0.5;
+                this.stats.pop.push(mockPop); this.stats.energy.push(mockEnergy);
+                if (this.stats.pop.length > 50) { this.stats.pop.shift(); this.stats.energy.shift(); }
+                window.Architect.drawGraphs(this.stats);
+            }
+        }
+
+        window.Architect = {
+            params: {
+                trails: 0.985, force: 0.5, repel: 0.1, pointSize: 1.0, opacity: 0.6, warp: 1.0,
+                evoEnabled: false,
+                evolution: { pressure: 0.3 },
+                env: { scale: 3.0, speed: 0.5, temp: 0.5, dense: 0.5, food: 0.5, flux: 0.5 },
+                species: [
+                    { id: 0, name: 'APEX_PREDATOR', interactions: [{targetId: 1, weight: 1.0}], phys: [1.2, 80.0, 0.1, 0.5], bio: [0.3, 0.6, 0.2, 0.6], eco: [0.8, 0.2, 0.1, 0.9] },
+                    { id: 1, name: 'ALGAE_GRAZER', interactions: [{targetId: 1, weight: 0.5}], phys: [0.8, 40.0, 0.4, 0.9], bio: [0.15, 0.4, 0.05, 0.8], eco: [0.2, 0.8, 0.9, 0.1] }
+                ]
+            },
+            setTab: (n) => {
+                ['world', 'sim', 'gen', 'viz'].forEach(t => {
+                    document.getElementById('pane-'+t).classList.add('hidden');
+                    document.getElementById('tab-'+t).classList.remove('tab-active');
+                });
+                document.getElementById('pane-'+n).classList.remove('hidden');
+                document.getElementById('tab-'+n).classList.add('tab-active');
+            },
+            setViz: (m) => {
+                window.Architect.engine.vizMode = m;
+                [0,1,2,3,4].forEach(i => document.getElementById('viz-'+i)?.classList.remove('active'));
+                document.getElementById('viz-'+m)?.classList.add('active');
+            },
+            toggleEvo: (v) => { 
+                window.Architect.params.evoEnabled = v;
+                document.getElementById('ui-evo-status').innerText = v ? 'ENGAGED' : 'INERT';
+                document.getElementById('ui-evo-status').className = v ? 'text-emerald-500' : 'text-zinc-500';
+            },
+            addSpecies: () => {
+                const p = window.Architect.params;
+                if(p.species.length >= 4) return;
+                p.species.push({ id: p.species.length, name: 'NEW_ORGANISM', interactions: [], phys: [1.0, 60.0, 0.3, 0.8], bio: [0.2, 0.5, 0.1, 0.5], eco: [0.5, 0.5, 0.5, 0.5] });
+                window.Architect.renderTraits();
+            },
+            removeSpecies: (idx) => { window.Architect.params.species.splice(idx, 1); window.Architect.renderTraits(); },
+            addInteraction: (sIdx) => { window.Architect.params.species[sIdx].interactions.push({targetId: 0, weight: 0.5}); window.Architect.renderTraits(); },
+            removeInteraction: (sIdx, iIdx) => { window.Architect.params.species[sIdx].interactions.splice(iIdx, 1); window.Architect.renderTraits(); },
+            drawGraphs: (stats) => {
+                const draw = (id, data, color) => {
+                    const c = document.getElementById(id); if(!c) return;
+                    const ctx = c.getContext('2d');
+                    ctx.clearRect(0,0,c.width,c.height);
+                    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
+                    data.forEach((v, i) => {
+                        const x = (i / 50) * c.width; const y = c.height - (v * c.height);
+                        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+                    });
+                    ctx.stroke();
+                };
+                draw('graph-pop', stats.pop, '#3b82f6');
+                draw('graph-energy', stats.energy, '#fbbf24');
+            },
+            getSpeciesColorVec: (s) => {
+                let r = (s.phys[0]/5.0 + s.eco[3]) * 0.5;
+                let g = (s.bio[0]/2.0 + s.eco[2]/2.0) * 0.5;
+                let b = (s.eco[0] + s.eco[1]) * 0.5;
+                const m = Math.max(r,g,b,1.0);
+                return [(r/m)+0.1, (g/m)+0.1, (b/m)+0.1];
+            },
+            getSpeciesColorCSS: (s) => {
+                const v = window.Architect.getSpeciesColorVec(s);
+                return `rgb(${Math.floor(v[0]*255)},${Math.floor(v[1]*255)},${Math.floor(v[2]*255)})`;
+            },
+            randomizeSystem: () => {
+                const p = window.Architect.params;
+                const count = 2 + Math.floor(Math.random() * 3); 
+                const prefixes = ['NEURO', 'CYBER', 'BIO', 'SOLAR', 'LUNAR', 'VOID', 'AERO', 'HYDRO', 'PYRO', 'GEO'];
+                const suffixes = ['PHAGE', 'KIN', 'MORPH', 'DROID', 'ZOID', 'SPORE', 'CELL', 'BOT', 'MIND', 'FORM'];
+                
+                p.species = [];
+                for(let i=0; i<count; i++) {
+                    const name = prefixes[Math.floor(Math.random()*prefixes.length)] + '_' + suffixes[Math.floor(Math.random()*suffixes.length)];
+                    
+                    const bio = [0.1 + Math.random()*0.4, 0.3 + Math.random()*0.5, 0.01 + Math.random()*0.1, 0.4 + Math.random()*0.6];
+                    const phys = [0.5 + Math.random()*1.5, 20.0 + Math.random()*80.0, Math.random()*0.5, 0.5 + Math.random()*0.5];
+                    const eco = [Math.random(), Math.random(), Math.random(), Math.random()]; 
+
+                    const interactions = [];
+                    const interCount = 1 + Math.floor(Math.random() * 2);
+                    for(let j=0; j<interCount; j++) {
+                        interactions.push({
+                            targetId: Math.floor(Math.random() * count),
+                            weight: (Math.random() * 4.0) - 2.0
+                        });
+                    }
+                    p.species.push({ id: i, name, phys, bio, eco, interactions });
+                }
+                window.Architect.renderTraits();
+                window.Architect.engine.reset();
+            },
+            renderTraits: () => {
+                const container = document.getElementById('gen-container');
+                let html = '';
+                window.Architect.params.species.forEach((s, sIdx) => {
+                    const color = window.Architect.getSpeciesColorCSS(s);
+                    html += `
+                    <div class="ui-border-b divide-y divide-zinc-900">
+                        <div class="p-2 bg-zinc-900/30 flex items-center gap-2">
+                            <div class="color-dot" style="background-color: ${color}"></div>
+                            <input type="text" value="${s.name}" oninput="window.Architect.params.species[${sIdx}].name=this.value" class="editor-input flex-1 !border-none !bg-transparent font-bold text-[10px]">
+                            <button onclick="window.Architect.removeSpecies(${sIdx})" class="text-zinc-700 hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                        </div>
+                        <div class="p-4 space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="space-y-1"><span class="text-[9px] text-zinc-600 font-bold uppercase">Mass (Red)</span><input type="range" min="0.1" max="5" step="0.01" value="${s.phys[0]}" oninput="window.Architect.params.species[${sIdx}].phys[0]=parseFloat(this.value); window.Architect.renderTraits()"></div>
+                                <div class="space-y-1"><span class="text-[9px] text-zinc-600 font-bold uppercase">Mutation</span><input type="range" min="0" max="0.5" step="0.001" value="${s.bio[2]}" oninput="window.Architect.params.species[${sIdx}].bio[2]=parseFloat(this.value)"></div>
+                                <div class="space-y-1"><span class="text-[9px] text-zinc-600 font-bold uppercase">Repro Thresh</span><input type="range" min="0" max="1" step="0.01" value="${s.bio[1]}" oninput="window.Architect.params.species[${sIdx}].bio[1]=parseFloat(this.value)"></div>
+                                <div class="space-y-1"><span class="text-[9px] text-zinc-600 font-bold uppercase">Metabolic (Grn)</span><input type="range" min="0" max="2" step="0.01" value="${s.bio[0]}" oninput="window.Architect.params.species[${sIdx}].bio[0]=parseFloat(this.value); window.Architect.renderTraits()"></div>
+                                <div class="space-y-1"><span class="text-[9px] text-zinc-600 font-bold uppercase">Predator (Red)</span><input type="range" min="0" max="1" step="0.01" value="${s.eco[3]}" oninput="window.Architect.params.species[${sIdx}].eco[3]=parseFloat(this.value); window.Architect.renderTraits()"></div>
+                                <div class="space-y-1"><span class="text-[9px] text-zinc-600 font-bold uppercase">Resist (Blu)</span><input type="range" min="0" max="1" step="0.01" value="${s.eco[0]}" oninput="window.Architect.params.species[${sIdx}].eco[0]=parseFloat(this.value); window.Architect.renderTraits()"></div>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center"><span class="text-[9px] text-zinc-600 font-bold uppercase">Affinity Matrix</span><button onclick="window.Architect.addInteraction(${sIdx})" class="text-[9px] text-blue-500 font-bold">+ BIND</button></div>
+                                <div class="space-y-1">
+                                    ${s.interactions.map((inter, iIdx) => `
+                                        <div class="flex items-center gap-1 bg-black p-1 border border-zinc-900">
+                                            <select class="editor-input flex-1 !py-0 !border-none !text-[9px]" onchange="window.Architect.params.species[${sIdx}].interactions[iIdx].targetId=parseInt(this.value)">${window.Architect.params.species.map(t => `<option value="${t.id}" ${inter.targetId === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
+                                            <input type="range" class="!w-16" min="-2" max="2" step="0.01" value="${inter.weight}" oninput="window.Architect.params.species[${sIdx}].interactions[${iIdx}].weight=parseFloat(this.value)">
+                                            <button onclick="window.Architect.removeInteraction(${sIdx}, ${iIdx})" class="text-zinc-800 hover:text-red-500"><i data-lucide="minus-square" class="w-3 h-3"></i></button>
+                                        </div>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                container.innerHTML = html; lucide.createIcons();
+            }
+        };
+
+        const engine = new Engine(document.getElementById('canvas'));
+        window.Architect.engine = engine;
+
+        const setupUI = () => {
+            const binds = [
+                {id: 'param-warp', k: 'warp'}, {id: 'param-trails', k: 'trails'}, {id: 'param-force', k: 'force'}, {id: 'param-repel', k: 'repel'},
+                {id: 'param-size', k: 'pointSize'}, {id: 'param-opacity', k: 'opacity'}, {id: 'param-pressure', k: 'pressure', s: 'evolution'},
+                {id: 'param-envScale', k: 'scale', s: 'env'}, {id: 'param-envSpeed', k: 'speed', s: 'env'},
+                {id: 'param-envTemp', k: 'temp', s: 'env'}, {id: 'param-envDense', k: 'dense', s: 'env'},
+                {id: 'param-envFood', k: 'food', s: 'env'}, {id: 'param-envFlux', k: 'flux', s: 'env'}
+            ];
+            binds.forEach(b => {
+                const el = document.getElementById(b.id);
+                if (!el) { console.warn("Missing bind:", b.id); return; }
+                const update = () => {
+                    const v = parseFloat(el.value);
+                    if(b.s) window.Architect.params[b.s][b.k] = v; else window.Architect.params[b.k] = v;
+                    const d = document.getElementById('val-'+b.id.split('-')[1]); if(d) d.innerText = v.toFixed(2);
+                };
+                el.value = b.s ? window.Architect.params[b.s][b.k] : window.Architect.params[b.k];
+                el.oninput = update; update();
+            });
+            ['graph-pop', 'graph-energy'].forEach(id => { const c = document.getElementById(id); c.width = 400; c.height = 80; });
+        };
+
+        setupUI(); window.Architect.renderTraits(); lucide.createIcons();
+
+        let frames = 0, last = performance.now();
+        function loop(t) {
+            window.Architect.engine.run(t);
+            frames++;
+            if(t - last >= 1000) { 
+                document.getElementById('ui-fps').innerText = frames + ' Hz';
+                if (window.Architect.params.evoEnabled) {
+                    window.Architect.engine.epoch += window.Architect.params.warp * 0.1;
+                    document.getElementById('ui-epoch').innerText = Math.floor(window.Architect.engine.epoch).toString().padStart(5, '0');
+                    document.getElementById('ui-biomass').innerText = (0.7 + Math.random() * 0.3).toFixed(2) + ' MB';
+                }
+                frames = 0; last = t; 
+            }
+            requestAnimationFrame(loop);
+        }
+        window.addEventListener('resize', () => window.Architect.engine.resize());
+        window.addEventListener('mousemove', e => { window.Architect.engine.state.mx = e.clientX; window.Architect.engine.state.my = window.Architect.engine.state.height - e.clientY; });
+        window.addEventListener('mousedown', e => { if(e.target.id === 'canvas') window.Architect.engine.state.click = 1; });
+        window.addEventListener('mouseup', () => window.Architect.engine.state.click = 0);
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
