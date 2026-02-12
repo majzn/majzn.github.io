@@ -458,12 +458,40 @@ endfunction
 "  10. C/C++ HYPER-SUITE
 " ==============================================================================
 
+" A. Intelligent Indentation (K&R Style)
 autocmd FileType c,cpp setlocal cindent cinoptions=:0,l1,t0,g0,(0
 
+" B. Enhanced Syntax Highlighting (The Fix)
+" This applies specifically to C/C++ files to make functions and operators pop.
+autocmd FileType c,cpp call CSSyntax()
+
+function! CSSyntax()
+  " 1. Highlight Function Calls
+  " Regex: Matches any word (\w+) immediately followed by a '(' (\ze\()
+  " This makes 'printf' or 'MyFunction' stand out.
+  syntax match cCustomFunc /\w\+\ze(/
+  
+  " 2. Highlight Operators
+  " Makes math/logic symbols (+, -, *, &&, ||) distinct from variable names.
+  syntax match cOperator /[\+\-\*\/\%\=\!\&\|\^\~\?\:\<\>]/
+
+  " 3. Link to Harmonic Theme
+  " We link these custom matches to your theme's existing groups.
+  " cCustomFunc -> Function (Sky Blue #61afef in your theme)
+  " cOperator   -> Operator (Cyan #56b6c2 in your theme)
+  highlight link cCustomFunc Function
+  highlight link cOperator Operator
+  
+  " 4. Ensure standard Types (int, char, void) use the Gold color
+  highlight link cType Type
+endfunction
+
+" C. Quick Compile & Run (Press F5)
 autocmd FileType c,cpp nnoremap <buffer> <F5> :call CompileRunC()<CR>
 function! CompileRunC()
   exec "w"
   if &filetype == 'c' | let l:cc = "gcc" | else | let l:cc = "g++" | endif
+  
   let l:src = shellescape(expand("%"))
   let l:exe = shellescape(expand("%:r") . (has("win32") ? ".exe" : ""))
 
@@ -474,6 +502,7 @@ function! CompileRunC()
   endif
 endfunction
 
+" D. Header/Source Switcher (Press F4)
 autocmd FileType c,cpp,objc nnoremap <buffer> <F4> :call SwitchSourceHeader()<CR>
 function! SwitchSourceHeader()
   let l:base = expand("%:r")
@@ -489,4 +518,5 @@ function! SwitchSourceHeader()
   endif
 endfunction
 
+" E. Boilerplate Snippet (Type 'main' + Tab)
 autocmd FileType c inoremap <buffer> <expr> <Tab> getline('.') =~ '^\s*main$' ? '<Esc>cc#include <stdio.h><CR><CR>int main() {<CR>  <C-r>"<CR>  return 0;<CR>}<Esc>kko' : '<Tab>'
