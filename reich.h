@@ -60,26 +60,9 @@ typedef void* reichHandle;
 #define REICH_LOG_WARN  2
 #define REICH_LOG_ERROR 3
 
-REICH_API void reich_log(int32 level, const char* format, ...);
-
-REICH_API void reich_file_close(reichHandle file);
-REICH_API int32 reich_file_tell(reichHandle file);
-REICH_API void reich_find_close(reichHandle handle);
-REICH_API reichSize reich_file_size(reichHandle file);
-REICH_API reichHandle reich_file_open(const char* filename, int32 mode);
-REICH_API int32 reich_file_seek(reichHandle file, int32 offset, int32 origin);
-REICH_API reichSize
-reich_file_read(reichHandle file, void* buffer, reichSize bytes);
-REICH_API reichSize
-reich_file_write(reichHandle file, const void* buffer, reichSize bytes);
-REICH_API reichHandle
-reich_find_first(const char* pattern, char* filenameBuffer, int32 bufferSize);
-REICH_API int32
-reich_find_next(reichHandle handle, char* filenameBuffer, int32 bufferSize);
-
 #define REICH_KEY_MAX            512
 #define REICH_MOUSE_BUTTONS      3
-#define REICH_MAX_FONTS          16
+#define REICH_MAX_FONTS          32
 #define REICH_TITLE_BAR_HEIGHT   32
 #define REICH_TITLE_BUTTON_WIDTH 45
 
@@ -122,7 +105,6 @@ typedef struct reichContext reichContext;
 
 typedef void (*PFUSERUPDATE)(reichContext* ctx);
 typedef void (*PFUSERRENDER)(reichContext* ctx, real64 alpha);
-typedef void (*PFUSERRESIZE)(reichContext* ctx, int32 width, int32 height);
 typedef void (*PFUSERINPUT)(reichContext* ctx);
 
 struct reichContext {
@@ -146,33 +128,38 @@ struct reichContext {
   int32 activeFont;
   PFUSERUPDATE userUpdate;
   PFUSERRENDER userRender;
-  PFUSERRESIZE userResize;
   PFUSERINPUT userInput;
   void* platform;
 };
 
-REICH_API int32 reich_init(
-    reichContext* ctx,
-    const char* title,
-    int32 width,
-    int32 height,
-    real64 targetFps);
+/* PLATFORM API **************************************************************/
 
-REICH_API void reich_set_callbacks(
-    reichContext* ctx,
-    PFUSERUPDATE update,
-    PFUSERRENDER render,
-    PFUSERRESIZE resize,
-    PFUSERINPUT input);
+REICH_API void reich_sys_file_close(reichHandle file);
+REICH_API int32 reich_sys_file_tell(reichHandle file);
+REICH_API void reich_sys_find_close(reichHandle handle);
+REICH_API reichSize reich_sys_file_size(reichHandle file);
+REICH_API void reich_sys_log(int32 level, const char* format, ...);
+REICH_API reichHandle reich_sys_file_open(const char* filename, int32 mode);
 
-REICH_API void reich_show_cursor(reichContext* ctx, int32 show);
+REICH_API int32 reich_sys_file_seek(
+		reichHandle file, int32 offset, int32 origin);
+REICH_API reichSize reich_sys_file_read(
+		reichHandle file, void* buffer, reichSize bytes);
+REICH_API reichSize reich_sys_file_write(
+		reichHandle file, const void* buffer, reichSize bytes);
+REICH_API reichHandle reich_sys_find_first(
+		const char* pattern, char* filenameBuffer, int32 bufferSize);
+REICH_API int32 reich_sys_find_next(
+		reichHandle handle, char* filenameBuffer, int32 bufferSize);
+
+REICH_API void reich_sys_show_cursor(void);
+REICH_API void reich_sys_hide_cursor(void);
 REICH_API void reich_sys_toggle_maximize(reichContext* ctx);
 REICH_API reichSize reich_sys_get_platform_data_size(void);
 REICH_API void reich_sys_poll_events(reichContext* ctx);
 REICH_API void reich_sys_minimize(reichContext* ctx);
 REICH_API void reich_sys_present(reichContext* ctx);
 REICH_API void reich_sys_close(reichContext* ctx);
-REICH_API void reich_sys_show_cursor(int32 show);
 REICH_API void* reich_sys_alloc(reichSize size);
 REICH_API int64 reich_sys_get_ticks(void);
 REICH_API int64 reich_sys_get_freq(void);
@@ -184,17 +171,17 @@ REICH_API void reich_sys_resize_canvas(
 REICH_API int32 reich_sys_window_init(
     reichContext* ctx, const char* title, int32 width, int32 height);
 
+/* LIBRARY API ***************************************************************/
+
 REICH_API void reich_run(reichContext* ctx);
-REICH_API void reich_present(reichContext* ctx);
-REICH_API int32 reich_running(reichContext* ctx);
 REICH_API void reich_timer_tick(reichContext* ctx);
 REICH_API int32 reich_timer_step(reichContext* ctx);
 REICH_API real64 reich_timer_alpha(reichContext* ctx);
-REICH_API void reich_poll_events(reichContext* ctx);
 
-REICH_API int32 reich_get_mouse_x(reichContext* ctx);
-REICH_API int32 reich_get_mouse_y(reichContext* ctx);
-REICH_API int32 reich_get_mouse_wheel(reichContext* ctx);
+REICH_API void reich_input_update(reichContext* ctx);
+REICH_API int32 reich_mouse_x(reichContext* ctx);
+REICH_API int32 reich_mouse_y(reichContext* ctx);
+REICH_API int32 reich_mouse_wheel(reichContext* ctx);
 REICH_API uint32 reich_get_char_pressed(reichContext* ctx);
 REICH_API int32 reich_key_down(reichContext* ctx, int32 keyCode);
 REICH_API int32 reich_mouse_down(reichContext* ctx, int32 button);
@@ -207,21 +194,19 @@ REICH_API void* reich_arena_alloc(reichArena* a, reichSize size);
 REICH_API void reich_arena_init(reichArena* a, void* mem, reichSize size);
 REICH_API void reich_arena_reset(reichArena* a);
 
-REICH_API uint32 reich_put_pixel(reichContext* cx, int32 x, int32 y, uint32 c);
+REICH_API uint32 reich_draw_pixel(reichContext* cx, int32 x, int32 y, uint32 c);
 REICH_API void reich_set_scale(reichContext* ctx, int32 scale);
-REICH_API void reich_clear(reichContext* ctx, uint32 color);
+REICH_API void reich_draw_clear(reichContext* ctx, uint32 color);
 REICH_API void reich_draw_decorations(reichContext* ctx);
 
 REICH_API void reich_draw_rect(
     reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color);
-
 REICH_API void reich_draw_frame(
     reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color);
-
 REICH_API void reich_draw_text(
     reichContext* ctx, int32 x, int32 y, const char* str, uint32 color);
 
-REICH_API int32 reich_ui_btn(
+REICH_API int32 reich_draw_button(
     reichContext* ctx,
     int32 id,
     int32 x,
@@ -231,11 +216,23 @@ REICH_API int32 reich_ui_btn(
     const char* label,
     uint32 bgCol);
 
+REICH_API int32 reich_init(
+    reichContext* ctx,
+    const char* title,
+    int32 width,
+    int32 height,
+    real64 targetFps);
+REICH_API void reich_set_callbacks(
+    reichContext* ctx,
+    PFUSERUPDATE update,
+    PFUSERRENDER render,
+    PFUSERINPUT input);
+
 REICH_API reichCanvas reich_load_bmp(const char* filename);
 
+REICH_API void reich_init_default_font(reichContext* ctx);
 REICH_API void reich_load_fonts(
     reichContext* ctx, const char* fn, int32 gw, int32 gh, int32 amt);
-
 REICH_API void reich_load_font(
     reichContext* ctx,
     const char* filename,
@@ -243,18 +240,92 @@ REICH_API void reich_load_font(
     int32 glyphWidth,
     int32 glyphHeight);
 
-REICH_API void reich_init_default_font(reichContext* ctx);
 
 #ifdef REICH_IMPLEMENTATION
 
-REICH_API uint32
-reich_put_pixel(reichContext* ctx, int32 x, int32 y, uint32 color) {
-  if ((x) >= 0 && (x) < (ctx)->screen.width && (y) >= 0 &&
-      (y) < (ctx)->screen.height) {
-    (ctx)->screen.pixels[(y) * (ctx)->screen.width + (x)] = (color);
-  }
-  return 0;
-}
+static const uint8 REICH_FONT_DATA[] = {
+    0x05, 0x06, 0x01, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x03, 0x8A, 0x03, 0x00,
+    0x00, 0x28, 0x00, 0x00, 0x01, 0xBF, 0xB8, 0x80, 0x23, 0x3C, 0xC4, 0x00,
+    0x8E, 0xD9, 0x1C, 0x02, 0x3B, 0xE4, 0x70, 0x00, 0xCD, 0x7B, 0xC0, 0x74,
+    0x63, 0x17, 0x00, 0x0E, 0x53, 0x80, 0x0F, 0xC6, 0xB1, 0xF8, 0x04, 0x66,
+    0x4A, 0x4C, 0x64, 0xA4, 0xCC, 0x41, 0x8E, 0x56, 0x30, 0x0F, 0x4A, 0x52,
+    0xF4, 0xA4, 0xCF, 0x32, 0x40, 0x04, 0x39, 0xEE, 0x40, 0x02, 0x77, 0x9C,
+    0x22, 0x38, 0x84, 0x71, 0x14, 0x05, 0x29, 0x40, 0x76, 0x94, 0xA5, 0x01,
+    0x92, 0x41, 0x30, 0x00, 0x01, 0x9A, 0x60, 0x08, 0xE7, 0x7C, 0x9F, 0x23,
+    0x88, 0x42, 0x00, 0x84, 0x23, 0x88, 0x00, 0x13, 0xC4, 0x00, 0x00, 0x8F,
+    0x20, 0x00, 0x00, 0x31, 0xE0, 0x00, 0x0A, 0xFA, 0x80, 0x00, 0x08, 0xCE,
+    0xF0, 0x01, 0xEE, 0x62, 0x00, 0x00, 0x00, 0x00, 0x01, 0x08, 0x40, 0x10,
+    0x05, 0x28, 0x00, 0x00, 0x15, 0xF5, 0x7D, 0x40, 0x75, 0x18, 0xAE, 0x20,
+    0x12, 0x22, 0x24, 0x06, 0x49, 0x12, 0x62, 0x00, 0x00, 0x00, 0x00, 0x22,
+    0x10, 0x82, 0x01, 0x04, 0x21, 0x10, 0x00, 0x51, 0x14, 0x00, 0x00, 0x8E,
+    0x20, 0x00, 0x00, 0x00, 0x04, 0x40, 0x00, 0xE0, 0x00, 0x00, 0x00, 0x00,
+    0x80, 0x00, 0x22, 0x22, 0x00, 0x64, 0xA5, 0x26, 0x00, 0x8C, 0x21, 0x1C,
+    0x0E, 0x09, 0x90, 0xF0, 0x19, 0x22, 0x49, 0x80, 0x32, 0xA5, 0xE1, 0x03,
+    0xD0, 0xE0, 0xB8, 0x07, 0x43, 0x92, 0x70, 0x3C, 0x22, 0x21, 0x00, 0x64,
+    0x99, 0x26, 0x01, 0x92, 0x70, 0xB8, 0x00, 0x20, 0x08, 0x00, 0x00, 0x80,
+    0x21, 0x00, 0x22, 0x20, 0x82, 0x00, 0x1E, 0x07, 0x80, 0x08, 0x20, 0x88,
+    0x80, 0x38, 0x26, 0x01, 0x00, 0x57, 0x95, 0xEE, 0x01, 0x92, 0x97, 0xA4,
+    0x0E, 0x4B, 0x92, 0xE0, 0x1D, 0x08, 0x41, 0xC0, 0xC5, 0x25, 0x2E, 0x03,
+    0xD0, 0xE4, 0x3C, 0x0F, 0x43, 0x90, 0x80, 0x1D, 0x0B, 0x49, 0xC0, 0x94,
+    0xBD, 0x29, 0x03, 0x88, 0x42, 0x38, 0x01, 0x0A, 0x52, 0x60, 0x25, 0x4C,
+    0x52, 0x40, 0x84, 0x21, 0x0F, 0x02, 0x5E, 0x94, 0xA4, 0x09, 0x6A, 0xD2,
+    0x90, 0x19, 0x29, 0x49, 0x80, 0xE4, 0xA5, 0xC8, 0x01, 0x92, 0x95, 0x9C,
+    0x0E, 0x4B, 0x92, 0x90, 0x1D, 0x06, 0x0B, 0x80, 0xF2, 0x10, 0x84, 0x02,
+    0x52, 0x94, 0x98, 0x09, 0x4A, 0x54, 0x40, 0x25, 0x29, 0x7A, 0x40, 0x94,
+    0x99, 0x29, 0x02, 0x52, 0x70, 0xB8, 0x0F, 0x09, 0x90, 0xF0, 0x18, 0x84,
+    0x21, 0x80, 0x04, 0x10, 0x41, 0x01, 0x84, 0x21, 0x18, 0x06, 0x48, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x1E, 0x82, 0x00, 0x00, 0x00, 0x0E, 0x94, 0x9C,
+    0x08, 0x72, 0x52, 0xE0, 0x00, 0xE8, 0x41, 0xC0, 0x13, 0xA5, 0x27, 0x00,
+    0x0C, 0x95, 0x1C, 0x06, 0x43, 0x90, 0x80, 0x00, 0xC9, 0x38, 0x5C, 0x84,
+    0x39, 0x29, 0x01, 0x00, 0x42, 0x38, 0x02, 0x00, 0x84, 0x26, 0x21, 0x09,
+    0x72, 0x40, 0xC2, 0x10, 0x8E, 0x00, 0x12, 0xF4, 0xA4, 0x00, 0x72, 0x52,
+    0x90, 0x00, 0xC9, 0x49, 0x80, 0x07, 0x25, 0x2E, 0x40, 0x0E, 0x94, 0x9C,
+    0x20, 0x72, 0x50, 0x80, 0x00, 0xEC, 0x1B, 0x80, 0x47, 0x10, 0x84, 0x00,
+    0x12, 0x94, 0x9C, 0x00, 0x4A, 0x4A, 0x20, 0x01, 0x29, 0x7A, 0x40, 0x04,
+    0x99, 0x29, 0x00, 0x12, 0x93, 0x85, 0xC0, 0x78, 0x88, 0xF0, 0x08, 0x8C,
+    0x20, 0x80, 0x42, 0x00, 0x84, 0x02, 0x08, 0x62, 0x20, 0x00, 0x22, 0xA2,
+    0x00, 0x00, 0x45, 0x4B, 0xC0, 0xAB, 0xB6, 0xEA, 0x82, 0x40, 0x94, 0x9C,
+    0x02, 0x23, 0xD4, 0xF0, 0x38, 0x07, 0x49, 0xC0, 0xA0, 0x1D, 0x27, 0x02,
+    0x08, 0x74, 0x9C, 0x06, 0x01, 0xD2, 0x70, 0x00, 0xE8, 0x41, 0xC8, 0xE0,
+    0x3D, 0x4F, 0x02, 0x80, 0xF5, 0x3C, 0x08, 0x23, 0xD4, 0xF0, 0x28, 0x04,
+    0x23, 0x80, 0xE0, 0x10, 0x8E, 0x02, 0x08, 0x42, 0x38, 0x09, 0x32, 0x5E,
+    0x90, 0x18, 0xC9, 0x7A, 0x40, 0x22, 0x3D, 0x4F, 0x03, 0xC4, 0x75, 0x1C,
+    0x0F, 0x4B, 0xDE, 0xF0, 0x3C, 0x06, 0x49, 0x80, 0x90, 0x19, 0x26, 0x02,
+    0x08, 0x64, 0x98, 0x0F, 0x02, 0x52, 0x70, 0x20, 0xC9, 0x49, 0xC0, 0x90,
+    0x24, 0xE1, 0x72, 0x40, 0x64, 0x98, 0x09, 0x02, 0x52, 0x70, 0x08, 0xE8,
+    0x38, 0x80, 0x75, 0x18, 0xAE, 0x32, 0x94, 0x47, 0x11, 0xCC, 0x53, 0x16,
+    0xA0, 0x0C, 0x47, 0x11, 0x80, 0x22, 0x1D, 0x27, 0x00, 0x88, 0xC2, 0x38,
+    0x01, 0x11, 0x92, 0x60, 0x04, 0x49, 0x49, 0x80, 0xF0, 0x39, 0x29, 0x03,
+    0xC0, 0xD5, 0xA4, 0x06, 0x49, 0xC0, 0xF0, 0x19, 0xAB, 0x42, 0x00, 0x20,
+    0x19, 0x07, 0x00, 0x00, 0xF4, 0x00, 0x00, 0x03, 0xC2, 0x00, 0x25, 0x44,
+    0x78, 0x8E, 0x95, 0x11, 0xA7, 0x09, 0x00, 0x42, 0x10, 0x00, 0x2A, 0x94,
+    0x50, 0x01, 0x45, 0x2A, 0x80, 0x22, 0x22, 0x22, 0x23, 0xFF, 0xFF, 0xFF,
+    0xFD, 0xDD, 0xDD, 0xDD, 0xC8, 0x42, 0x10, 0x84, 0x21, 0x09, 0xC2, 0x10,
+    0x84, 0xE1, 0x38, 0x45, 0x29, 0x4A, 0x52, 0x80, 0x00, 0x79, 0x4A, 0x00,
+    0x38, 0x4E, 0x11, 0x4A, 0xD0, 0xB4, 0xA5, 0x29, 0x4A, 0x52, 0x80, 0x0F,
+    0x0B, 0x4A, 0x52, 0xB4, 0x2F, 0x01, 0x4A, 0x57, 0x80, 0x02, 0x13, 0x84,
+    0xE0, 0x00, 0x00, 0x70, 0x84, 0x21, 0x08, 0x70, 0x00, 0x84, 0x27, 0xC0,
+    0x00, 0x00, 0x1F, 0x21, 0x08, 0x42, 0x1C, 0x84, 0x00, 0x01, 0xF0, 0x00,
+    0x84, 0x27, 0xC8, 0x42, 0x10, 0xE4, 0x39, 0x14, 0xA5, 0x2D, 0x4A, 0x52,
+    0x96, 0x87, 0x80, 0x00, 0x7A, 0x16, 0xA5, 0x2B, 0x60, 0xF8, 0x00, 0x0F,
+    0x83, 0x6A, 0x52, 0x96, 0x85, 0xA8, 0x00, 0xF8, 0x3E, 0x05, 0x2B, 0x60,
+    0xDA, 0x88, 0x4F, 0x83, 0xE0, 0x52, 0x94, 0xF0, 0x00, 0x00, 0xF8, 0x3E,
+    0x40, 0x00, 0x0F, 0x52, 0x94, 0xA5, 0x3C, 0x00, 0x21, 0x0E, 0x43, 0x80,
+    0x00, 0x39, 0x0E, 0x40, 0x00, 0x0F, 0x52, 0x94, 0xA5, 0x2D, 0x4A, 0x21,
+    0x3E, 0x0F, 0x90, 0x84, 0x27, 0x00, 0x00, 0x00, 0x07, 0x21, 0x3F, 0xFF,
+    0xFF, 0xFF, 0x00, 0x01, 0xFF, 0xFF, 0x18, 0xC6, 0x31, 0x83, 0x9C, 0xE7,
+    0x39, 0xFF, 0xFF, 0x80, 0x00, 0x02, 0xA9, 0x45, 0x01, 0x92, 0xA4, 0xA8,
+    0x06, 0x4A, 0x10, 0x80, 0x01, 0xE9, 0x7A, 0x40, 0x43, 0xB8, 0x40, 0x00,
+    0x1E, 0x62, 0x3C, 0x00, 0x52, 0x9A, 0x84, 0x01, 0x26, 0x20, 0xC0, 0xF3,
+    0x24, 0xCF, 0x00, 0x00, 0x17, 0xA4, 0x06, 0x33, 0xCC, 0x90, 0x1D, 0x06,
+    0x49, 0x88, 0x02, 0xAA, 0xA0, 0x00, 0x8C, 0x93, 0x10, 0x07, 0x43, 0xD0,
+    0x70, 0x19, 0x29, 0x4A, 0x40, 0xF0, 0x3C, 0x0F, 0x01, 0x1C, 0x40, 0x38,
+    0x00, 0x10, 0xC8, 0xE0, 0x00, 0x8C, 0x11, 0xC0, 0x01, 0x10, 0x84, 0x21,
+    0x08, 0x42, 0x20, 0x0F, 0xCC, 0x21, 0x9F, 0xD1, 0x51, 0x22, 0xA2, 0x01,
+    0x14, 0x40, 0x00, 0x04, 0x71, 0x00, 0x00, 0x01, 0x00, 0x00, 0x0C, 0xE1,
+    0x91, 0x00, 0x62, 0x94, 0x00, 0x00, 0x86, 0x66, 0x10, 0x00, 0x63, 0x9C,
+    0xE0, 0x00, 0x00, 0x00, 0x00};
+
 
 REICH_API void* reich_memset(void* dest, int32 c, reichSize count) {
   char* bytes = (char*)dest;
@@ -416,7 +487,7 @@ typedef struct reichSearchState {
   WIN32_FIND_DATAA findData;
 } reichSearchState;
 
-REICH_API reichHandle reich_file_open(const char* filename, int32 mode) {
+REICH_API reichHandle reich_sys_file_open(const char* filename, int32 mode) {
   HANDLE file;
   DWORD access = 0;
   DWORD share = 0;
@@ -433,46 +504,46 @@ REICH_API reichHandle reich_file_open(const char* filename, int32 mode) {
   file = CreateFileA(
       filename, access, share, NULL, creation, FILE_ATTRIBUTE_NORMAL, NULL);
   if (file == INVALID_HANDLE_VALUE) {
-    reich_log(REICH_LOG_ERROR, "Failed to open file: %s", filename);
+    reich_sys_log(REICH_LOG_ERROR, "Failed to open file: %s", filename);
     return NULL;
   }
   return (reichHandle)file;
 }
 
-REICH_API void reich_file_close(reichHandle file) {
+REICH_API void reich_sys_file_close(reichHandle file) {
   if (file) { CloseHandle((HANDLE)file); }
 }
 
 REICH_API reichSize
-reich_file_read(reichHandle file, void* buffer, reichSize bytes) {
+reich_sys_file_read(reichHandle file, void* buffer, reichSize bytes) {
   DWORD read = 0;
   if (!file || !buffer) { return 0; }
   if (!ReadFile((HANDLE)file, buffer, (DWORD)bytes, &read, NULL)) {
-    reich_log(REICH_LOG_ERROR, "Failed to read from file.");
+    reich_sys_log(REICH_LOG_ERROR, "Failed to read from file.");
     return 0;
   }
   return (reichSize)read;
 }
 
 REICH_API reichSize
-reich_file_write(reichHandle file, const void* buffer, reichSize bytes) {
+reich_sys_file_write(reichHandle file, const void* buffer, reichSize bytes) {
   DWORD written = 0;
   if (!file || !buffer) { return 0; }
   if (!WriteFile((HANDLE)file, buffer, (DWORD)bytes, &written, NULL)) {
-    reich_log(REICH_LOG_ERROR, "Failed to write to file.");
+    reich_sys_log(REICH_LOG_ERROR, "Failed to write to file.");
     return 0;
   }
   return (reichSize)written;
 }
 
-REICH_API reichSize reich_file_size(reichHandle file) {
+REICH_API reichSize reich_sys_file_size(reichHandle file) {
   LARGE_INTEGER size;
   if (!file) { return 0; }
   if (!GetFileSizeEx((HANDLE)file, &size)) { return 0; }
   return (reichSize)size.QuadPart;
 }
 
-REICH_API int32 reich_file_seek(reichHandle file, int32 offset, int32 origin) {
+REICH_API int32 reich_sys_file_seek(reichHandle file, int32 offset, int32 origin) {
   DWORD method = FILE_BEGIN;
   if (!file) { return 0; }
   if (origin == REICH_SEEK_CUR) {
@@ -483,16 +554,16 @@ REICH_API int32 reich_file_seek(reichHandle file, int32 offset, int32 origin) {
   return (int32)SetFilePointer((HANDLE)file, offset, NULL, method);
 }
 
-REICH_API int32 reich_file_tell(reichHandle file) {
-  return reich_file_seek(file, 0, REICH_SEEK_CUR);
+REICH_API int32 reich_sys_file_tell(reichHandle file) {
+  return reich_sys_file_seek(file, 0, REICH_SEEK_CUR);
 }
 
-REICH_API reichHandle
-reich_find_first(const char* pattern, char* filenameBuffer, int32 bufferSize) {
+REICH_API reichHandle reich_sys_find_first(
+		const char* pattern, char* filenameBuffer, int32 bufferSize) {
   reichSearchState* state =
       (reichSearchState*)reich_sys_alloc(sizeof(reichSearchState));
   if (!state) {
-    reich_log(REICH_LOG_ERROR, "Failed to allocate memory for search state.");
+    reich_sys_log(REICH_LOG_ERROR, "Failed to allocate memory for search state.");
     return NULL;
   }
   state->findHandle = FindFirstFileA(pattern, &state->findData);
@@ -506,8 +577,8 @@ reich_find_first(const char* pattern, char* filenameBuffer, int32 bufferSize) {
   return (reichHandle)state;
 }
 
-REICH_API int32
-reich_find_next(reichHandle handle, char* filenameBuffer, int32 bufferSize) {
+REICH_API int32 reich_sys_find_next(
+		reichHandle handle, char* filenameBuffer, int32 bufferSize) {
   reichSearchState* state = (reichSearchState*)handle;
   if (!state) { return 0; }
   if (!FindNextFileA(state->findHandle, &state->findData)) { return 0; }
@@ -517,7 +588,7 @@ reich_find_next(reichHandle handle, char* filenameBuffer, int32 bufferSize) {
   return 1;
 }
 
-REICH_API void reich_find_close(reichHandle handle) {
+REICH_API void reich_sys_find_close(reichHandle handle) {
   reichSearchState* state = (reichSearchState*)handle;
   if (state) {
     FindClose(state->findHandle);
@@ -525,7 +596,7 @@ REICH_API void reich_find_close(reichHandle handle) {
   }
 }
 
-REICH_API void reich_log(int32 level, const char* format, ...) {
+REICH_API void reich_sys_log(int32 level, const char* format, ...) {
   char buffer[2048];
   char prefix[16];
   va_list args;
@@ -556,7 +627,7 @@ REICH_API void reich_log(int32 level, const char* format, ...) {
   }
 }
 
-LRESULT CALLBACK reich_win32_proc(HWND h, UINT m, WPARAM w, LPARAM l) {
+LRESULT CALLBACK reich_sys_window_callback(HWND h, UINT m, WPARAM w, LPARAM l) {
   reichContext* ctx = (reichContext*)NULL;
   reichPlatformContext* pctx = (reichPlatformContext*)NULL;
   if (m == WM_NCCREATE) {
@@ -570,12 +641,12 @@ LRESULT CALLBACK reich_win32_proc(HWND h, UINT m, WPARAM w, LPARAM l) {
   if (!ctx || !pctx) { return DefWindowProcA(h, m, w, l); }
   switch (m) {
   case WM_DESTROY:
-    reich_log(REICH_LOG_INFO, "Window destroyed.");
+    reich_sys_log(REICH_LOG_INFO, "Window destroyed.");
     ctx->running = 0;
     PostQuitMessage(0);
     return 0;
   case WM_CLOSE:
-    reich_log(REICH_LOG_INFO, "Window closed.");
+    reich_sys_log(REICH_LOG_INFO, "Window closed.");
     ctx->running = 0;
     return 0;
   case WM_ERASEBKGND:
@@ -668,9 +739,6 @@ LRESULT CALLBACK reich_win32_proc(HWND h, UINT m, WPARAM w, LPARAM l) {
     ctx->windowHeight = height;
     ctx->isMaximized = (w == SIZE_MAXIMIZED);
     reich_sys_resize_canvas(ctx, width, height);
-    if (ctx->userResize) {
-      ctx->userResize(ctx, ctx->screen.width, ctx->screen.height);
-    }
     if (ctx->userRender) { ctx->userRender(ctx, 1.0); }
     reich_draw_decorations(ctx);
     reich_sys_present(ctx);
@@ -772,12 +840,12 @@ REICH_API int32 reich_sys_window_init(
   SetProcessDPIAware();
   AttachConsole((DWORD)-1);
   if (!plat) {
-    reich_log(REICH_LOG_ERROR, "Platform context is NULL.");
+    reich_sys_log(REICH_LOG_ERROR, "Platform context is NULL.");
     return 0;
   }
   reich_memset(&wc, 0, sizeof(WNDCLASSA));
   wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-  wc.lpfnWndProc = reich_win32_proc;
+  wc.lpfnWndProc = reich_sys_window_callback;
   wc.hInstance = GetModuleHandle(NULL);
   wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -803,7 +871,7 @@ REICH_API int32 reich_sys_window_init(
       wc.hInstance,
       (LPVOID)ctx);
   if (!plat->windowHandle) {
-    reich_log(REICH_LOG_ERROR, "Failed to create window.");
+    reich_sys_log(REICH_LOG_ERROR, "Failed to create window.");
     return 0;
   }
   SetWindowPos(
@@ -822,9 +890,9 @@ REICH_API int32 reich_sys_window_init(
   plat->bitmapInfo.bmiHeader.biBitCount = 32;
   plat->bitmapInfo.bmiHeader.biCompression = BI_RGB;
   reich_sys_resize_canvas(ctx, width, height);
-  reich_clear(ctx, 0xFF000000);
+  reich_draw_clear(ctx, 0xFF000000);
   reich_sys_present(ctx);
-  reich_log(
+  reich_sys_log(
       REICH_LOG_INFO,
       "Window initialized successfully: %s (%dx%d)",
       title,
@@ -847,7 +915,7 @@ REICH_API void reich_sys_resize_canvas(
     ctx->screen.pixels =
         (uint32*)reich_sys_alloc((reichSize)cw * ch * sizeof(uint32));
     if (!ctx->screen.pixels) {
-      reich_log(
+      reich_sys_log(
           REICH_LOG_ERROR, "Failed to allocate canvas memory: %dx%d", cw, ch);
     }
     pctx->bitmapInfo.bmiHeader.biWidth = cw;
@@ -905,13 +973,19 @@ REICH_API void reich_sys_free(void* ptr) {
   if (ptr) { VirtualFree(ptr, 0, MEM_RELEASE); }
 }
 
-REICH_API void reich_sys_show_cursor(int32 show) {
-  ShowCursor(show);
+REICH_API void reich_sys_show_cursor(void) {
+  ShowCursor(TRUE);
+}
+
+REICH_API void reich_sys_hide_cursor(void) {
+  ShowCursor(FALSE);
 }
 
 #else
 #error "Platform not supported"
 #endif
+
+/* MEMORY ********************************************************************/
 
 REICH_API void reich_arena_init(reichArena* a, void* mem, reichSize size) {
   a->base = (uint8*)mem;
@@ -923,7 +997,7 @@ REICH_API void* reich_arena_alloc(reichArena* a, reichSize size) {
   void* ptr;
   reichSize aligned = (size + 7) & ~7;
   if (a->used + aligned > a->size) {
-    reich_log(
+    reich_sys_log(
         REICH_LOG_ERROR,
         "Arena overflow. Capacity: %lu, Requested: %lu",
         a->size,
@@ -939,7 +1013,32 @@ REICH_API void reich_arena_reset(reichArena* a) {
   a->used = 0;
 }
 
-REICH_API void reich_engine_process_input(reichContext* ctx) {
+/* TIMING ********************************************************************/
+
+REICH_API void reich_timer_tick(reichContext* ctx) {
+  int64 currentCounter = reich_sys_get_ticks();
+  real64 frameTime =
+      (real64)(currentCounter - ctx->lastCounter) / (real64)ctx->perfFreq;
+  ctx->lastCounter = currentCounter;
+  if (frameTime > 0.25) { frameTime = 0.25; }
+  ctx->accumulator += frameTime;
+}
+
+REICH_API int32 reich_timer_step(reichContext* ctx) {
+  if (ctx->accumulator >= ctx->fixedDt) {
+    ctx->accumulator -= ctx->fixedDt;
+    return 1;
+  }
+  return 0;
+}
+
+REICH_API real64 reich_timer_alpha(reichContext* ctx) {
+  return ctx->accumulator / ctx->fixedDt;
+}
+
+/* INPUT *********************************************************************/
+
+REICH_API void reich_input_update(reichContext* ctx) {
   int i;
   ctx->input.hotId = 0;
   ctx->input.mouseWheel = 0;
@@ -970,311 +1069,11 @@ REICH_API void reich_engine_process_input(reichContext* ctx) {
   }
   ctx->input.deltaX = ctx->input.mouseX - ctx->input.lastMouseX;
   ctx->input.deltaY = ctx->input.mouseY - ctx->input.lastMouseY;
-}
-
-REICH_API void reich_draw_decorations(reichContext* ctx) {
-  int32 w = ctx->screen.width;
-  int32 btnW = REICH_TITLE_BUTTON_WIDTH;
-  int32 h = REICH_TITLE_BAR_HEIGHT;
-  int32 mx = ctx->input.scaledMouseX;
-  int32 my = ctx->input.scaledMouseY;
-  int32 closeX = w - btnW;
-  int32 maxX = closeX - btnW;
-  int32 minX = maxX - btnW;
-  uint32 cClose = 0xFF333333;
-  uint32 cMax = 0xFF333333;
-  uint32 cMin = 0xFF333333;
-  int32 i;
-  reich_draw_rect(ctx, 0, 0, w, h, 0xFF222222);
-  reich_draw_rect(ctx, 0, h - 1, w, 1, 0xFF444444);
-  if (ctx->windowTitle) {
-    reich_draw_text(ctx, 10, 8, ctx->windowTitle, 0xFFAAAAAA);
-  }
-  if (!ctx->isMaximized) {
-    reich_draw_frame(ctx, 0, 0, w, ctx->screen.height, 0xFF444444);
-  }
-  if (my < h) {
-    if (mx >= closeX) {
-      cClose = 0xFFE81123;
-    } else if (mx >= maxX) {
-      cMax = 0xFF555555;
-    } else if (mx >= minX) {
-      cMin = 0xFF555555;
-    }
-  }
-  reich_draw_rect(ctx, closeX, 0, btnW, h, cClose);
-  for (i = 0; i < 10; ++i) {
-    reich_put_pixel(ctx, closeX + 17 + i, 11 + i, 0xFFFFFFFF);
-    reich_put_pixel(ctx, closeX + 17 + 9 - i, 11 + i, 0xFFFFFFFF);
-  }
-  reich_draw_rect(ctx, maxX, 0, btnW, h, cMax);
-  if (ctx->isMaximized) {
-    reich_draw_frame(ctx, maxX + 17, 13, 8, 8, 0xFFFFFFFF);
-    reich_draw_frame(ctx, maxX + 19, 11, 8, 8, 0xFFFFFFFF);
-  } else {
-    reich_draw_frame(ctx, maxX + 17, 11, 10, 10, 0xFFFFFFFF);
-  }
-  reich_draw_rect(ctx, minX, 0, btnW, h, cMin);
-  reich_draw_rect(ctx, minX + 17, 20, 10, 1, 0xFFFFFFFF);
-}
-
-REICH_API void reich_update_window_controls(reichContext* ctx) {
-  int32 mx;
-  int32 my;
-  int32 btnW;
-  int32 h;
-  int32 w;
-  if (!ctx->input.buttons[0] || ctx->input.lastButtons[0]) { return; }
-  mx = ctx->input.scaledMouseX;
-  my = ctx->input.scaledMouseY;
-  btnW = REICH_TITLE_BUTTON_WIDTH;
-  h = REICH_TITLE_BAR_HEIGHT;
-  w = ctx->screen.width;
-  if (my < h && mx >= w - (btnW * 3)) {
-    if (mx >= w - btnW) {
-      reich_sys_close(ctx);
-    } else if (mx >= w - (btnW * 2)) {
-      reich_sys_toggle_maximize(ctx);
-    } else {
-      reich_sys_minimize(ctx);
-    }
+  if (reich_key_pressed(ctx, 0x74)) {
+    ctx->activeFont = (ctx->activeFont + 1) % REICH_MAX_FONTS;
   }
 }
 
-static const uint8 REICH_FONT_DATA[] = {
-    0x05, 0x06, 0x01, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x03, 0x8A, 0x03, 0x00,
-    0x00, 0x28, 0x00, 0x00, 0x01, 0xBF, 0xB8, 0x80, 0x23, 0x3C, 0xC4, 0x00,
-    0x8E, 0xD9, 0x1C, 0x02, 0x3B, 0xE4, 0x70, 0x00, 0xCD, 0x7B, 0xC0, 0x74,
-    0x63, 0x17, 0x00, 0x0E, 0x53, 0x80, 0x0F, 0xC6, 0xB1, 0xF8, 0x04, 0x66,
-    0x4A, 0x4C, 0x64, 0xA4, 0xCC, 0x41, 0x8E, 0x56, 0x30, 0x0F, 0x4A, 0x52,
-    0xF4, 0xA4, 0xCF, 0x32, 0x40, 0x04, 0x39, 0xEE, 0x40, 0x02, 0x77, 0x9C,
-    0x22, 0x38, 0x84, 0x71, 0x14, 0x05, 0x29, 0x40, 0x76, 0x94, 0xA5, 0x01,
-    0x92, 0x41, 0x30, 0x00, 0x01, 0x9A, 0x60, 0x08, 0xE7, 0x7C, 0x9F, 0x23,
-    0x88, 0x42, 0x00, 0x84, 0x23, 0x88, 0x00, 0x13, 0xC4, 0x00, 0x00, 0x8F,
-    0x20, 0x00, 0x00, 0x31, 0xE0, 0x00, 0x0A, 0xFA, 0x80, 0x00, 0x08, 0xCE,
-    0xF0, 0x01, 0xEE, 0x62, 0x00, 0x00, 0x00, 0x00, 0x01, 0x08, 0x40, 0x10,
-    0x05, 0x28, 0x00, 0x00, 0x15, 0xF5, 0x7D, 0x40, 0x75, 0x18, 0xAE, 0x20,
-    0x12, 0x22, 0x24, 0x06, 0x49, 0x12, 0x62, 0x00, 0x00, 0x00, 0x00, 0x22,
-    0x10, 0x82, 0x01, 0x04, 0x21, 0x10, 0x00, 0x51, 0x14, 0x00, 0x00, 0x8E,
-    0x20, 0x00, 0x00, 0x00, 0x04, 0x40, 0x00, 0xE0, 0x00, 0x00, 0x00, 0x00,
-    0x80, 0x00, 0x22, 0x22, 0x00, 0x64, 0xA5, 0x26, 0x00, 0x8C, 0x21, 0x1C,
-    0x0E, 0x09, 0x90, 0xF0, 0x19, 0x22, 0x49, 0x80, 0x32, 0xA5, 0xE1, 0x03,
-    0xD0, 0xE0, 0xB8, 0x07, 0x43, 0x92, 0x70, 0x3C, 0x22, 0x21, 0x00, 0x64,
-    0x99, 0x26, 0x01, 0x92, 0x70, 0xB8, 0x00, 0x20, 0x08, 0x00, 0x00, 0x80,
-    0x21, 0x00, 0x22, 0x20, 0x82, 0x00, 0x1E, 0x07, 0x80, 0x08, 0x20, 0x88,
-    0x80, 0x38, 0x26, 0x01, 0x00, 0x57, 0x95, 0xEE, 0x01, 0x92, 0x97, 0xA4,
-    0x0E, 0x4B, 0x92, 0xE0, 0x1D, 0x08, 0x41, 0xC0, 0xC5, 0x25, 0x2E, 0x03,
-    0xD0, 0xE4, 0x3C, 0x0F, 0x43, 0x90, 0x80, 0x1D, 0x0B, 0x49, 0xC0, 0x94,
-    0xBD, 0x29, 0x03, 0x88, 0x42, 0x38, 0x01, 0x0A, 0x52, 0x60, 0x25, 0x4C,
-    0x52, 0x40, 0x84, 0x21, 0x0F, 0x02, 0x5E, 0x94, 0xA4, 0x09, 0x6A, 0xD2,
-    0x90, 0x19, 0x29, 0x49, 0x80, 0xE4, 0xA5, 0xC8, 0x01, 0x92, 0x95, 0x9C,
-    0x0E, 0x4B, 0x92, 0x90, 0x1D, 0x06, 0x0B, 0x80, 0xF2, 0x10, 0x84, 0x02,
-    0x52, 0x94, 0x98, 0x09, 0x4A, 0x54, 0x40, 0x25, 0x29, 0x7A, 0x40, 0x94,
-    0x99, 0x29, 0x02, 0x52, 0x70, 0xB8, 0x0F, 0x09, 0x90, 0xF0, 0x18, 0x84,
-    0x21, 0x80, 0x04, 0x10, 0x41, 0x01, 0x84, 0x21, 0x18, 0x06, 0x48, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x1E, 0x82, 0x00, 0x00, 0x00, 0x0E, 0x94, 0x9C,
-    0x08, 0x72, 0x52, 0xE0, 0x00, 0xE8, 0x41, 0xC0, 0x13, 0xA5, 0x27, 0x00,
-    0x0C, 0x95, 0x1C, 0x06, 0x43, 0x90, 0x80, 0x00, 0xC9, 0x38, 0x5C, 0x84,
-    0x39, 0x29, 0x01, 0x00, 0x42, 0x38, 0x02, 0x00, 0x84, 0x26, 0x21, 0x09,
-    0x72, 0x40, 0xC2, 0x10, 0x8E, 0x00, 0x12, 0xF4, 0xA4, 0x00, 0x72, 0x52,
-    0x90, 0x00, 0xC9, 0x49, 0x80, 0x07, 0x25, 0x2E, 0x40, 0x0E, 0x94, 0x9C,
-    0x20, 0x72, 0x50, 0x80, 0x00, 0xEC, 0x1B, 0x80, 0x47, 0x10, 0x84, 0x00,
-    0x12, 0x94, 0x9C, 0x00, 0x4A, 0x4A, 0x20, 0x01, 0x29, 0x7A, 0x40, 0x04,
-    0x99, 0x29, 0x00, 0x12, 0x93, 0x85, 0xC0, 0x78, 0x88, 0xF0, 0x08, 0x8C,
-    0x20, 0x80, 0x42, 0x00, 0x84, 0x02, 0x08, 0x62, 0x20, 0x00, 0x22, 0xA2,
-    0x00, 0x00, 0x45, 0x4B, 0xC0, 0xAB, 0xB6, 0xEA, 0x82, 0x40, 0x94, 0x9C,
-    0x02, 0x23, 0xD4, 0xF0, 0x38, 0x07, 0x49, 0xC0, 0xA0, 0x1D, 0x27, 0x02,
-    0x08, 0x74, 0x9C, 0x06, 0x01, 0xD2, 0x70, 0x00, 0xE8, 0x41, 0xC8, 0xE0,
-    0x3D, 0x4F, 0x02, 0x80, 0xF5, 0x3C, 0x08, 0x23, 0xD4, 0xF0, 0x28, 0x04,
-    0x23, 0x80, 0xE0, 0x10, 0x8E, 0x02, 0x08, 0x42, 0x38, 0x09, 0x32, 0x5E,
-    0x90, 0x18, 0xC9, 0x7A, 0x40, 0x22, 0x3D, 0x4F, 0x03, 0xC4, 0x75, 0x1C,
-    0x0F, 0x4B, 0xDE, 0xF0, 0x3C, 0x06, 0x49, 0x80, 0x90, 0x19, 0x26, 0x02,
-    0x08, 0x64, 0x98, 0x0F, 0x02, 0x52, 0x70, 0x20, 0xC9, 0x49, 0xC0, 0x90,
-    0x24, 0xE1, 0x72, 0x40, 0x64, 0x98, 0x09, 0x02, 0x52, 0x70, 0x08, 0xE8,
-    0x38, 0x80, 0x75, 0x18, 0xAE, 0x32, 0x94, 0x47, 0x11, 0xCC, 0x53, 0x16,
-    0xA0, 0x0C, 0x47, 0x11, 0x80, 0x22, 0x1D, 0x27, 0x00, 0x88, 0xC2, 0x38,
-    0x01, 0x11, 0x92, 0x60, 0x04, 0x49, 0x49, 0x80, 0xF0, 0x39, 0x29, 0x03,
-    0xC0, 0xD5, 0xA4, 0x06, 0x49, 0xC0, 0xF0, 0x19, 0xAB, 0x42, 0x00, 0x20,
-    0x19, 0x07, 0x00, 0x00, 0xF4, 0x00, 0x00, 0x03, 0xC2, 0x00, 0x25, 0x44,
-    0x78, 0x8E, 0x95, 0x11, 0xA7, 0x09, 0x00, 0x42, 0x10, 0x00, 0x2A, 0x94,
-    0x50, 0x01, 0x45, 0x2A, 0x80, 0x22, 0x22, 0x22, 0x23, 0xFF, 0xFF, 0xFF,
-    0xFD, 0xDD, 0xDD, 0xDD, 0xC8, 0x42, 0x10, 0x84, 0x21, 0x09, 0xC2, 0x10,
-    0x84, 0xE1, 0x38, 0x45, 0x29, 0x4A, 0x52, 0x80, 0x00, 0x79, 0x4A, 0x00,
-    0x38, 0x4E, 0x11, 0x4A, 0xD0, 0xB4, 0xA5, 0x29, 0x4A, 0x52, 0x80, 0x0F,
-    0x0B, 0x4A, 0x52, 0xB4, 0x2F, 0x01, 0x4A, 0x57, 0x80, 0x02, 0x13, 0x84,
-    0xE0, 0x00, 0x00, 0x70, 0x84, 0x21, 0x08, 0x70, 0x00, 0x84, 0x27, 0xC0,
-    0x00, 0x00, 0x1F, 0x21, 0x08, 0x42, 0x1C, 0x84, 0x00, 0x01, 0xF0, 0x00,
-    0x84, 0x27, 0xC8, 0x42, 0x10, 0xE4, 0x39, 0x14, 0xA5, 0x2D, 0x4A, 0x52,
-    0x96, 0x87, 0x80, 0x00, 0x7A, 0x16, 0xA5, 0x2B, 0x60, 0xF8, 0x00, 0x0F,
-    0x83, 0x6A, 0x52, 0x96, 0x85, 0xA8, 0x00, 0xF8, 0x3E, 0x05, 0x2B, 0x60,
-    0xDA, 0x88, 0x4F, 0x83, 0xE0, 0x52, 0x94, 0xF0, 0x00, 0x00, 0xF8, 0x3E,
-    0x40, 0x00, 0x0F, 0x52, 0x94, 0xA5, 0x3C, 0x00, 0x21, 0x0E, 0x43, 0x80,
-    0x00, 0x39, 0x0E, 0x40, 0x00, 0x0F, 0x52, 0x94, 0xA5, 0x2D, 0x4A, 0x21,
-    0x3E, 0x0F, 0x90, 0x84, 0x27, 0x00, 0x00, 0x00, 0x07, 0x21, 0x3F, 0xFF,
-    0xFF, 0xFF, 0x00, 0x01, 0xFF, 0xFF, 0x18, 0xC6, 0x31, 0x83, 0x9C, 0xE7,
-    0x39, 0xFF, 0xFF, 0x80, 0x00, 0x02, 0xA9, 0x45, 0x01, 0x92, 0xA4, 0xA8,
-    0x06, 0x4A, 0x10, 0x80, 0x01, 0xE9, 0x7A, 0x40, 0x43, 0xB8, 0x40, 0x00,
-    0x1E, 0x62, 0x3C, 0x00, 0x52, 0x9A, 0x84, 0x01, 0x26, 0x20, 0xC0, 0xF3,
-    0x24, 0xCF, 0x00, 0x00, 0x17, 0xA4, 0x06, 0x33, 0xCC, 0x90, 0x1D, 0x06,
-    0x49, 0x88, 0x02, 0xAA, 0xA0, 0x00, 0x8C, 0x93, 0x10, 0x07, 0x43, 0xD0,
-    0x70, 0x19, 0x29, 0x4A, 0x40, 0xF0, 0x3C, 0x0F, 0x01, 0x1C, 0x40, 0x38,
-    0x00, 0x10, 0xC8, 0xE0, 0x00, 0x8C, 0x11, 0xC0, 0x01, 0x10, 0x84, 0x21,
-    0x08, 0x42, 0x20, 0x0F, 0xCC, 0x21, 0x9F, 0xD1, 0x51, 0x22, 0xA2, 0x01,
-    0x14, 0x40, 0x00, 0x04, 0x71, 0x00, 0x00, 0x01, 0x00, 0x00, 0x0C, 0xE1,
-    0x91, 0x00, 0x62, 0x94, 0x00, 0x00, 0x86, 0x66, 0x10, 0x00, 0x63, 0x9C,
-    0xE0, 0x00, 0x00, 0x00, 0x00};
-
-REICH_API int32 reich_init(
-    reichContext* ctx,
-    const char* title,
-    int32 width,
-    int32 height,
-    real64 targetFps) {
-  reichSize memSize;
-  reichSize platSize;
-  void* memory;
-  if (!ctx) {
-    reich_log(REICH_LOG_ERROR, "reich_init called with NULL context.");
-    return 0;
-  }
-  reich_memset(ctx, 0, sizeof(reichContext));
-  ctx->scale = 1;
-  ctx->windowTitle = title;
-  ctx->windowWidth = width;
-  ctx->windowHeight = height;
-  ctx->running = 1;
-  ctx->fixedDt = 1.0 / targetFps;
-  ctx->accumulator = 0.0;
-  ctx->perfFreq = reich_sys_get_freq();
-  ctx->lastCounter = reich_sys_get_ticks();
-  memSize = (reichSize)256 * 1024 * 1024;
-  memory = reich_sys_alloc(memSize);
-  if (!memory) {
-    reich_log(
-        REICH_LOG_ERROR,
-        "Failed to allocate main memory block (%lu bytes).",
-        memSize);
-    return 0;
-  }
-  reich_arena_init(&ctx->permMem, memory, memSize);
-  platSize = reich_sys_get_platform_data_size();
-  ctx->platform = reich_arena_alloc(&ctx->permMem, platSize);
-  if (!ctx->platform) {
-    reich_log(REICH_LOG_ERROR, "Failed to allocate platform data.");
-    return 0;
-  }
-  ctx->screen.width = width;
-  ctx->screen.height = height;
-  ctx->screen.pixels =
-      (uint32*)reich_sys_alloc((reichSize)width * height * sizeof(uint32));
-  if (!ctx->screen.pixels) {
-    reich_log(REICH_LOG_ERROR, "Failed to allocate screen pixels.");
-    return 0;
-  }
-  reich_init_default_font(ctx);
-  if (!reich_sys_window_init(ctx, title, width, height)) {
-    reich_log(REICH_LOG_ERROR, "Window initialization failed.");
-    return 0;
-  }
-  reich_log(REICH_LOG_INFO, "Reich initialized. Target FPS: %.2f", targetFps);
-  return 1;
-}
-
-REICH_API void reich_set_callbacks(
-    reichContext* ctx,
-    PFUSERUPDATE update,
-    PFUSERRENDER render,
-    PFUSERRESIZE resize,
-    PFUSERINPUT input) {
-  if (!ctx) { return; }
-  ctx->userUpdate = update;
-  ctx->userRender = render;
-  ctx->userResize = resize;
-  ctx->userInput = input;
-}
-
-REICH_API void reich_set_scale(reichContext* ctx, int32 scale) {
-  if (!ctx || scale < 1) { return; }
-  ctx->scale = scale;
-  reich_sys_resize_canvas(ctx, ctx->windowWidth, ctx->windowHeight);
-}
-
-REICH_API int32 reich_running(reichContext* ctx) {
-  return ctx->running;
-}
-
-REICH_API void reich_poll_events(reichContext* ctx) {
-  reich_engine_process_input(ctx);
-}
-
-REICH_API void reich_timer_tick(reichContext* ctx) {
-  int64 currentCounter = reich_sys_get_ticks();
-  real64 frameTime =
-      (real64)(currentCounter - ctx->lastCounter) / (real64)ctx->perfFreq;
-  ctx->lastCounter = currentCounter;
-  if (frameTime > 0.25) { frameTime = 0.25; }
-  ctx->accumulator += frameTime;
-}
-
-REICH_API int32 reich_timer_step(reichContext* ctx) {
-  if (ctx->accumulator >= ctx->fixedDt) {
-    ctx->accumulator -= ctx->fixedDt;
-    return 1;
-  }
-  return 0;
-}
-
-REICH_API real64 reich_timer_alpha(reichContext* ctx) {
-  return ctx->accumulator / ctx->fixedDt;
-}
-
-REICH_API void reich_present(reichContext* ctx) {
-  reich_sys_present(ctx);
-}
-
-REICH_API void reich_run(reichContext* ctx) {
-  uint8 bkKP[REICH_KEY_MAX];
-  uint8 bkKR[REICH_KEY_MAX];
-  uint8 bkBP[REICH_MOUSE_BUTTONS];
-  uint8 bkBR[REICH_MOUSE_BUTTONS];
-  int32 first;
-  reich_log(REICH_LOG_INFO, "Starting main loop.");
-  while (reich_running(ctx)) {
-    reich_poll_events(ctx);
-    reich_update_window_controls(ctx);
-    reich_memcpy(bkKP, ctx->input.keysPressed, REICH_KEY_MAX);
-    reich_memcpy(bkKR, ctx->input.keysReleased, REICH_KEY_MAX);
-    reich_memcpy(bkBP, ctx->input.buttonsPressed, REICH_MOUSE_BUTTONS);
-    reich_memcpy(bkBR, ctx->input.buttonsReleased, REICH_MOUSE_BUTTONS);
-    reich_timer_tick(ctx);
-    first = 1;
-    while (reich_timer_step(ctx)) {
-      if (ctx->userUpdate) { ctx->userUpdate(ctx); }
-      if (first) {
-        reich_memset(ctx->input.keysPressed, 0, REICH_KEY_MAX);
-        reich_memset(ctx->input.keysReleased, 0, REICH_KEY_MAX);
-        reich_memset(ctx->input.buttonsPressed, 0, REICH_MOUSE_BUTTONS);
-        reich_memset(ctx->input.buttonsReleased, 0, REICH_MOUSE_BUTTONS);
-        first = 0;
-      }
-    }
-    reich_memcpy(ctx->input.keysPressed, bkKP, REICH_KEY_MAX);
-    reich_memcpy(ctx->input.keysReleased, bkKR, REICH_KEY_MAX);
-    reich_memcpy(ctx->input.buttonsPressed, bkBP, REICH_MOUSE_BUTTONS);
-    reich_memcpy(ctx->input.buttonsReleased, bkBR, REICH_MOUSE_BUTTONS);
-    if (ctx->userInput) { ctx->userInput(ctx); }
-    if (ctx->userRender) { ctx->userRender(ctx, reich_timer_alpha(ctx)); }
-    reich_draw_decorations(ctx);
-    reich_present(ctx);
-  }
-  reich_log(REICH_LOG_INFO, "Main loop ended.");
-}
-
-REICH_API void reich_clear(reichContext* ctx, uint32 color) {
-  int32 count = ctx->screen.width * ctx->screen.height;
-  uint32* p = ctx->screen.pixels;
-  while (count--) { *p++ = color; }
-}
 
 REICH_API int32 reich_key_down(reichContext* ctx, int32 keyCode) {
   if (keyCode < 0 || keyCode >= REICH_KEY_MAX) { return 0; }
@@ -1306,174 +1105,23 @@ REICH_API int32 reich_mouse_released(reichContext* ctx, int32 button) {
   return (int32)ctx->input.buttonsReleased[button];
 }
 
-REICH_API int32 reich_get_mouse_x(reichContext* ctx) {
+REICH_API int32 reich_mouse_x(reichContext* ctx) {
   return ctx->input.mouseX / ctx->scale;
 }
 
-REICH_API int32 reich_get_mouse_y(reichContext* ctx) {
+REICH_API int32 reich_mouse_y(reichContext* ctx) {
   return ctx->input.mouseY / ctx->scale;
 }
 
-REICH_API void reich_draw_rect(
-    reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color) {
-  int32 i;
-  int32 j;
-  int32 sx;
-  int32 sy;
-  int32 ex;
-  int32 ey;
-  uint32* pixels;
-  if (!ctx || !ctx->screen.pixels) { return; }
-  pixels = ctx->screen.pixels;
-  sx = x;
-  if (sx < 0) { sx = 0; }
-  sy = y;
-  if (sy < 0) { sy = 0; }
-  ex = x + w;
-  if (ex > ctx->screen.width) { ex = ctx->screen.width; }
-  ey = y + h;
-  if (ey > ctx->screen.height) { ey = ctx->screen.height; }
-  for (j = sy; j < ey; ++j) {
-    for (i = sx; i < ex; ++i) { pixels[j * ctx->screen.width + i] = color; }
-  }
+REICH_API int32 reich_mouse_wheel(reichContext* ctx) {
+  return ctx->input.mouseWheel;
 }
 
-REICH_API void reich_draw_frame(
-    reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color) {
-  reich_draw_rect(ctx, x, y, w, 1, color);
-  reich_draw_rect(ctx, x, y + h - 1, w, 1, color);
-  reich_draw_rect(ctx, x, y, 1, h, color);
-  reich_draw_rect(ctx, x + w - 1, y, 1, h, color);
+REICH_API uint32 reich_get_char_pressed(reichContext* ctx) {
+  return ctx->input.lastChar;
 }
 
-REICH_API void reich_draw_text(
-    reichContext* ctx, int32 x, int32 y, const char* str, uint32 color) {
-  int32 i;
-  int32 j;
-  int32 cx;
-  int32 cy;
-  int32 fw;
-  int32 fh;
-  int32 start;
-  int32 end;
-  uint8 c;
-  uint8* font;
-  uint32 kern = 4;
-  if (!ctx || !str || ctx->activeFont >= ctx->fontCount) { return; }
-  font = ctx->fonts[ctx->activeFont];
-  fw = font[0];
-  fh = font[1];
-  start = font[3];
-  end = font[4];
-  cx = x;
-  cy = y;
-  while (*str) {
-    c = (uint8)*str++;
-    if (c == '\n') {
-      cx = x;
-      cy += fh + 2;
-      continue;
-    }
-    if (c >= start && c <= end) {
-      int32 idx = (c - start) * (fw * fh);
-      for (j = 0; j < fh; ++j) {
-        for (i = 0; i < fw; ++i) {
-          int32 bit = idx + (j * fw + i);
-          if ((font[5 + (bit >> 3)] >> (7 - (bit & 7))) & 1) {
-            reich_draw_rect(ctx, cx + i, cy + j, 1, 1, color);
-          }
-        }
-      }
-    }
-    cx += fw + font[2] - kern;
-  }
-}
-
-REICH_API int32 reich_ui_btn(
-    reichContext* ctx,
-    int32 id,
-    int32 x,
-    int32 y,
-    int32 w,
-    int32 h,
-    const char* label,
-    uint32 bgCol) {
-  int32 mx = reich_get_mouse_x(ctx);
-  int32 my = reich_get_mouse_y(ctx);
-  int32 hover = (mx >= x && mx < x + w && my >= y && my < y + h);
-  int32 clicked = 0;
-  uint32 col = bgCol;
-  if (hover) {
-    ctx->input.hotId = id;
-    if (ctx->input.activeId == 0 && reich_mouse_pressed(ctx, 0)) {
-      ctx->input.activeId = id;
-    }
-  }
-  if (ctx->input.activeId == id) {
-    if (!ctx->input.buttons[0]) {
-      if (hover) { clicked = 1; }
-      ctx->input.activeId = 0;
-    }
-  }
-  if (hover) {
-    col = 0xFF000000 | ((bgCol & 0x00FEFEFE) >> 1);
-    if (ctx->input.activeId == id) {
-      col = 0xFF000000 | ((col & 0x00FEFEFE) >> 1);
-    } else {
-      col += 0x00202020;
-    }
-  }
-  reich_draw_rect(ctx, x, y, w, h, col);
-  if (label) {
-    int32 kern = 4;
-    uint8* f = ctx->fonts[ctx->activeFont];
-    reichSize len = reich_strlen(label);
-    int32 tw = (int32)len * (f[0] + f[2] - kern);
-    reich_draw_text(
-        ctx, x + (w - tw) / 2, y + (h - f[1]) / 2, label, 0xFFFFFF);
-  }
-  return clicked;
-}
-
-REICH_API uint8* reich_font_import(
-    reichArena* a,
-    uint32* pixels,
-    int32 iw,
-    int32 ih,
-    int32 gw,
-    int32 gh,
-    int32 start,
-    int32 end) {
-  int32 x;
-  int32 y;
-  int32 i;
-  int32 count = end - start + 1;
-  int32 total = (count * gw * gh + 7) / 8;
-  uint8* data = (uint8*)reich_arena_alloc(a, (reichSize)(5 + total));
-  if (!data) { NULL; }
-  data[0] = (uint8)gw;
-  data[1] = (uint8)gh;
-  data[2] = 1;
-  data[3] = (uint8)start;
-  data[4] = (uint8)end;
-  for (i = 0; i < total; ++i) { data[5 + i] = 0; }
-  if (gw <= 0) { return data; }
-  for (i = 0; i < count; ++i) {
-    int32 gx = (i % (iw / gw)) * gw;
-    int32 gy = (i / (iw / gw)) * gh;
-    for (y = 0; y < gh; ++y) {
-      for (x = 0; x < gw; ++x) {
-        if (gx + x < iw && gy + y < ih) {
-          if ((pixels[(gy + y) * iw + (gx + x)] & 0x00FFFFFF) != 0) {
-            int32 b = i * gw * gh + y * gw + x;
-            data[5 + (b >> 3)] |= (1 << (7 - (b & 7)));
-          }
-        }
-      }
-    }
-  }
-  return data;
-}
+/* LOADERS *******************************************************************/
 
 REICH_API reichCanvas reich_load_bmp(const char* filename) {
   reichCanvas canvas;
@@ -1516,38 +1164,38 @@ REICH_API reichCanvas reich_load_bmp(const char* filename) {
   int32 scaleB;
   int32 scaleA;
   reich_memset(&canvas, 0, sizeof(reichCanvas));
-  f = reich_file_open(filename, REICH_FILE_READ);
+  f = reich_sys_file_open(filename, REICH_FILE_READ);
   if (!f) {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Failed to open file %s", filename);
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Failed to open file %s", filename);
     return canvas;
   }
-  if (reich_file_read(f, fileHeader, 14) != 14) {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Failed to read file header.");
-    reich_file_close(f);
+  if (reich_sys_file_read(f, fileHeader, 14) != 14) {
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Failed to read file header.");
+    reich_sys_file_close(f);
     return canvas;
   }
   if (fileHeader[0] != 'B' || fileHeader[1] != 'M') {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Invalid magic number.");
-    reich_file_close(f);
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Invalid magic number.");
+    reich_sys_file_close(f);
     return canvas;
   }
   dataOffset = *(uint32*)(fileHeader + 10);
   fileSize = *(uint32*)(fileHeader + 2);
-  if (reich_file_read(f, &headerSize, 4) != 4) {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Failed to read header size.");
-    reich_file_close(f);
+  if (reich_sys_file_read(f, &headerSize, 4) != 4) {
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Failed to read header size.");
+    reich_sys_file_close(f);
     return canvas;
   }
   if (headerSize < 12) {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Header size too small.");
-    reich_file_close(f);
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Header size too small.");
+    reich_sys_file_close(f);
     return canvas;
   }
   if (headerSize > 124) { headerSize = 124; }
   *(uint32*)infoHeader = headerSize;
-  if (reich_file_read(f, infoHeader + 4, headerSize - 4) != headerSize - 4) {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Failed to read info header.");
-    reich_file_close(f);
+  if (reich_sys_file_read(f, infoHeader + 4, headerSize - 4) != headerSize - 4) {
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Failed to read info header.");
+    reich_sys_file_close(f);
     return canvas;
   }
   if (headerSize == 12) {
@@ -1568,8 +1216,8 @@ REICH_API reichCanvas reich_load_bmp(const char* filename) {
     colorsUsed = *(uint32*)(infoHeader + 32);
   }
   if (width <= 0 || height == 0 || planes != 1) {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Invalid dimensions or planes.");
-    reich_file_close(f);
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Invalid dimensions or planes.");
+    reich_sys_file_close(f);
     return canvas;
   }
   isTopDown = 0;
@@ -1579,23 +1227,23 @@ REICH_API reichCanvas reich_load_bmp(const char* filename) {
   }
   if (bpp != 1 && bpp != 4 && bpp != 8 && bpp != 16 && bpp != 24 &&
       bpp != 32) {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Unsupported BPP: %d", bpp);
-    reich_file_close(f);
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Unsupported BPP: %d", bpp);
+    reich_sys_file_close(f);
     return canvas;
   }
   if (compression != 0 && compression != 1 && compression != 2 &&
       compression != 3) {
-    reich_log(
+    reich_sys_log(
         REICH_LOG_ERROR, "BMP Load: Unsupported compression: %d", compression);
-    reich_file_close(f);
+    reich_sys_file_close(f);
     return canvas;
   }
   canvas.width = width;
   canvas.height = height;
   canvas.pixels = (uint32*)reich_sys_alloc((reichSize)width * height * 4);
   if (!canvas.pixels) {
-    reich_log(REICH_LOG_ERROR, "BMP Load: Failed to allocate pixels.");
-    reich_file_close(f);
+    reich_sys_log(REICH_LOG_ERROR, "BMP Load: Failed to allocate pixels.");
+    reich_sys_file_close(f);
     return canvas;
   }
   palette = (uint32*)NULL;
@@ -1605,13 +1253,13 @@ REICH_API reichCanvas reich_load_bmp(const char* filename) {
     if (headerSize == 12) {
       for (i = 0; i < colorsUsed; ++i) {
         uint8 pal[3];
-        reich_file_read(f, pal, 3);
+        reich_sys_file_read(f, pal, 3);
         palette[i] = 0xFF000000 | (pal[2] << 16) | (pal[1] << 8) | pal[0];
       }
     } else {
       for (i = 0; i < colorsUsed; ++i) {
         uint8 pal[4];
-        reich_file_read(f, pal, 4);
+        reich_sys_file_read(f, pal, 4);
         palette[i] = 0xFF000000 | (pal[2] << 16) | (pal[1] << 8) | pal[0];
       }
     }
@@ -1627,9 +1275,9 @@ REICH_API reichCanvas reich_load_bmp(const char* filename) {
       bMask = *(uint32*)(infoHeader + 48);
       aMask = *(uint32*)(infoHeader + 52);
     } else {
-      reich_file_read(f, &rMask, 4);
-      reich_file_read(f, &gMask, 4);
-      reich_file_read(f, &bMask, 4);
+      reich_sys_file_read(f, &rMask, 4);
+      reich_sys_file_read(f, &gMask, 4);
+      reich_sys_file_read(f, &bMask, 4);
     }
   } else if (bpp == 16) {
     rMask = 0x7C00;
@@ -1637,11 +1285,11 @@ REICH_API reichCanvas reich_load_bmp(const char* filename) {
     bMask = 0x001F;
     aMask = 0x0000;
   }
-  reich_file_seek(f, dataOffset, REICH_SEEK_SET);
+  reich_sys_file_seek(f, dataOffset, REICH_SEEK_SET);
   if (imageSize == 0) { imageSize = fileSize - dataOffset; }
   data = (uint8*)reich_sys_alloc((reichSize)imageSize);
-  reich_file_read(f, data, imageSize);
-  reich_file_close(f);
+  reich_sys_file_read(f, data, imageSize);
+  reich_sys_file_close(f);
   shiftR = 0;
   shiftG = 0;
   shiftB = 0;
@@ -1799,6 +1447,8 @@ REICH_API reichCanvas reich_load_bmp(const char* filename) {
   return canvas;
 }
 
+/* FONTS *********************************************************************/
+
 REICH_API void reich_init_default_font(reichContext* ctx) {
   if (ctx->fontCount >= REICH_MAX_FONTS) { return; }
   ctx->fonts[ctx->fontCount] = (uint8*)reich_arena_alloc(
@@ -1809,8 +1459,48 @@ REICH_API void reich_init_default_font(reichContext* ctx) {
       ctx->fonts[ctx->fontCount][i] = REICH_FONT_DATA[i];
     }
     ctx->fontCount++;
-    reich_log(REICH_LOG_INFO, "Default font initialized.");
+    reich_sys_log(REICH_LOG_INFO, "Default font initialized.");
   }
+}
+
+REICH_API uint8* reich_font_import(
+    reichArena* a,
+    uint32* pixels,
+    int32 iw,
+    int32 ih,
+    int32 gw,
+    int32 gh,
+    int32 start,
+    int32 end) {
+  int32 x;
+  int32 y;
+  int32 i;
+  int32 count = end - start + 1;
+  int32 total = (count * gw * gh + 7) / 8;
+  uint8* data = (uint8*)reich_arena_alloc(a, (reichSize)(5 + total));
+  if (!data) { NULL; }
+  data[0] = (uint8)gw;
+  data[1] = (uint8)gh;
+  data[2] = 1;
+  data[3] = (uint8)start;
+  data[4] = (uint8)end;
+  for (i = 0; i < total; ++i) { data[5 + i] = 0; }
+  if (gw <= 0) { return data; }
+  for (i = 0; i < count; ++i) {
+    int32 gx = (i % (iw / gw)) * gw;
+    int32 gy = (i / (iw / gw)) * gh;
+    for (y = 0; y < gh; ++y) {
+      for (x = 0; x < gw; ++x) {
+        if (gx + x < iw && gy + y < ih) {
+          if ((pixels[(gy + y) * iw + (gx + x)] & 0x00FFFFFF) != 0) {
+            int32 b = i * gw * gh + y * gw + x;
+            data[5 + (b >> 3)] |= (1 << (7 - (b & 7)));
+          }
+        }
+      }
+    }
+  }
+  return data;
 }
 
 REICH_API void reich_load_font(
@@ -1864,7 +1554,7 @@ REICH_API void reich_load_font(
           gh,
           start,
           end);
-      reich_log(
+      reich_sys_log(
           REICH_LOG_INFO,
           "Loaded font: %s (%d chars, %dx%d glyphs)",
           filename,
@@ -1872,39 +1562,367 @@ REICH_API void reich_load_font(
           gw,
           gh);
     } else {
-      reich_log(REICH_LOG_ERROR, "Invalid font dimensions for %s", filename);
+      reich_sys_log(REICH_LOG_ERROR, "Invalid font dimensions for %s", filename);
     }
     reich_sys_free(bmp.pixels);
   } else {
-    reich_log(REICH_LOG_WARN, "Failed to load font bitmap: %s", filename);
+    reich_sys_log(REICH_LOG_WARN, "Failed to load font bitmap: %s", filename);
   }
 }
 
 REICH_API void reich_load_fonts(
     reichContext* ctx, const char* fn, int32 gw, int32 gh, int32 amt) {
   char filename[260];
-  reichHandle h = reich_find_first(fn, filename, 260);
+  reichHandle h = reich_sys_find_first(fn, filename, 260);
   if (h) {
     do {
       reich_load_font(ctx, filename, amt, gw, gh);
-    } while (reich_find_next(h, filename, 260));
-    reich_find_close(h);
+    } while (reich_sys_find_next(h, filename, 260));
+    reich_sys_find_close(h);
   } else {
-    reich_log(REICH_LOG_INFO, "No font found");
+    reich_sys_log(REICH_LOG_INFO, "No font found");
   }
   if (ctx->fontCount == 0) { reich_init_default_font(ctx); }
 }
 
-REICH_API int32 reich_get_mouse_wheel(reichContext* ctx) {
-  return ctx->input.mouseWheel;
+/* DRAWING *******************************************************************/
+
+REICH_API uint32 reich_draw_pixel(
+		reichContext* ctx, int32 x, int32 y, uint32 color) {
+  if ((x) >= 0 && (x) < (ctx)->screen.width && (y) >= 0 &&
+      (y) < (ctx)->screen.height) {
+    (ctx)->screen.pixels[(y) * (ctx)->screen.width + (x)] = (color);
+  }
+  return 0;
 }
 
-REICH_API uint32 reich_get_char_pressed(reichContext* ctx) {
-  return ctx->input.lastChar;
+REICH_API void reich_draw_clear(reichContext* ctx, uint32 color) {
+  int32 count = ctx->screen.width * ctx->screen.height;
+  uint32* p = ctx->screen.pixels;
+  while (count--) { *p++ = color; }
 }
 
-REICH_API void reich_show_cursor(reichContext* ctx, int32 show) {
-  reich_sys_show_cursor(show);
+REICH_API void reich_draw_rect(
+    reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color) {
+  int32 i;
+  int32 j;
+  int32 sx;
+  int32 sy;
+  int32 ex;
+  int32 ey;
+  uint32* pixels;
+  if (!ctx || !ctx->screen.pixels) { return; }
+  pixels = ctx->screen.pixels;
+  sx = x;
+  if (sx < 0) { sx = 0; }
+  sy = y;
+  if (sy < 0) { sy = 0; }
+  ex = x + w;
+  if (ex > ctx->screen.width) { ex = ctx->screen.width; }
+  ey = y + h;
+  if (ey > ctx->screen.height) { ey = ctx->screen.height; }
+  for (j = sy; j < ey; ++j) {
+    for (i = sx; i < ex; ++i) { pixels[j * ctx->screen.width + i] = color; }
+  }
+}
+
+REICH_API void reich_draw_frame(
+    reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color) {
+  reich_draw_rect(ctx, x, y, w, 1, color);
+  reich_draw_rect(ctx, x, y + h - 1, w, 1, color);
+  reich_draw_rect(ctx, x, y, 1, h, color);
+  reich_draw_rect(ctx, x + w - 1, y, 1, h, color);
+}
+
+REICH_API void reich_draw_text(
+    reichContext* ctx, int32 x, int32 y, const char* str, uint32 color) {
+  int32 i;
+  int32 j;
+  int32 cx;
+  int32 cy;
+  int32 fw;
+  int32 fh;
+  int32 start;
+  int32 end;
+  uint8 c;
+  uint8* font;
+  uint32 kern = 4;
+  if (!ctx || !str || ctx->activeFont >= ctx->fontCount) { return; }
+  font = ctx->fonts[ctx->activeFont];
+  fw = font[0];
+  fh = font[1];
+  start = font[3];
+  end = font[4];
+  cx = x;
+  cy = y;
+  while (*str) {
+    c = (uint8)*str++;
+    if (c == '\n') {
+      cx = x;
+      cy += fh + 2;
+      continue;
+    }
+    if (c >= start && c <= end) {
+      int32 idx = (c - start) * (fw * fh);
+      for (j = 0; j < fh; ++j) {
+        for (i = 0; i < fw; ++i) {
+          int32 bit = idx + (j * fw + i);
+          if ((font[5 + (bit >> 3)] >> (7 - (bit & 7))) & 1) {
+            reich_draw_rect(ctx, cx + i, cy + j, 1, 1, color);
+          }
+        }
+      }
+    }
+    cx += fw + font[2] - kern;
+  }
+}
+
+REICH_API int32 reich_draw_button(
+    reichContext* ctx,
+    int32 id,
+    int32 x,
+    int32 y,
+    int32 w,
+    int32 h,
+    const char* label,
+    uint32 bgCol) {
+  int32 mx = reich_mouse_x(ctx);
+  int32 my = reich_mouse_y(ctx);
+  int32 hover = (mx >= x && mx < x + w && my >= y && my < y + h);
+  int32 clicked = 0;
+  uint32 col = bgCol;
+  if (hover) {
+    ctx->input.hotId = id;
+    if (ctx->input.activeId == 0 && reich_mouse_pressed(ctx, 0)) {
+      ctx->input.activeId = id;
+    }
+  }
+  if (ctx->input.activeId == id) {
+    if (!ctx->input.buttons[0]) {
+      if (hover) { clicked = 1; }
+      ctx->input.activeId = 0;
+    }
+  }
+  if (hover) {
+    col = 0xFF000000 | ((bgCol & 0x00FEFEFE) >> 1);
+    if (ctx->input.activeId == id) {
+      col = 0xFF000000 | ((col & 0x00FEFEFE) >> 1);
+    } else {
+      col += 0x00202020;
+    }
+  }
+  reich_draw_rect(ctx, x, y, w, h, col);
+  if (label) {
+    int32 kern = 4;
+    uint8* f = ctx->fonts[ctx->activeFont];
+    reichSize len = reich_strlen(label);
+    int32 tw = (int32)len * (f[0] + f[2] - kern);
+    reich_draw_text(
+        ctx, x + (w - tw) / 2, y + (h - f[1]) / 2, label, 0xFFFFFF);
+  }
+  return clicked;
+}
+
+REICH_API void reich_draw_decorations(reichContext* ctx) {
+  int32 w = ctx->screen.width;
+  int32 btnW = REICH_TITLE_BUTTON_WIDTH;
+  int32 h = REICH_TITLE_BAR_HEIGHT;
+  int32 mx = ctx->input.scaledMouseX;
+  int32 my = ctx->input.scaledMouseY;
+  int32 closeX = w - btnW;
+  int32 maxX = closeX - btnW;
+  int32 minX = maxX - btnW;
+  uint32 cClose = 0xFF333333;
+  uint32 cMax = 0xFF333333;
+  uint32 cMin = 0xFF333333;
+  int32 i;
+  reich_draw_rect(ctx, 0, 0, w, h, 0xFF222222);
+  reich_draw_rect(ctx, 0, h - 1, w, 1, 0xFF444444);
+  if (ctx->windowTitle) {
+    reich_draw_text(ctx, 10, 8, ctx->windowTitle, 0xFFAAAAAA);
+  }
+  if (!ctx->isMaximized) {
+    reich_draw_frame(ctx, 0, 0, w, ctx->screen.height, 0xFF444444);
+  }
+  if (my < h) {
+    if (mx >= closeX) {
+      cClose = 0xFFE81123;
+    } else if (mx >= maxX) {
+      cMax = 0xFF555555;
+    } else if (mx >= minX) {
+      cMin = 0xFF555555;
+    }
+  }
+  reich_draw_rect(ctx, closeX, 0, btnW, h, cClose);
+  for (i = 0; i < 10; ++i) {
+    reich_draw_pixel(ctx, closeX + 17 + i, 11 + i, 0xFFFFFFFF);
+    reich_draw_pixel(ctx, closeX + 17 + 9 - i, 11 + i, 0xFFFFFFFF);
+  }
+  reich_draw_rect(ctx, maxX, 0, btnW, h, cMax);
+  if (ctx->isMaximized) {
+    reich_draw_frame(ctx, maxX + 17, 13, 8, 8, 0xFFFFFFFF);
+    reich_draw_frame(ctx, maxX + 19, 11, 8, 8, 0xFFFFFFFF);
+  } else {
+    reich_draw_frame(ctx, maxX + 17, 11, 10, 10, 0xFFFFFFFF);
+  }
+  reich_draw_rect(ctx, minX, 0, btnW, h, cMin);
+  reich_draw_rect(ctx, minX + 17, 20, 10, 1, 0xFFFFFFFF);
+}
+
+REICH_API void reich_draw_grid(
+    reichContext* ctx,
+		int32 x, int32 y,
+		int32 w, int32 h,
+		int32 ox, int32 oy,
+		int32 cellSize,
+		uint32 color) {
+  int32 i;
+	ox %= cellSize;
+	oy %= cellSize;
+  for (i = 0; i < ctx->screen.width + cellSize; i += cellSize) {
+    reich_draw_rect(ctx, i + ox - cellSize, oy - cellSize, 1, ctx->screen.height + cellSize, 0xFF303030);
+  }
+  for (i = 0; i < ctx->screen.height + cellSize; i += cellSize) {
+    reich_draw_rect(ctx, ox - cellSize, i + oy - cellSize, ctx->screen.width + cellSize, 1, 0xFF303030);
+  }
+}
+
+
+
+/* RUNTIME *******************************************************************/
+
+REICH_API int32 reich_init(
+    reichContext* ctx,
+    const char* title,
+    int32 width,
+    int32 height,
+    real64 targetFps) {
+  reichSize memSize;
+  reichSize platSize;
+  void* memory;
+  if (!ctx) {
+    reich_sys_log(REICH_LOG_ERROR, "reich_init called with NULL context.");
+    return 0;
+  }
+  reich_memset(ctx, 0, sizeof(reichContext));
+  ctx->scale = 1;
+  ctx->windowTitle = title;
+  ctx->windowWidth = width;
+  ctx->windowHeight = height;
+  ctx->running = 1;
+  ctx->fixedDt = 1.0 / targetFps;
+  ctx->accumulator = 0.0;
+  ctx->perfFreq = reich_sys_get_freq();
+  ctx->lastCounter = reich_sys_get_ticks();
+  memSize = (reichSize)512 * 1024 * 1024;
+  memory = reich_sys_alloc(memSize);
+  if (!memory) {
+    reich_sys_log(
+        REICH_LOG_ERROR,
+        "Failed to allocate main memory block (%lu bytes).",
+        memSize);
+    return 0;
+  }
+  reich_arena_init(&ctx->permMem, memory, memSize);
+  platSize = reich_sys_get_platform_data_size();
+  ctx->platform = reich_arena_alloc(&ctx->permMem, platSize);
+  if (!ctx->platform) {
+    reich_sys_log(REICH_LOG_ERROR, "Failed to allocate platform data.");
+    return 0;
+  }
+  ctx->screen.width = width;
+  ctx->screen.height = height;
+  ctx->screen.pixels =
+      (uint32*)reich_sys_alloc((reichSize)width * height * sizeof(uint32));
+  if (!ctx->screen.pixels) {
+    reich_sys_log(REICH_LOG_ERROR, "Failed to allocate screen pixels.");
+    return 0;
+  }
+  reich_init_default_font(ctx);
+  if (!reich_sys_window_init(ctx, title, width, height)) {
+    reich_sys_log(REICH_LOG_ERROR, "Window initialization failed.");
+    return 0;
+  }
+  reich_sys_log(REICH_LOG_INFO, "Reich initialized. Target FPS: %.2f", targetFps);
+  return 1;
+}
+
+REICH_API void reich_set_callbacks(
+    reichContext* ctx,
+    PFUSERUPDATE update,
+    PFUSERRENDER render,
+    PFUSERINPUT input) {
+  if (!ctx) { return; }
+  ctx->userUpdate = update;
+  ctx->userRender = render;
+  ctx->userInput = input;
+}
+
+REICH_API void reich_update_window_controls(reichContext* ctx) {
+  int32 mx;
+  int32 my;
+  int32 btnW;
+  int32 h;
+  int32 w;
+  if (!ctx->input.buttons[0] || ctx->input.lastButtons[0]) { return; }
+  mx = ctx->input.scaledMouseX;
+  my = ctx->input.scaledMouseY;
+  btnW = REICH_TITLE_BUTTON_WIDTH;
+  h = REICH_TITLE_BAR_HEIGHT;
+  w = ctx->screen.width;
+  if (my < h && mx >= w - (btnW * 3)) {
+    if (mx >= w - btnW) {
+      reich_sys_close(ctx);
+    } else if (mx >= w - (btnW * 2)) {
+      reich_sys_toggle_maximize(ctx);
+    } else {
+      reich_sys_minimize(ctx);
+    }
+  }
+}
+
+REICH_API void reich_set_scale(reichContext* ctx, int32 scale) {
+  if (!ctx || scale < 1) { return; }
+  ctx->scale = scale;
+  reich_sys_resize_canvas(ctx, ctx->windowWidth, ctx->windowHeight);
+}
+
+REICH_API void reich_run(reichContext* ctx) {
+  uint8 bkKP[REICH_KEY_MAX];
+  uint8 bkKR[REICH_KEY_MAX];
+  uint8 bkBP[REICH_MOUSE_BUTTONS];
+  uint8 bkBR[REICH_MOUSE_BUTTONS];
+  int32 first;
+  reich_sys_log(REICH_LOG_INFO, "Starting main loop.");
+  while (ctx->running) {
+    reich_input_update(ctx);
+    reich_update_window_controls(ctx);
+    reich_memcpy(bkKP, ctx->input.keysPressed, REICH_KEY_MAX);
+    reich_memcpy(bkKR, ctx->input.keysReleased, REICH_KEY_MAX);
+    reich_memcpy(bkBP, ctx->input.buttonsPressed, REICH_MOUSE_BUTTONS);
+    reich_memcpy(bkBR, ctx->input.buttonsReleased, REICH_MOUSE_BUTTONS);
+    reich_timer_tick(ctx);
+    first = 1;
+    while (reich_timer_step(ctx)) {
+      if (ctx->userUpdate) { ctx->userUpdate(ctx); }
+      if (first) {
+        reich_memset(ctx->input.keysPressed, 0, REICH_KEY_MAX);
+        reich_memset(ctx->input.keysReleased, 0, REICH_KEY_MAX);
+        reich_memset(ctx->input.buttonsPressed, 0, REICH_MOUSE_BUTTONS);
+        reich_memset(ctx->input.buttonsReleased, 0, REICH_MOUSE_BUTTONS);
+        first = 0;
+      }
+    }
+    reich_memcpy(ctx->input.keysPressed, bkKP, REICH_KEY_MAX);
+    reich_memcpy(ctx->input.keysReleased, bkKR, REICH_KEY_MAX);
+    reich_memcpy(ctx->input.buttonsPressed, bkBP, REICH_MOUSE_BUTTONS);
+    reich_memcpy(ctx->input.buttonsReleased, bkBR, REICH_MOUSE_BUTTONS);
+    if (ctx->userInput) { ctx->userInput(ctx); }
+    if (ctx->userRender) { ctx->userRender(ctx, reich_timer_alpha(ctx)); }
+    reich_draw_decorations(ctx);
+		reich_sys_present(ctx);
+  }
+  reich_sys_log(REICH_LOG_INFO, "Main loop ended.");
 }
 
 #endif /* REICH_IMPLEMENTATION */
