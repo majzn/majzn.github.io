@@ -266,54 +266,145 @@ set statusline+=%4*%c\
 set statusline+=%2*%{GetFileContext()}\          
 
 " ==============================================================================
-"  8. GRADIENT ENGINE
+"  8. MATHEMATICAL GRADIENT ENGINE (RGB INTERPOLATION)
 " ==============================================================================
-let g:gradient_themes = {}
-let g:gradient_themes['Cyberpunk'] = ['#00f0ff', '#00e0ff', '#00c0ff', '#00a0ff', '#0080ff', '#5000ff', '#8000ff', '#b000ff', '#e000ff', '#ff00d0', '#ff00a0', '#ff0070']
-let g:gradient_themes['Matrix']    = ['#003300', '#004400', '#005500', '#006600', '#007700', '#008800', '#009900', '#00aa00', '#00bb00', '#00cc00', '#00dd00', '#00ee00', '#00ff00', '#55ff55', '#aaffaa', '#ffffff']
-let g:gradient_themes['Magma']     = ['#0000ff', '#4400ff', '#8800ff', '#cc00ff', '#ff00cc', '#ff0088', '#ff0044', '#ff0000', '#ff4400', '#ff8800', '#ffcc00', '#ffff00']
-let g:gradient_themes['Frost']     = ['#ffffff', '#e0f7fa', '#b2ebf2', '#80deea', '#4dd0e1', '#26c6da', '#00bcd4', '#00acc1', '#0097a7', '#00838f', '#006064', '#003032']
-let g:gradient_themes['Sunset']    = ['#2d004d', '#4b0082', '#800080', '#ba55d3', '#ff00ff', '#ff1493', '#ff4500', '#ff8c00', '#ffa500', '#ffd700', '#ffff00', '#ffffbd']
 
-let g:current_gradient = 'Cyberpunk'
-let g:gradient_keys = keys(g:gradient_themes)
+" --- 1. CONFIGURATION ---
+let g:gradient_resolution = 100 
+
+" --- 2. MATH HELPERS ---
+
+" Hex to RGB
+function! s:HexToRGB(hex)
+  let l:hex = substitute(a:hex, '#', '', '')
+  return [str2nr(l:hex[0:1], 16), str2nr(l:hex[2:3], 16), str2nr(l:hex[4:5], 16)]
+endfunction
+
+" RGB to Hex
+function! s:RGBToHex(rgb)
+  let l:r = float2nr(a:rgb[0])
+  let l:g = float2nr(a:rgb[1])
+  let l:b = float2nr(a:rgb[2])
+  return printf("#%02x%02x%02x", l:r, l:g, l:b)
+endfunction
+
+" Linear Interpolation
+function! s:Lerp(start, end, step, total_steps)
+  let l:factor = (1.0 * a:step) / a:total_steps
+  return a:start + (a:end - a:start) * l:factor
+endfunction
+
+" Generate Palette
+function! GenerateDynamicPalette(keyframes, total_steps)
+  let l:palette = []
+  let l:segments = len(a:keyframes) - 1
+  if l:segments < 1 | return a:keyframes | endif
+  
+  let l:steps_per_segment = a:total_steps / l:segments
+
+  for i in range(l:segments)
+    let l:start_rgb = s:HexToRGB(a:keyframes[i])
+    let l:end_rgb   = s:HexToRGB(a:keyframes[i+1])
+    
+    for j in range(l:steps_per_segment)
+      let l:r = s:Lerp(l:start_rgb[0], l:end_rgb[0], j, l:steps_per_segment)
+      let l:g = s:Lerp(l:start_rgb[1], l:end_rgb[1], j, l:steps_per_segment)
+      let l:b = s:Lerp(l:start_rgb[2], l:end_rgb[2], j, l:steps_per_segment)
+      call add(l:palette, s:RGBToHex([l:r, l:g, l:b]))
+    endfor
+  endfor
+  
+  " Ensure we explicitly add the final color to close the loop
+  call add(l:palette, a:keyframes[-1])
+  return l:palette
+endfunction
+
+" --- 3. THEME DEFINITIONS (ANCHOR POINTS) ---
+let g:gradient_anchors = {}
+let g:gradient_anchors['Cyberpunk'] = ['#00f0ff', '#5000ff', '#ff0070']
+let g:gradient_anchors['Sunset']    = ['#2d004d', '#ff00ff', '#ffff00']
+let g:gradient_anchors['Matrix']    = ['#002200', '#00ff00', '#ffffff']
+let g:gradient_anchors['Magma']     = ['#0000aa', '#ff0000', '#ffff00']
+let g:gradient_anchors['Frost']     = ['#ffffff', '#00d4ff', '#003032']
+let g:gradient_anchors['Viridis']   = ['#440154', '#21908c', '#fde725']
+let g:gradient_anchors['Plasma']    = ['#0d0887', '#cc4678', '#f0f921']
+let g:gradient_anchors['Inferno']   = ['#000004', '#bb3754', '#fcffa4']
+let g:gradient_anchors['Forest']    = ['#001100', '#228833', '#aaffbb']
+let g:gradient_anchors['DeepSea']   = ['#000022', '#0044aa', '#00ffff']
+let g:gradient_anchors['Fire']      = ['#220000', '#ff0000', '#ffff00']
+let g:gradient_anchors['Grey']      = ['#222222', '#888888', '#ffffff']
+let g:gradient_anchors['Kelvin'] = ['#ff8912', '#ffc58f', '#ffffff', '#c9dfff', '#809eff']
+let g:gradient_anchors['Blackbody'] = ['#000000', '#550000', '#aa0000', '#ff0000', '#ffaa00', '#ffff00', '#ffffff']
+let g:gradient_anchors['Blueprint'] = ['#001133', '#002266', '#004499', '#3377cc', '#88bbff', '#ffffff']
+let g:gradient_anchors['Spectrum'] = ['#ff0000', '#ffa500', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#ee82ee']
+let g:gradient_anchors['Synthwave'] = ['#240046', '#7b2cbf', '#ff00ff', '#00ffff', '#ffffff']
+let g:gradient_anchors['Jungle'] = ['#001a00', '#003300', '#006600', '#339933', '#66cc66', '#99ff99', '#ccffcc']
+let g:gradient_anchors['Dusk'] = ['#ff8800', '#ff4444', '#cc0066', '#880088', '#4400aa', '#000044']
+let g:gradient_anchors['Dawn'] = ['#000033', '#2d004d', '#800080', '#ff4500', '#ffcc00', '#87ceeb']
+let g:gradient_anchors['BladeRunner'] = ['#003333', '#006666', '#00ffff', '#ffffff', '#ffaa00', '#ff5500']
+let g:gradient_anchors['Candy'] = ['#ff99cc', '#cc99ff', '#99ccff', '#99ffcc', '#ffff99']
+let g:gradient_anchors['Toxic'] = ['#000000', '#1a3300', '#4d9900', '#ccff00', '#ffffcc', '#ffffff']
+let g:gradient_anchors['Patriot'] = ['#b22234', '#ffffff', '#3c3b6e']
+let g:gradient_anchors['Golden'] = ['#2e1500', '#5c2a00', '#b8860b', '#ffd700', '#ffffcc']
+let g:gradient_anchors['Borealis'] = ['#002211', '#005533', '#00aa77', '#00ddaa', '#4466aa', '#8844aa']
+let g:gradient_anchors['Miami'] = ['#ff00cc', '#ff66cc', '#ccaaff', '#66ccff', '#00ffff']
+let g:gradient_anchors['CottonCandy'] = ['#ffaddb', '#e0b0ff', '#b0c4ff', '#9bf6ff']
+let g:gradient_anchors['Rust'] = ['#2e1000', '#5c2200', '#8a3700', '#cc5500', '#ff9966', '#ffccaa']
+let g:gradient_anchors['Dracula'] = ['#282a36', '#6272a4', '#8be9fd', '#50fa7b', '#ffb86c', '#ff79c6', '#bd93f9']
+
+" Set Default
+let g:current_gradient_name = 'Kelvin'
+let g:generated_cache = []
+
+" --- 4. ENGINE CORE ---
 
 function! ApplyGradientHighlighting()
-  let l:palette = g:gradient_themes[g:current_gradient]
-  for i in range(len(l:palette))
-    let l:color = l:palette[i]
+  " 1. Generate the palette based on current anchor points
+  if !has_key(g:gradient_anchors, g:current_gradient_name)
+    let g:current_gradient_name = 'Cyberpunk'
+  endif
+  let l:anchors = g:gradient_anchors[g:current_gradient_name]
+  let g:generated_cache = GenerateDynamicPalette(l:anchors, g:gradient_resolution)
+
+  " 2. Define Highlights
+  for i in range(len(g:generated_cache))
+    let l:color = g:generated_cache[i]
     exe 'hi GradientLvl' . i . ' guifg=' . l:color . ' guibg=NONE gui=bold'
     exe 'sign define GSign' . i . ' numhl=GradientLvl' . i
   endfor
 endfunction
 
-" INITIALIZE
-call ApplyGradientHighlighting()
-
 function! PlaceGradientSigns()
-  if line('$') > 3000 | return | endif
+  if line('$') > 5000 | return | endif
   silent! sign unplace * group=GradientGroup
-  let l:total = line('$')
-  if l:total == 0 | let l:total = 1 | endif
-  let l:palette = g:gradient_themes[g:current_gradient]
-  let l:spec_len = len(l:palette)
 
-  for l:lnum in range(1, l:total)
-    let l:idx = ((l:lnum - 1) * l:spec_len) / l:total
-    if l:idx >= l:spec_len | let l:idx = l:spec_len - 1 | endif
+  let l:total_lines = line('$')
+  if l:total_lines == 0 | let l:total_lines = 1 | endif
+  let l:palette_size = len(g:generated_cache)
+  if l:palette_size == 0 
+    call ApplyGradientHighlighting()
+    let l:palette_size = len(g:generated_cache)
+  endif
+
+  for l:lnum in range(1, l:total_lines)
+    let l:idx = ((l:lnum - 1) * l:palette_size) / l:total_lines
+    if l:idx >= l:palette_size | let l:idx = l:palette_size - 1 | endif
     exe 'sign place ' . l:lnum . ' line=' . l:lnum . ' name=GSign' . l:idx . ' group=GradientGroup file=' . expand('%:p')
   endfor
 endfunction
 
-command! -nargs=1 Gradient let g:current_gradient = <args> | call ApplyGradientHighlighting() | call PlaceGradientSigns() | echo "Gradient: " . g:current_gradient
+" --- 5. COMMANDS & TRIGGERS ---
+
+command! -nargs=1 Gradient let g:current_gradient_name = <args> | call ApplyGradientHighlighting() | call PlaceGradientSigns() | echo "Gradient: " . g:current_gradient_name
 
 function! CycleGradient()
-  let l:idx = index(g:gradient_keys, g:current_gradient)
-  let l:idx = (l:idx + 1) % len(g:gradient_keys)
-  let g:current_gradient = g:gradient_keys[l:idx]
+  let l:keys = keys(g:gradient_anchors)
+  let l:idx = index(l:keys, g:current_gradient_name)
+  let l:idx = (l:idx + 1) % len(l:keys)
+  let g:current_gradient_name = l:keys[l:idx]
   call ApplyGradientHighlighting()
   call PlaceGradientSigns()
-  echo "Gradient Theme: " . g:current_gradient
+  echo "Gradient Theme: " . g:current_gradient_name
 endfunction
 
 augroup GradientEngine
@@ -321,6 +412,8 @@ augroup GradientEngine
   autocmd VimEnter * call ApplyGradientHighlighting()
   autocmd BufReadPost,BufWritePost,TextChanged,TextChangedI * call PlaceGradientSigns()
 augroup END
+
+call ApplyGradientHighlighting()
 
 " ==============================================================================
 "  9. ADVANCED UTILITIES
