@@ -11,10 +11,13 @@ void input(reichContext* ctx) {
 int32 t_time = 0;
 
 void render(reichContext* ctx, real64 alpha) {
-  reich_draw_clear(ctx, 0xFF202020);
+	reich_draw_clear(ctx, 0xFF202020);
+#if 0
 	reich_draw_grid(ctx, 0, 0, ctx->screen.width, ctx->screen.height, t_time, t_time, 32, 0x020202);
+#endif
+	reich_draw_line(ctx, 20, 30, 20 + reich_sin(((real32)t_time)*0.01)*100.0f, 30 + reich_cos(((real32)t_time)*0.01)*100.0f, 0xAAFFFF00);
 	t_time++;
-	Sleep(100);
+	Sleep(16);
 }
 
 int WINAPI WinMain(
@@ -23,7 +26,7 @@ int WINAPI WinMain(
     LPSTR lpCmdLine,
     int nShowCmd) {
   reichContext ctx;
-  if (!reich_init(&ctx, "Reich Debug App", 800, 600, 60.0)) { return -1; }
+  if (!reich_init(&ctx, " !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~", 800, 600, 60.0)) { return -1; }
   reich_load_fonts(&ctx, "FONT_*", 0, 0, 255);
   ctx.activeFont = 5;
 	reich_set_callbacks(&ctx, update, render, input);

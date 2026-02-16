@@ -1,6 +1,8 @@
+#define REICH_IMPLEMENTATION
 #ifndef REICH_H
 #define REICH_H
 
+#include <math.h>
 #include <stdint.h>
 #include <stdarg.h>
 
@@ -63,8 +65,17 @@ typedef void* reichHandle;
 #define REICH_KEY_MAX            512
 #define REICH_MOUSE_BUTTONS      3
 #define REICH_MAX_FONTS          32
-#define REICH_TITLE_BAR_HEIGHT   32
-#define REICH_TITLE_BUTTON_WIDTH 45
+#define REICH_TITLE_BAR_HEIGHT   28
+#define REICH_TITLE_BUTTON_WIDTH 42
+
+typedef struct reichRect_t reichRect;
+
+struct reichRect_t {
+	int32 x1;
+	int32 y1;
+	int32 x2;
+	int32 y2;
+};
 
 typedef struct reichArena {
   uint8* base;
@@ -111,6 +122,7 @@ struct reichContext {
   reichArena permMem;
   reichArena frameMem;
   reichCanvas screen;
+	reichRect clip;
   reichInput input;
   const char* windowTitle;
   int32 windowWidth;
@@ -199,22 +211,10 @@ REICH_API void reich_set_scale(reichContext* ctx, int32 scale);
 REICH_API void reich_draw_clear(reichContext* ctx, uint32 color);
 REICH_API void reich_draw_decorations(reichContext* ctx);
 
-REICH_API void reich_draw_rect(
-    reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color);
-REICH_API void reich_draw_frame(
+REICH_API int32 reich_draw_rect(
     reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color);
 REICH_API void reich_draw_text(
     reichContext* ctx, int32 x, int32 y, const char* str, uint32 color);
-
-REICH_API int32 reich_draw_button(
-    reichContext* ctx,
-    int32 id,
-    int32 x,
-    int32 y,
-    int32 w,
-    int32 h,
-    const char* label,
-    uint32 bgCol);
 
 REICH_API int32 reich_init(
     reichContext* ctx,
@@ -725,7 +725,9 @@ LRESULT CALLBACK reich_sys_window_callback(HWND h, UINT m, WPARAM w, LPARAM l) {
     ptLocal.y = GET_Y_LPARAM(l);
     ScreenToClient(h, &ptLocal);
     tbHeight = REICH_TITLE_BAR_HEIGHT * ctx->scale;
-    if (ptLocal.y >= 0 && ptLocal.y < tbHeight) {
+    ctx->input.mouseX = ptLocal.x;
+    ctx->input.mouseY = ptLocal.y;
+		if (ptLocal.y >= 0 && ptLocal.y < tbHeight) {
       btnArea = (REICH_TITLE_BUTTON_WIDTH * ctx->scale) * 3;
       if (ptLocal.x >= ctx->windowWidth - btnArea) { return HTCLIENT; }
       return HTCAPTION;
@@ -1585,9 +1587,90 @@ REICH_API void reich_load_fonts(
   if (ctx->fontCount == 0) { reich_init_default_font(ctx); }
 }
 
+/* MATH **********************************************************************/
+
+#define REICH_PI 3.14159265f
+#define REICH_HALF_PI 1.57079632f
+#define REICH_TWO_PI 6.28318530f
+
+static float reich_wrap(float x) {
+    const float twoPi = REICH_TWO_PI;
+    int k = (int)(x / twoPi);
+    x -= (float)k * twoPi;
+    if (x > REICH_PI) x -= twoPi;
+    if (x < -REICH_PI) x += twoPi;
+    return x;
+}
+
+float reich_sin(float x) {
+    float x2, term, result;
+    x = reich_wrap(x);
+    x2 = x * x;
+    result = x;
+    term = x;
+    
+    term *= -x2 * 0.16666667f;
+    result += term;
+    
+    term *= -x2 * 0.05f;
+    result += term;
+    
+    term *= -x2 * 0.02380952f;
+    result += term;
+    
+    term *= -x2 * 0.01388889f;
+    result += term;
+    
+    return result;
+}
+
+float reich_cos(float x) {
+    return reich_sin(x + REICH_HALF_PI);
+}
+
+/* RECT **********************************************************************/
+
+REICH_API reichRect reich_rect(int32 x1, int32 y1, int32 x2, int32 y2) {
+	reichRect ret;
+	ret.x1 = x1;
+	ret.y1 = y1;
+	ret.x2 = x2;
+	ret.y2 = y2;
+	return ret;
+}
+
+REICH_API int32 reich_rect_bounds(
+		int32 x, int32 y, int32 minX, int32 minY, int32 maxX, int32 maxY) {
+	return (x >= minX) && (y >= minY) && (x < maxX) && (y < maxY);
+}
+
+#define reich_bounds_check(_x, _y, _sx, _sy, _ex, _ey) \
+  ((_x) >= (_sx) && (_x) < (_ex) && (_y) >= (_sy) && (_y) < (_ey))
+
 /* DRAWING *******************************************************************/
 
-REICH_API uint32 reich_draw_pixel(
+uint8 reich_rgba_channel(uint32 col, int8 channel) {
+  switch(channel) {
+    case('a'): { return (col >> 24) & 0xFF; }
+    case('r'): { return (col >> 16) & 0xFF; }
+    case('g'): { return (col >> 8) & 0xFF; }
+    case('b'): { return (col >> 0) & 0xFF; }
+  }
+  return 0;
+}
+
+REICH_API uint32 reich_draw_set_clip(reichContext* ctx, reichRect rect) {
+	ctx->clip = rect;
+	return 0;
+}
+
+#define reich_draw_pixel(__pixels, __x, __y, __pitch, __c) \
+	(__pixels)[(__y) * (__pitch) + (__x)] = (__c)
+
+#define reich_draw_pixel(__pixels, __x, __y, __pitch, __c) \
+	(__pixels)[(__y) * (__pitch) + (__x)] = (__c)
+
+REICH_API uint32 reich_draw_pixel_safe(
 		reichContext* ctx, int32 x, int32 y, uint32 color) {
   if ((x) >= 0 && (x) < (ctx)->screen.width && (y) >= 0 &&
       (y) < (ctx)->screen.height) {
@@ -1596,13 +1679,77 @@ REICH_API uint32 reich_draw_pixel(
   return 0;
 }
 
+REICH_API static uint32 reich_draw_blend(uint32 src, uint32 dst) {
+    uint32 a = (src >> 24) & 0xFF;
+    if (a == 255) { return src; }
+    if (a == 0) { return dst; }
+    uint32 scale = a + (a >> 7);
+    uint32 invScale = 256 - scale;
+    uint32 rbSrc = src & 0x00FF00FF;
+    uint32 rbDst = dst & 0x00FF00FF;
+    uint32 gSrc = src & 0x0000FF00;
+    uint32 gDst = dst & 0x0000FF00;
+    uint32 rbOut = (rbSrc * scale + rbDst * invScale) >> 8;
+    uint32 gOut = (gSrc * scale + gDst * invScale) >> 8;
+    return 0xFF000000 | (rbOut & 0x00FF00FF) | (gOut & 0x0000FF00);
+}
+
 REICH_API void reich_draw_clear(reichContext* ctx, uint32 color) {
   int32 count = ctx->screen.width * ctx->screen.height;
   uint32* p = ctx->screen.pixels;
   while (count--) { *p++ = color; }
 }
 
-REICH_API void reich_draw_rect(
+REICH_API int32 reich_draw_line(
+		reichContext* ctx,
+		real32 x1, real32 y1, real32 x2, real32 y2, uint32 colour) {
+	real32 dx, dy, dax, day, x, y, step;
+	int32 i, steps;
+	uint32* pixels = ctx->screen.pixels;
+	uint32 pitch = ctx->screen.width;
+	reichRect clip = ctx->clip;
+	uint8 alpha = reich_rgba_channel(colour, 'a');
+	int32 hasAlpha = alpha < 255 ? 1 : 0;
+	if(alpha == 0) { return 0; }
+	if (x1 < clip.x1 && x2 < clip.x1) { return 0; }
+  if (y1 < clip.y1 && y2 < clip.y1) { return 0; }
+  if (x1 >= clip.x2 && x2 >= clip.x2) { return 0; }
+  if (y1 >= clip.y2 && y2 >= clip.y2) { return 0; }
+	dx = (x2 - x1);
+  dy = (y2 - y1);
+  dax = fabs(dx);
+  day = fabs(dy);
+	step = ((dax >= day) ? dax : day);
+	if(step <= 0.0f) { step = 1.0f; }
+	dx /= step;
+	dy /= step;
+	x = x1;
+	y = y1;
+	steps = (int32)step;
+	for(i = 0; i <= steps; i++) {
+		int32 ix = (int32)(x + 0.5f);
+		int32 iy = (int32)(y + 0.5f);
+		switch(hasAlpha) {
+			case(0): {
+				if(reich_rect_bounds(ix, iy, clip.x1, clip.y1, clip.x2, clip.y2)) {
+					reich_draw_pixel(pixels, ix, iy, pitch, colour);
+				}
+				break;
+			}
+			case(1): {
+				if(reich_rect_bounds(ix, iy, clip.x1, clip.y1, clip.x2, clip.y2)) {
+					reich_draw_pixel(pixels, ix, iy, pitch,
+							reich_draw_blend(colour, pixels[ix + iy*pitch]));
+				}
+			}
+		}
+		x += dx;
+		y += dy;
+	}
+	return 0;
+}
+
+REICH_API void reich_draw_rect_fill(
     reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color) {
   int32 i;
   int32 j;
@@ -1622,16 +1769,19 @@ REICH_API void reich_draw_rect(
   ey = y + h;
   if (ey > ctx->screen.height) { ey = ctx->screen.height; }
   for (j = sy; j < ey; ++j) {
-    for (i = sx; i < ex; ++i) { pixels[j * ctx->screen.width + i] = color; }
+    for (i = sx; i < ex; ++i) {
+			pixels[j * ctx->screen.width + i] = color;
+		}
   }
 }
 
-REICH_API void reich_draw_frame(
-    reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color) {
-  reich_draw_rect(ctx, x, y, w, 1, color);
-  reich_draw_rect(ctx, x, y + h - 1, w, 1, color);
-  reich_draw_rect(ctx, x, y, 1, h, color);
-  reich_draw_rect(ctx, x + w - 1, y, 1, h, color);
+REICH_API int32 reich_draw_rect(
+		reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 colour) {
+	reich_draw_line(ctx, x, y, x + w, y, colour);
+	reich_draw_line(ctx, x, y + h, x + w, y + h, colour);
+	reich_draw_line(ctx, x, y, x, y + h, colour);
+	reich_draw_line(ctx, x + w, y, x + w, y + h, colour);
+	return 0;
 }
 
 REICH_API void reich_draw_text(
@@ -1668,59 +1818,13 @@ REICH_API void reich_draw_text(
         for (i = 0; i < fw; ++i) {
           int32 bit = idx + (j * fw + i);
           if ((font[5 + (bit >> 3)] >> (7 - (bit & 7))) & 1) {
-            reich_draw_rect(ctx, cx + i, cy + j, 1, 1, color);
+						reich_draw_pixel_safe(ctx, cx + i, cy + j, color);
           }
         }
       }
     }
     cx += fw + font[2] - kern;
   }
-}
-
-REICH_API int32 reich_draw_button(
-    reichContext* ctx,
-    int32 id,
-    int32 x,
-    int32 y,
-    int32 w,
-    int32 h,
-    const char* label,
-    uint32 bgCol) {
-  int32 mx = reich_mouse_x(ctx);
-  int32 my = reich_mouse_y(ctx);
-  int32 hover = (mx >= x && mx < x + w && my >= y && my < y + h);
-  int32 clicked = 0;
-  uint32 col = bgCol;
-  if (hover) {
-    ctx->input.hotId = id;
-    if (ctx->input.activeId == 0 && reich_mouse_pressed(ctx, 0)) {
-      ctx->input.activeId = id;
-    }
-  }
-  if (ctx->input.activeId == id) {
-    if (!ctx->input.buttons[0]) {
-      if (hover) { clicked = 1; }
-      ctx->input.activeId = 0;
-    }
-  }
-  if (hover) {
-    col = 0xFF000000 | ((bgCol & 0x00FEFEFE) >> 1);
-    if (ctx->input.activeId == id) {
-      col = 0xFF000000 | ((col & 0x00FEFEFE) >> 1);
-    } else {
-      col += 0x00202020;
-    }
-  }
-  reich_draw_rect(ctx, x, y, w, h, col);
-  if (label) {
-    int32 kern = 4;
-    uint8* f = ctx->fonts[ctx->activeFont];
-    reichSize len = reich_strlen(label);
-    int32 tw = (int32)len * (f[0] + f[2] - kern);
-    reich_draw_text(
-        ctx, x + (w - tw) / 2, y + (h - f[1]) / 2, label, 0xFFFFFF);
-  }
-  return clicked;
 }
 
 REICH_API void reich_draw_decorations(reichContext* ctx) {
@@ -1736,13 +1840,14 @@ REICH_API void reich_draw_decorations(reichContext* ctx) {
   uint32 cMax = 0xFF333333;
   uint32 cMin = 0xFF333333;
   int32 i;
-  reich_draw_rect(ctx, 0, 0, w, h, 0xFF222222);
+  ctx->clip = reich_rect(0, 0, ctx->screen.width, ctx->screen.height);
+	reich_draw_rect(ctx, 0, 0, w, h, 0xFF222222);
   reich_draw_rect(ctx, 0, h - 1, w, 1, 0xFF444444);
   if (ctx->windowTitle) {
     reich_draw_text(ctx, 10, 8, ctx->windowTitle, 0xFFAAAAAA);
   }
   if (!ctx->isMaximized) {
-    reich_draw_frame(ctx, 0, 0, w, ctx->screen.height, 0xFF444444);
+    reich_draw_rect(ctx, 0, 0, w, ctx->screen.height, 0xFF444444);
   }
   if (my < h) {
     if (mx >= closeX) {
@@ -1753,20 +1858,23 @@ REICH_API void reich_draw_decorations(reichContext* ctx) {
       cMin = 0xFF555555;
     }
   }
-  reich_draw_rect(ctx, closeX, 0, btnW, h, cClose);
+  reich_draw_rect_fill(ctx, closeX, 0, btnW, h, cClose);
+  reich_draw_rect(ctx, closeX, 0, btnW, h, 0x44FFFFFF);
   for (i = 0; i < 10; ++i) {
-    reich_draw_pixel(ctx, closeX + 17 + i, 11 + i, 0xFFFFFFFF);
-    reich_draw_pixel(ctx, closeX + 17 + 9 - i, 11 + i, 0xFFFFFFFF);
+    reich_draw_pixel_safe(ctx, closeX + 17 + i, 9 + i, 0xFFFFFFFF);
+    reich_draw_pixel_safe(ctx, closeX + 17 + 9 - i, 9 + i, 0xFFFFFFFF);
   }
-  reich_draw_rect(ctx, maxX, 0, btnW, h, cMax);
+  reich_draw_rect_fill(ctx, maxX, 0, btnW, h, cMax);
+  reich_draw_rect(ctx, maxX, 0, btnW, h, 0x44FFFFFF);
   if (ctx->isMaximized) {
-    reich_draw_frame(ctx, maxX + 17, 13, 8, 8, 0xFFFFFFFF);
-    reich_draw_frame(ctx, maxX + 19, 11, 8, 8, 0xFFFFFFFF);
+    reich_draw_rect(ctx, maxX + 17, 11, 8, 6, 0xFFFFFFFF);
+    reich_draw_rect(ctx, maxX + 19, 9, 8, 6, 0xFFFFFFFF);
   } else {
-    reich_draw_frame(ctx, maxX + 17, 11, 10, 10, 0xFFFFFFFF);
+    reich_draw_rect(ctx, maxX + 17, 9, 10, 10, 0xFFFFFFFF);
   }
-  reich_draw_rect(ctx, minX, 0, btnW, h, cMin);
-  reich_draw_rect(ctx, minX + 17, 20, 10, 1, 0xFFFFFFFF);
+	reich_draw_rect_fill(ctx, minX, 0, btnW, h, cMin);
+	reich_draw_rect(ctx, minX, 0, btnW, h, 0x44FFFFFF);
+  reich_draw_rect(ctx, minX + 17, 18, 10, 1, 0xFFFFFFFF);
 }
 
 REICH_API void reich_draw_grid(
