@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitmap Font Designer Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+        
+        /* Grid & Pixel Styles */
+        .pixel-grid { display: grid; gap: 1px; background-color: #334155; padding: 1px; user-select: none; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
+        .pixel { width: 24px; height: 24px; background-color: #1e293b; cursor: pointer; transition: background-color 0.05s ease; }
+        .pixel.active { background-color: #3b82f6; }
+        .pixel:hover { border: 1px solid rgba(255,255,255,0.3); }
+        
+        /* Sidebar List */
+        .char-item { cursor: pointer; border-left: 3px solid transparent; transition: all 0.1s; }
+        .char-item:hover { background-color: #1e293b; }
+        .char-item.selected { background-color: #1e293b; border-left-color: #3b82f6; background-image: linear-gradient(to right, #1e293b, #0f172a); }
+        
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        
+        /* Utilities */
+        .tool-active { background-color: #3b82f6 !important; color: white !important; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .bg-pattern { background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 20px 20px; }
+        .image-render-pixel { image-rendering: pixelated; }
+        
+        /* Resizable Preview */
+        .resizable-y { resize: vertical; overflow: auto; min-height: 80px; max-height: 50vh; }
+    </style>
+</head>
+<body class="h-screen flex flex-col selection:bg-blue-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-gray-900/90 shrink-0 z-30 backdrop-blur-sm">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-1.5 rounded-lg shadow-lg shadow-blue-900/50">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            </div>
+            <h1 class="font-bold text-lg tracking-tight text-slate-200 hidden sm:block">BitFont<span class="text-blue-500">Forge</span> <span class="text-xs font-normal text-slate-500 ml-1">v3.2</span></h1>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <!-- Global Actions -->
+            <div class="flex items-center gap-1 bg-gray-800 rounded-md p-1 border border-gray-700">
+                <button id="undoBtn" class="p-1.5 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition" title="Undo (Ctrl+Z)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                </button>
+                <button id="redoBtn" class="p-1.5 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition" title="Redo (Ctrl+Y)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"></path></svg>
+                </button>
+            </div>
+
+            <div class="h-6 w-px bg-gray-700"></div>
+
+            <div class="flex items-center bg-gray-800 rounded-md px-3 py-1 gap-2 border border-gray-700">
+                <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Size</span>
+                <input id="fontWidth" type="number" value="8" min="1" max="64" class="w-8 bg-transparent text-center text-sm focus:outline-none text-white font-mono border-b border-gray-600 focus:border-blue-500">
+                <span class="text-gray-500">x</span>
+                <input id="fontHeight" type="number" value="8" min="1" max="64" class="w-8 bg-transparent text-center text-sm focus:outline-none text-white font-mono border-b border-gray-600 focus:border-blue-500">
+                <button id="resizeBtn" class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded transition ml-1">Set</button>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                 <button id="imgImportBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded transition flex items-center gap-1 font-medium border border-gray-600">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Import Image
+                </button>
+                <button id="rasterizeBtn" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded transition flex items-center gap-1 font-medium shadow-lg shadow-purple-900/20">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    Sys Font
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Sidebar: Char List -->
+        <aside class="w-56 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 z-20">
+            <div class="p-3 border-b border-gray-800">
+                <div class="relative">
+                    <input id="charSearch" type="text" placeholder="Search glyphs..." class="w-full bg-gray-800 border border-gray-700 rounded-md pl-8 pr-2 py-1.5 text-xs focus:border-blue-500 outline-none text-white transition-colors">
+                    <svg class="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+            </div>
+            <div id="charList" class="flex-1 overflow-y-auto p-1 space-y-0.5"></div>
+            <div class="p-2 border-t border-gray-800 bg-gray-900 text-[10px] flex justify-between text-gray-500">
+                <span>0x00 - 0xFF</span>
+                <span id="charCount">256 Glyphs</span>
+            </div>
+        </aside>
+
+        <!-- Main Editor Area -->
+        <main class="flex-1 bg-slate-900 flex flex-col relative overflow-hidden" id="mainArea">
+            <!-- Floating Toolbar -->
+            <div class="absolute top-4 left-4 flex flex-col gap-2 glass-panel p-2 rounded-lg shadow-2xl z-20">
+                <!-- Drawing Tools -->
+                <div class="flex flex-col gap-1">
+                    <button id="toolPen" class="w-9 h-9 flex items-center justify-center rounded-md hover:bg-gray-700 text-gray-300 transition-all tool-active" title="Pen (P)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    </button>
+                    <button id="toolEraser" class="w-9 h-9 flex items-center justify-center rounded-md hover:bg-gray-700 text-gray-300 transition-all" title="Eraser (E)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                    <button id="toolFill" class="w-9 h-9 flex items-center justify-center rounded-md hover:bg-gray-700 text-gray-300 transition-all" title="Flood Fill (F)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    </button>
+                </div>
+                
+                <div class="h-px bg-gray-600/50 my-0.5"></div>
+                
+                <!-- Actions -->
+                <button id="actionClear" class="w-9 h-9 flex items-center justify-center rounded-md hover:bg-red-900/50 text-red-400 transition-all" title="Clear Grid">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <button id="actionInvert" class="w-9 h-9 flex items-center justify-center rounded-md hover:bg-gray-700 text-gray-300 transition-all" title="Invert Grid">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                </button>
+                
+                <div class="h-px bg-gray-600/50 my-0.5"></div>
+
+                <!-- Shift Actions -->
+                <div class="grid grid-cols-3 gap-1 w-9">
+                    <button id="moveUp" class="col-start-2 w-full h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 bg-gray-800"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg></button>
+                    <button id="moveLeft" class="col-start-1 w-full h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 bg-gray-800"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
+                    <button id="moveRight" class="col-start-3 w-full h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 bg-gray-800"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
+                    <button id="moveDown" class="col-start-2 w-full h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 bg-gray-800"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>
+                </div>
+
+                <div class="h-px bg-gray-600/50 my-0.5"></div>
+
+                <!-- Clipboard Actions -->
+                <button id="copyGlyph" class="w-9 h-9 flex items-center justify-center rounded-md hover:bg-gray-700 text-gray-300 transition-all" title="Copy Glyph">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                </button>
+                <button id="pasteGlyph" class="w-9 h-9 flex items-center justify-center rounded-md hover:bg-gray-700 text-gray-300 transition-all" title="Paste Glyph">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                </button>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="flex-1 overflow-auto flex items-center justify-center p-12 bg-pattern" id="gridContainer">
+                <div class="flex flex-col items-center gap-2">
+                    <!-- Info Header -->
+                    <div class="flex items-center justify-between w-full bg-gray-800/80 backdrop-blur rounded-t-lg border-x border-t border-gray-700 px-4 py-2">
+                         <div class="flex items-center gap-4 text-sm font-mono">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-500 uppercase">Index</span>
+                                <span class="text-white font-bold" id="lblIndex">0</span>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-500 uppercase">Hex</span>
+                                <span class="text-blue-400 font-bold" id="lblHex">0x00</span>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-500 uppercase">Char</span>
+                                <span class="text-green-400 font-bold text-lg leading-none" id="lblChar">NUL</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-1">
+                             <button id="prevChar" class="p-1 hover:text-white text-gray-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
+                             <button id="nextChar" class="p-1 hover:text-white text-gray-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
+                        </div>
+                    </div>
+                    
+                    <!-- The Grid -->
+                    <div id="editorGrid" class="pixel-grid border border-gray-700 rounded-b-lg overflow-hidden"></div>
+                </div>
+            </div>
+            
+            <div class="h-6 bg-gray-900 border-t border-gray-800 flex items-center justify-between px-4 text-[10px] text-gray-500 shrink-0 select-none">
+                <span>Left Click: Draw &bull; Right Click: Erase</span>
+                <span id="statusMsg">Ready</span>
+            </div>
+        </main>
+
+        <!-- Right Sidebar -->
+        <aside class="w-80 bg-gray-900 border-l border-gray-800 flex flex-col shrink-0 z-20 overflow-hidden">
+            <!-- Enhanced Preview Section -->
+            <div class="p-4 border-b border-gray-800 shrink-0 bg-gray-800/30 flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Live Preview</h3>
+                    <div class="flex items-center gap-1">
+                        <input id="previewBg" type="color" value="#111827" class="w-4 h-4 rounded overflow-hidden cursor-pointer border-0 p-0" title="Background Color">
+                        <input id="previewFg" type="color" value="#3b82f6" class="w-4 h-4 rounded overflow-hidden cursor-pointer border-0 p-0" title="Text Color">
+                        <select id="previewZoom" class="text-[10px] bg-gray-800 border border-gray-700 rounded px-1 text-gray-300 outline-none">
+                            <option value="1">1x</option>
+                            <option value="2" selected>2x</option>
+                            <option value="4">4x</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Resizable Container -->
+                <div class="border border-gray-700 rounded-lg overflow-hidden flex flex-col shadow-inner bg-gray-900/50">
+                    <div class="resizable-y custom-scrollbar flex p-2 transition-colors duration-200 min-h-[100px]" id="previewContainer">
+                        <canvas id="previewCanvas" class="m-auto"></canvas>
+                    </div>
+                    <div class="border-t border-gray-700 p-0">
+                         <textarea id="testString" rows="1" class="w-full bg-gray-800 text-white p-2 text-xs focus:outline-none resize-none placeholder-gray-600" placeholder="Type here to test...">THE quick brown fox 123</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-800 shrink-0 bg-gray-900">
+                <button class="flex-1 py-2.5 text-xs font-medium text-blue-400 border-b-2 border-blue-500 bg-gray-800/50 focus:outline-none transition-colors" id="tabCode">Code Export</button>
+                <button class="flex-1 py-2.5 text-xs font-medium text-gray-500 hover:text-gray-300 border-b-2 border-transparent focus:outline-none transition-colors" id="tabImage">Sprite Sheet</button>
+            </div>
+            
+            <!-- Code Export Panel -->
+            <div id="panelCode" class="flex-1 p-4 overflow-y-auto flex flex-col gap-4">
+                <div class="space-y-2">
+                    <label class="text-[10px] uppercase font-bold text-gray-500">Output Format</label>
+                    <div class="relative">
+                        <select id="exportFormat" class="w-full appearance-none bg-gray-800 border border-gray-700 text-xs rounded-md px-3 py-2 outline-none text-white focus:border-blue-500 transition-colors">
+                            <option value="c_row">C Array (Row Major) - Generic</option>
+                            <option value="c_col">C Array (Column Major) - OLED/LCD</option>
+                            <option value="c_rle">C Array (RLE Compressed)</option>
+                            <option value="adafruit">Adafruit GFX Library</option>
+                            <option value="micropython">MicroPython Bytearray</option>
+                            <option value="json">JSON (Raw Data)</option>
+                            <option value="hex">Hex Dump</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col min-h-0 relative">
+                    <textarea id="exportOutput" readonly class="flex-1 w-full bg-gray-800 border border-gray-700 rounded-md p-3 text-[10px] font-mono text-green-400 outline-none resize-none focus:border-gray-600 whitespace-pre custom-scrollbar"></textarea>
+                    <div class="absolute bottom-2 right-2 flex gap-2">
+                        <button id="downloadJsonBtn" class="bg-gray-700/80 backdrop-blur hover:bg-gray-600 text-white text-[10px] px-2 py-1 rounded border border-gray-600 transition" title="Save Project">Save JSON</button>
+                         <button id="importBtn" class="bg-gray-700/80 backdrop-blur hover:bg-gray-600 text-white text-[10px] px-2 py-1 rounded border border-gray-600 transition">Import JSON</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="copyBtn" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium py-2 rounded-md shadow-lg shadow-blue-900/20 transition-all active:scale-95">Copy Code</button>
+                    <button id="downloadBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium py-2 rounded-md transition-all active:scale-95">Download .h</button>
+                </div>
+            </div>
+
+            <!-- Image Export Panel -->
+            <div id="panelImage" class="flex-1 p-4 overflow-y-auto hidden flex-col gap-4">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold">Columns</label>
+                            <input id="imgCols" type="number" value="16" min="1" max="256" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold">Scale</label>
+                            <input id="imgScale" type="number" value="1" min="1" max="10" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold">Spacing</label>
+                            <input id="imgSpacing" type="number" value="1" min="0" max="10" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold">Margin</label>
+                            <input id="imgMargin" type="number" value="2" min="0" max="10" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white">
+                        </div>
+                    </div>
+                    
+                     <div class="space-y-1">
+                        <label class="text-[10px] text-gray-500 uppercase font-bold">Colors</label>
+                        <div class="grid grid-cols-2 gap-4">
+                             <div class="flex items-center gap-2 bg-gray-800 p-1 rounded border border-gray-700">
+                                 <input id="imgFgColor" type="color" value="#ffffff" class="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0">
+                                 <span class="text-[10px] text-gray-400">Foreground</span>
+                            </div>
+                            <div class="flex items-center gap-2 bg-gray-800 p-1 rounded border border-gray-700">
+                                <input id="imgBgColor" type="color" value="#000000" class="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0">
+                                 <span class="text-[10px] text-gray-400">Background</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-4 border-t border-gray-800">
+                    <button id="downloadImgBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-2.5 rounded-md flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/20 active:scale-95">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Export .PNG Sheet
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Rasterize Modal -->
+    <div id="rasterizeModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 w-96 shadow-2xl">
+            <h3 class="text-lg font-bold text-white mb-4">Import System Font</h3>
+            <p class="text-xs text-gray-400 mb-4">Overwrite bitmap data using a system font.</p>
+            
+            <div class="space-y-3 mb-6">
+                <div>
+                    <label class="text-xs text-gray-500 uppercase font-bold block mb-1">Font Family</label>
+                    <input id="sysFontName" type="text" value="monospace" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-blue-500 outline-none" placeholder="e.g. Arial, Courier New">
+                </div>
+                <div class="flex gap-3">
+                     <div class="flex-1">
+                        <label class="text-xs text-gray-500 uppercase font-bold block mb-1">Size (px)</label>
+                        <input id="sysFontSize" type="number" value="12" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-blue-500 outline-none">
+                    </div>
+                    <div class="flex-1">
+                         <label class="text-xs text-gray-500 uppercase font-bold block mb-1">Offset Y</label>
+                        <input id="sysFontOffset" type="number" value="0" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-blue-500 outline-none">
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 border-t border-gray-700 pt-3">
+                    <div class="flex-1">
+                        <label class="text-xs text-gray-500 uppercase font-bold block mb-1">From Char</label>
+                        <input id="sysFontStart" type="number" value="32" min="0" max="255" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-blue-500 outline-none">
+                    </div>
+                    <div class="flex-1">
+                         <label class="text-xs text-gray-500 uppercase font-bold block mb-1">To Char</label>
+                        <input id="sysFontEnd" type="number" value="126" min="0" max="255" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-blue-500 outline-none">
+                    </div>
+                </div>
+
+                 <div class="flex flex-col gap-2 mt-2">
+                    <div class="flex items-center gap-2">
+                        <input id="sysFontBold" type="checkbox" class="rounded bg-gray-900 border-gray-600">
+                        <label for="sysFontBold" class="text-sm text-gray-300">Bold</label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input id="sysFontAutoSize" type="checkbox" checked class="rounded bg-gray-900 border-gray-600 accent-purple-500">
+                        <label for="sysFontAutoSize" class="text-sm text-white font-medium">Auto-size Grid to Fit</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-2">
+                <button id="cancelRaster" class="px-4 py-2 text-xs font-medium text-gray-400 hover:text-white transition">Cancel</button>
+                <button id="confirmRaster" class="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded transition shadow-lg">Generate</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Image Import Modal -->
+    <div id="imageImportModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 w-[600px] shadow-2xl flex flex-col max-h-[90vh]">
+            <h3 class="text-lg font-bold text-white mb-2">Import from Image (Sprite Sheet)</h3>
+            <p class="text-xs text-gray-400 mb-4">Upload a PNG/BMP. The editor grid will be resized to match the Cell Dimensions.</p>
+            
+            <div class="flex gap-4 mb-4 flex-1 min-h-0">
+                <!-- Preview Area -->
+                <div class="flex-1 bg-gray-900 border border-gray-700 rounded flex items-center justify-center overflow-auto relative">
+                    <canvas id="importPreviewCanvas" class="max-w-none"></canvas>
+                    <div id="importPlaceholder" class="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">No image loaded</div>
+                </div>
+                
+                <!-- Controls -->
+                <div class="w-48 flex flex-col gap-3 overflow-y-auto pr-1">
+                    <input type="file" id="importFile" accept="image/*" class="text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-700 file:text-white hover:file:bg-gray-600">
+                    
+                    <div class="h-px bg-gray-700 my-1"></div>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] uppercase font-bold text-gray-500">Cell W</label>
+                            <input id="impCellW" type="number" value="8" class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white">
+                        </div>
+                        <div>
+                            <label class="text-[10px] uppercase font-bold text-gray-500">Cell H</label>
+                            <input id="impCellH" type="number" value="8" class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white">
+                        </div>
+                    </div>
+                    
+                     <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] uppercase font-bold text-gray-500">Cols</label>
+                            <input id="impCols" type="number" value="16" class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white">
+                        </div>
+                        <div>
+                            <label class="text-[10px] uppercase font-bold text-gray-500">Start Char</label>
+                            <input id="impStart" type="number" value="0" class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] uppercase font-bold text-gray-500">Margin</label>
+                            <input id="impMargin" type="number" value="0" class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white">
+                        </div>
+                        <div>
+                            <label class="text-[10px] uppercase font-bold text-gray-500">Spacing</label>
+                            <input id="impSpacing" type="number" value="0" class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white">
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-gray-700 my-1"></div>
+                    
+                    <div>
+                         <label class="text-[10px] uppercase font-bold text-gray-500">Threshold (0-255)</label>
+                         <input id="impThreshold" type="range" min="0" max="255" value="128" class="w-full accent-blue-500">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-2 pt-2 border-t border-gray-700">
+                <button id="cancelImportImg" class="px-4 py-2 text-xs font-medium text-gray-400 hover:text-white transition">Cancel</button>
+                <button id="runImportImg" class="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-500 rounded transition shadow-lg">Import Data</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Core State
+        const state = {
+            width: 8,
+            height: 8,
+            activeChar: 65,
+            data: {},
+            tool: 'pen', 
+            isDrawing: false,
+            mouseButton: 0,
+            activeTab: 'code',
+            clipboard: null,
+            history: [],
+            historyIndex: -1,
+            maxHistory: 30,
+            importImage: null
+        };
+
+        // DOM Elements
+        const el = {
+            grid: document.getElementById('editorGrid'),
+            charList: document.getElementById('charList'),
+            preview: document.getElementById('previewCanvas'),
+            previewContainer: document.getElementById('previewContainer'),
+            testString: document.getElementById('testString'),
+            widthInput: document.getElementById('fontWidth'),
+            heightInput: document.getElementById('fontHeight'),
+            output: document.getElementById('exportOutput'),
+            format: document.getElementById('exportFormat'),
+            lblIndex: document.getElementById('lblIndex'),
+            lblHex: document.getElementById('lblHex'),
+            lblChar: document.getElementById('lblChar'),
+            tabCode: document.getElementById('tabCode'),
+            tabImage: document.getElementById('tabImage'),
+            panelCode: document.getElementById('panelCode'),
+            panelImage: document.getElementById('panelImage'),
+            previewBg: document.getElementById('previewBg'),
+            previewFg: document.getElementById('previewFg'),
+            previewZoom: document.getElementById('previewZoom'),
+            status: document.getElementById('statusMsg'),
+            modalRaster: document.getElementById('rasterizeModal'),
+            modalImg: document.getElementById('imageImportModal'),
+            impCanvas: document.getElementById('importPreviewCanvas')
+        };
+
+        // --- Initialization ---
+
+        function init() {
+            el.widthInput.value = state.width;
+            el.heightInput.value = state.height;
+            
+            // Initialize empty data
+            for (let i = 0; i < 256; i++) {
+                if (!state.data[i]) state.data[i] = new Array(state.width * state.height).fill(0);
+            }
+
+            // Push initial state
+            saveState();
+
+            renderGrid();
+            renderCharList();
+            updatePreviewColors();
+            updatePreview();
+            generateOutput();
+            selectChar(65);
+            setupEvents();
+            
+            setStatus("Ready.");
+        }
+
+        // --- Event Listeners ---
+
+        function setupEvents() {
+            // Mouse Interaction
+            el.grid.addEventListener('mousedown', handleGridInput);
+            el.grid.addEventListener('mouseover', handleGridInput);
+            window.addEventListener('mouseup', () => {
+                if(state.isDrawing) {
+                    state.isDrawing = false;
+                    saveState(); 
+                }
+            });
+            el.grid.addEventListener('contextmenu', e => e.preventDefault());
+
+            // Toolbar
+            document.getElementById('toolPen').addEventListener('click', () => setTool('pen'));
+            document.getElementById('toolEraser').addEventListener('click', () => setTool('eraser'));
+            document.getElementById('toolFill').addEventListener('click', () => setTool('fill'));
+            
+            document.getElementById('actionClear').addEventListener('click', () => { clearChar(); saveState(); });
+            document.getElementById('actionInvert').addEventListener('click', () => { invertChar(); saveState(); });
+
+            document.getElementById('moveUp').addEventListener('click', () => { shiftChar(0, -1); saveState(); });
+            document.getElementById('moveDown').addEventListener('click', () => { shiftChar(0, 1); saveState(); });
+            document.getElementById('moveLeft').addEventListener('click', () => { shiftChar(-1, 0); saveState(); });
+            document.getElementById('moveRight').addEventListener('click', () => { shiftChar(1, 0); saveState(); });
+
+            // Clipboard
+            document.getElementById('copyGlyph').addEventListener('click', copyGlyph);
+            document.getElementById('pasteGlyph').addEventListener('click', pasteGlyph);
+
+            // History
+            document.getElementById('undoBtn').addEventListener('click', undo);
+            document.getElementById('redoBtn').addEventListener('click', redo);
+            
+            // Navigation
+            document.getElementById('prevChar').addEventListener('click', () => selectChar((state.activeChar - 1 + 256) % 256));
+            document.getElementById('nextChar').addEventListener('click', () => selectChar((state.activeChar + 1) % 256));
+
+            // Global Actions
+            document.getElementById('resizeBtn').addEventListener('click', resizeFont);
+            el.widthInput.addEventListener('keydown', e => { if(e.key === 'Enter') resizeFont(); });
+            el.heightInput.addEventListener('keydown', e => { if(e.key === 'Enter') resizeFont(); });
+
+            document.getElementById('rasterizeBtn').addEventListener('click', () => el.modalRaster.classList.remove('hidden'));
+            document.getElementById('imgImportBtn').addEventListener('click', () => el.modalImg.classList.remove('hidden'));
+            
+            // Modal Actions (Raster)
+            document.getElementById('cancelRaster').addEventListener('click', () => el.modalRaster.classList.add('hidden'));
+            document.getElementById('confirmRaster').addEventListener('click', runRasterizer);
+
+            // Modal Actions (Image Import)
+            document.getElementById('cancelImportImg').addEventListener('click', () => el.modalImg.classList.add('hidden'));
+            document.getElementById('importFile').addEventListener('change', handleImageUpload);
+            document.getElementById('runImportImg').addEventListener('click', runImageImport);
+            
+            // Image Import Live Updates
+            ['impCellW', 'impCellH', 'impCols', 'impStart', 'impMargin', 'impSpacing', 'impThreshold'].forEach(id => {
+               document.getElementById(id).addEventListener('input', drawImportGrid);
+            });
+
+            // Preview & Export
+            el.testString.addEventListener('input', updatePreview);
+            el.previewBg.addEventListener('input', updatePreviewColors);
+            el.previewFg.addEventListener('input', updatePreviewColors);
+            el.previewZoom.addEventListener('change', updatePreviewColors); 
+
+            el.format.addEventListener('change', generateOutput);
+            document.getElementById('copyBtn').addEventListener('click', copyOutput);
+            document.getElementById('importBtn').addEventListener('click', importData);
+            document.getElementById('downloadJsonBtn').addEventListener('click', downloadJson);
+            document.getElementById('downloadBtn').addEventListener('click', downloadFile);
+            document.getElementById('downloadImgBtn').addEventListener('click', downloadImage);
+
+            // Tabs
+            el.tabCode.addEventListener('click', () => switchTab('code'));
+            el.tabImage.addEventListener('click', () => switchTab('image'));
+
+            // Search
+            document.getElementById('charSearch').addEventListener('input', filterCharList);
+
+            // Shortcuts
+            document.addEventListener('keydown', handleKeys);
+        }
+
+        // --- Logic: Image Import ---
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    state.importImage = img;
+                    document.getElementById('importPlaceholder').style.display = 'none';
+                    // Auto-detect roughly? defaulting to current width
+                    document.getElementById('impCellW').value = state.width;
+                    document.getElementById('impCellH').value = state.height;
+                    drawImportGrid();
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function drawImportGrid() {
+            if (!state.importImage) return;
+            
+            const ctx = el.impCanvas.getContext('2d');
+            const img = state.importImage;
+            
+            el.impCanvas.width = img.width;
+            el.impCanvas.height = img.height;
+            
+            // Draw image
+            ctx.drawImage(img, 0, 0);
+            
+            // Settings
+            const w = parseInt(document.getElementById('impCellW').value) || 8;
+            const h = parseInt(document.getElementById('impCellH').value) || 8;
+            const cols = parseInt(document.getElementById('impCols').value) || 16;
+            const margin = parseInt(document.getElementById('impMargin').value) || 0;
+            const spacing = parseInt(document.getElementById('impSpacing').value) || 0;
+            
+            // Draw Overlay
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            
+            const rows = Math.ceil(256 / cols);
+            
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const x = margin + c * (w + spacing);
+                    const y = margin + r * (h + spacing);
+                    
+                    if (x + w <= img.width && y + h <= img.height) {
+                        ctx.rect(x + 0.5, y + 0.5, w, h);
+                    }
+                }
+            }
+            ctx.stroke();
+        }
+
+        function runImageImport() {
+            if (!state.importImage) return;
+            
+            const w = parseInt(document.getElementById('impCellW').value) || 8;
+            const h = parseInt(document.getElementById('impCellH').value) || 8;
+            const cols = parseInt(document.getElementById('impCols').value) || 16;
+            const margin = parseInt(document.getElementById('impMargin').value) || 0;
+            const spacing = parseInt(document.getElementById('impSpacing').value) || 0;
+            const startChar = parseInt(document.getElementById('impStart').value) || 0;
+            const threshold = parseInt(document.getElementById('impThreshold').value) || 128;
+
+            // Update app state to imported cell size
+            state.width = w;
+            state.height = h;
+            el.widthInput.value = w;
+            el.heightInput.value = h;
+            
+            // Reset data structure for new size
+            for(let i=0; i<256; i++) {
+                 if(!state.data[i] || state.data[i].length !== w*h) {
+                     state.data[i] = new Array(w*h).fill(0);
+                 }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = state.importImage.width;
+            canvas.height = state.importImage.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(state.importImage, 0, 0);
+            
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            
+            let charIdx = startChar;
+            const rows = Math.ceil((256 - startChar) / cols) + 5; // buffer
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (charIdx > 255) break;
+                    
+                    const startX = margin + c * (w + spacing);
+                    const startY = margin + r * (h + spacing);
+                    
+                    if (startX + w > canvas.width || startY + h > canvas.height) continue;
+                    
+                    const charData = new Array(w * h).fill(0);
+                    
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < w; x++) {
+                            const pixelIdx = ((startY + y) * canvas.width + (startX + x)) * 4;
+                            // Check brightness
+                            const rVal = imgData[pixelIdx];
+                            const gVal = imgData[pixelIdx+1];
+                            const bVal = imgData[pixelIdx+2];
+                            const bright = (rVal + gVal + bVal) / 3;
+                            
+                            // Assume light pixels are active
+                            if (bright > threshold) {
+                                charData[y * w + x] = 1;
+                            }
+                        }
+                    }
+                    state.data[charIdx] = charData;
+                    charIdx++;
+                }
+            }
+            
+            el.modalImg.classList.add('hidden');
+            saveState();
+            refreshUI();
+            setStatus(`Imported ${charIdx - startChar} chars from image`);
+        }
+
+        // --- Logic: History & State ---
+
+        function saveState() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.history = state.history.slice(0, state.historyIndex + 1);
+            }
+            
+            const snapshot = {
+                width: state.width,
+                height: state.height,
+                data: JSON.parse(JSON.stringify(state.data)), 
+                activeChar: state.activeChar
+            };
+            
+            state.history.push(snapshot);
+            if (state.history.length > state.maxHistory) state.history.shift();
+            else state.historyIndex++;
+            
+            updateHistoryButtons();
+        }
+
+        function undo() {
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                restoreState(state.history[state.historyIndex]);
+            }
+        }
+
+        function redo() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.historyIndex++;
+                restoreState(state.history[state.historyIndex]);
+            }
+        }
+
+        function restoreState(snapshot) {
+            state.width = snapshot.width;
+            state.height = snapshot.height;
+            state.data = JSON.parse(JSON.stringify(snapshot.data));
+            
+            el.widthInput.value = state.width;
+            el.heightInput.value = state.height;
+            renderGrid();
+            renderCharList();
+            selectChar(snapshot.activeChar);
+            updatePreview();
+            generateOutput();
+            updateHistoryButtons();
+        }
+
+        function updateHistoryButtons() {
+            document.getElementById('undoBtn').style.opacity = state.historyIndex > 0 ? '1' : '0.3';
+            document.getElementById('redoBtn').style.opacity = state.historyIndex < state.history.length - 1 ? '1' : '0.3';
+        }
+
+        // --- Logic: Drawing & Grid ---
+
+        function renderGrid() {
+            el.grid.style.gridTemplateColumns = `repeat(${state.width}, 1fr)`;
+            el.grid.innerHTML = '';
+            
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < state.width * state.height; i++) {
+                const pixel = document.createElement('div');
+                pixel.className = 'pixel';
+                pixel.dataset.index = i;
+                frag.appendChild(pixel);
+            }
+            el.grid.appendChild(frag);
+            updateGridVisuals();
+        }
+
+        function updateGridVisuals() {
+            const charData = state.data[state.activeChar];
+            const pixels = el.grid.children;
+            const len = pixels.length;
+            const fg = el.previewFg.value;
+            
+            for (let i = 0; i < len; i++) {
+                if (charData[i]) {
+                    pixels[i].style.backgroundColor = fg;
+                    pixels[i].classList.add('active');
+                } else {
+                    pixels[i].style.backgroundColor = '';
+                    pixels[i].classList.remove('active');
+                }
+            }
+        }
+
+        function handleGridInput(e) {
+            e.preventDefault();
+            if (e.type === 'mousedown') {
+                state.isDrawing = true;
+                state.mouseButton = e.button; 
+                if (state.tool === 'fill' && e.button === 0) {
+                    fillArea(parseInt(e.target.dataset.index));
+                    saveState();
+                    return;
+                }
+            }
+            
+            if (state.isDrawing && state.tool !== 'fill') {
+                const index = parseInt(e.target.dataset.index);
+                if (!isNaN(index)) {
+                    const charData = state.data[state.activeChar];
+                    const newVal = (state.mouseButton === 2 || state.tool === 'eraser') ? 0 : 1;
+                    
+                    if (charData[index] !== newVal) {
+                        charData[index] = newVal;
+                        updateGridVisuals();
+                        updatePreview();
+                        updateCharListItem(state.activeChar);
+                        if(state.activeTab === 'code') generateOutput();
+                    }
+                }
+            }
+        }
+
+        function fillArea(startIndex) {
+            if (isNaN(startIndex)) return;
+            const data = state.data[state.activeChar];
+            const targetVal = data[startIndex];
+            const fillVal = targetVal === 1 ? 0 : 1;
+            const w = state.width;
+            const h = state.height;
+            const stack = [startIndex];
+            const seen = new Set();
+            
+            while (stack.length) {
+                const idx = stack.pop();
+                if(seen.has(idx)) continue;
+                seen.add(idx);
+
+                const x = idx % w;
+                const y = Math.floor(idx / w);
+                
+                if (data[idx] === targetVal) {
+                    data[idx] = fillVal;
+                    if (x > 0) stack.push(idx - 1);
+                    if (x < w - 1) stack.push(idx + 1);
+                    if (y > 0) stack.push(idx - w);
+                    if (y < h - 1) stack.push(idx + w);
+                }
+            }
+            updateGridVisuals();
+            updatePreview();
+            updateCharListItem(state.activeChar);
+            generateOutput();
+        }
+
+        // --- Logic: Tools & Actions ---
+
+        function setTool(tool) {
+            state.tool = tool;
+            document.querySelectorAll('#toolPen, #toolEraser, #toolFill').forEach(btn => btn.classList.remove('tool-active', 'bg-blue-600', 'text-white'));
+            
+            let btnId = 'toolPen';
+            if (tool === 'eraser') btnId = 'toolEraser';
+            if (tool === 'fill') btnId = 'toolFill';
+            
+            const btn = document.getElementById(btnId);
+            btn.classList.add('tool-active');
+            setStatus(`Tool: ${tool.charAt(0).toUpperCase() + tool.slice(1)}`);
+        }
+
+        function clearChar() {
+            state.data[state.activeChar].fill(0);
+            refreshUI();
+            setStatus("Cleared glyph");
+        }
+
+        function invertChar() {
+            const arr = state.data[state.activeChar];
+            for(let i=0; i<arr.length; i++) arr[i] = arr[i] ? 0 : 1;
+            refreshUI();
+            setStatus("Inverted glyph");
+        }
+
+        function shiftChar(dx, dy) {
+            const oldArr = state.data[state.activeChar];
+            const newArr = new Array(state.width * state.height).fill(0);
+            for (let y = 0; y < state.height; y++) {
+                for (let x = 0; x < state.width; x++) {
+                    const nx = x - dx;
+                    const ny = y - dy;
+                    if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height) {
+                        newArr[y * state.width + x] = oldArr[ny * state.width + nx];
+                    }
+                }
+            }
+            state.data[state.activeChar] = newArr;
+            refreshUI();
+        }
+        
+        function copyGlyph() {
+            state.clipboard = [...state.data[state.activeChar]];
+            setStatus("Glyph copied to clipboard");
+        }
+        
+        function pasteGlyph() {
+            if(!state.clipboard) return setStatus("Clipboard empty");
+            if(state.clipboard.length !== state.data[state.activeChar].length) return setStatus("Dimension mismatch");
+            
+            state.data[state.activeChar] = [...state.clipboard];
+            refreshUI();
+            saveState();
+            setStatus("Glyph pasted");
+        }
+
+        function refreshUI() {
+            renderGrid(); // Explicitly rebuild grid to match dimensions
+            renderCharList(); 
+            updatePreview();
+            generateOutput();
+            el.lblIndex.textContent = state.activeChar;
+            el.lblHex.textContent = '0x' + state.activeChar.toString(16).toUpperCase().padStart(2,'0');
+            el.lblChar.textContent = getCharDisplay(state.activeChar);
+        }
+
+        // --- Logic: Char List & Selection ---
+
+        function renderCharList() {
+            el.charList.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            const c = document.createElement('canvas');
+            c.width = state.width;
+            c.height = state.height;
+            const ctx = c.getContext('2d');
+            
+            for (let i = 0; i < 256; i++) {
+                const item = document.createElement('div');
+                const isSelected = (i === state.activeChar);
+                item.className = `char-item flex items-center p-2 gap-3 text-xs ${isSelected ? 'selected' : ''}`;
+                item.dataset.code = i;
+                item.onclick = () => selectChar(i);
+                
+                drawCharToCanvas(i, ctx, [200,200,200]); 
+                const url = c.toDataURL(); 
+                
+                item.innerHTML = `
+                    <img src="${url}" class="w-6 h-6 border border-gray-700 bg-black image-render-pixel" alt="${i}">
+                    <div class="flex flex-col min-w-0">
+                        <div class="flex items-baseline gap-2">
+                            <span class="font-bold text-gray-300 truncate w-4">${getCharDisplay(i)}</span>
+                            <span class="text-gray-600 font-mono">0x${i.toString(16).toUpperCase().padStart(2,'0')}</span>
+                        </div>
+                    </div>
+                `;
+                
+                if (isSelected) setTimeout(() => item.scrollIntoView({ behavior: 'auto', block: 'nearest' }), 0);
+
+                frag.appendChild(item);
+            }
+            el.charList.appendChild(frag);
+        }
+
+        function updateCharListItem(code) {
+            const img = document.querySelector(`.char-item[data-code="${code}"] img`);
+            if (img) {
+                const c = document.createElement('canvas');
+                c.width = state.width;
+                c.height = state.height;
+                drawCharToCanvas(code, c.getContext('2d'), [200,200,200]);
+                img.src = c.toDataURL();
+            }
+        }
+
+        function selectChar(code) {
+            document.querySelectorAll('.char-item').forEach(e => e.classList.remove('selected'));
+            const item = document.querySelector(`.char-item[data-code="${code}"]`);
+            if (item) {
+                item.classList.add('selected');
+                item.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+            }
+            
+            state.activeChar = code;
+            el.lblIndex.textContent = code;
+            el.lblHex.textContent = '0x' + code.toString(16).toUpperCase().padStart(2,'0');
+            el.lblChar.textContent = getCharDisplay(code);
+            
+            updateGridVisuals();
+            setStatus(`Selected Char ${code}`);
+        }
+
+        function getCharDisplay(i) {
+            if (i >= 33 && i <= 126) return String.fromCharCode(i);
+            const map = { 0:'NUL', 8:'BS', 9:'TAB', 10:'LF', 13:'CR', 27:'ESC', 32:'SPC', 127:'DEL', 255:'NBSP' };
+            return map[i] || '.';
+        }
+        
+        function filterCharList(e) {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.char-item').forEach(item => {
+                const code = parseInt(item.dataset.code);
+                const hex = '0x' + code.toString(16);
+                const char = String.fromCharCode(code).toLowerCase();
+                
+                let match = code.toString().includes(term) || hex.includes(term);
+                if (code > 32 && code < 127 && char.includes(term)) match = true;
+                
+                item.style.display = match ? 'flex' : 'none';
+            });
+        }
+
+        // --- Logic: Preview ---
+        
+        function updatePreviewColors() {
+             el.previewContainer.style.backgroundColor = el.previewBg.value;
+             updateGridVisuals(); 
+             updatePreview();
+        }
+
+        function updatePreview() {
+            const str = el.testString.value;
+            const ctx = el.preview.getContext('2d');
+            const zoom = parseInt(el.previewZoom.value) || 2;
+            
+            el.preview.width = (str.length * state.width * zoom) + (str.length * zoom); 
+            el.preview.height = state.height * zoom;
+            
+            ctx.fillStyle = el.previewBg.value; 
+            ctx.fillRect(0, 0, el.preview.width, el.preview.height);
+
+            const tempC = document.createElement('canvas');
+            tempC.width = state.width;
+            tempC.height = state.height;
+            const tempCtx = tempC.getContext('2d');
+            
+            const fgHex = el.previewFg.value;
+            const fgRgb = hexToRgb(fgHex);
+
+            let cursorX = 0;
+            for (let i = 0; i < str.length; i++) {
+                const code = str.charCodeAt(i);
+                const dataCode = (code < 256) ? code : 63; 
+                
+                tempCtx.clearRect(0,0,state.width, state.height);
+                drawCharToCanvas(dataCode, tempCtx, fgRgb);
+                
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(tempC, 0, 0, state.width, state.height, cursorX, 0, state.width * zoom, state.height * zoom);
+                
+                cursorX += (state.width * zoom) + zoom;
+            }
+        }
+        
+        function drawCharToCanvas(charCode, ctx, rgb = [255,255,255]) {
+            const data = state.data[charCode];
+            if(!data) return;
+            
+            const imgData = ctx.createImageData(state.width, state.height);
+            for (let i = 0; i < data.length; i++) {
+                const idx = i * 4;
+                if (data[i]) {
+                    imgData.data[idx] = rgb[0];
+                    imgData.data[idx+1] = rgb[1];
+                    imgData.data[idx+2] = rgb[2];
+                    imgData.data[idx+3] = 255;
+                } else {
+                    imgData.data[idx+3] = 0;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        // --- Logic: System Font Rasterizer ---
+        
+        function runRasterizer() {
+            const fontName = document.getElementById('sysFontName').value;
+            const fontSize = parseInt(document.getElementById('sysFontSize').value);
+            const offsetY = parseInt(document.getElementById('sysFontOffset').value);
+            const isBold = document.getElementById('sysFontBold').checked;
+            const startChar = parseInt(document.getElementById('sysFontStart').value);
+            const endChar = parseInt(document.getElementById('sysFontEnd').value);
+            const autoSize = document.getElementById('sysFontAutoSize').checked;
+
+            if (!fontName || isNaN(fontSize) || isNaN(startChar) || isNaN(endChar)) return alert("Invalid settings");
+            if (startChar < 0 || endChar > 255 || startChar > endChar) return alert("Invalid character range");
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const fontStr = `${isBold ? 'bold ' : ''}${fontSize}px "${fontName}", monospace`;
+            ctx.font = fontStr;
+
+            // Auto-resize logic
+            if (autoSize) {
+                let maxW = 0;
+                const newH = Math.ceil(fontSize * 1.2);
+                
+                for(let i=startChar; i<=endChar; i++) {
+                    const w = ctx.measureText(String.fromCharCode(i)).width;
+                    if(w > maxW) maxW = w;
+                }
+                const newW = Math.ceil(maxW) || Math.ceil(fontSize * 0.6);
+                
+                // Update Global State
+                state.width = newW;
+                state.height = newH;
+                el.widthInput.value = newW;
+                el.heightInput.value = newH;
+                
+                // Re-initialize data arrays for new size
+                for(let i=0; i<256; i++) {
+                    state.data[i] = new Array(newW * newH).fill(0);
+                }
+            }
+
+            // Sync canvas to (potentially new) dimensions
+            canvas.width = state.width;
+            canvas.height = state.height;
+            // Context needs reset after resize
+            ctx.font = fontStr;
+            ctx.textBaseline = 'top'; 
+            
+            for (let i = startChar; i <= endChar; i++) {
+                ctx.clearRect(0, 0, state.width, state.height);
+                ctx.fillStyle = 'white';
+                
+                const char = String.fromCharCode(i);
+                const metrics = ctx.measureText(char);
+                const x = Math.floor((state.width - metrics.width) / 2); 
+                
+                ctx.fillText(char, x, offsetY);
+                
+                const imgData = ctx.getImageData(0, 0, state.width, state.height);
+                const pixels = imgData.data;
+                const newData = new Array(state.width * state.height).fill(0);
+                
+                for (let p = 0; p < newData.length; p++) {
+                    if (pixels[p * 4 + 3] > 100) { 
+                        newData[p] = 1;
+                    }
+                }
+                state.data[i] = newData;
+            }
+            
+            el.modalRaster.classList.add('hidden');
+            saveState();
+            refreshUI();
+            setStatus(`Imported ${endChar - startChar + 1} chars from ${fontName}`);
+        }
+
+        // --- Logic: Resize ---
+
+        function resizeFont() {
+            const newW = parseInt(el.widthInput.value);
+            const newH = parseInt(el.heightInput.value);
+            
+            if (newW < 1 || newH < 1 || newW > 64 || newH > 64) return alert("Size must be between 1 and 64");
+            
+            const newData = {};
+            for (let i = 0; i < 256; i++) {
+                newData[i] = new Array(newW * newH).fill(0);
+                // Ensure source data exists before copying
+                if (state.data[i] && state.data[i].length === state.width * state.height) {
+                    const copyW = Math.min(state.width, newW);
+                    const copyH = Math.min(state.height, newH);
+                    for (let y = 0; y < copyH; y++) {
+                        for (let x = 0; x < copyW; x++) {
+                            newData[i][y * newW + x] = state.data[i][y * state.width + x];
+                        }
+                    }
+                }
+            }
+            
+            state.width = newW;
+            state.height = newH;
+            state.data = newData;
+            saveState();
+            refreshUI();
+            setStatus(`Resized to ${newW}x${newH}`);
+        }
+
+        // --- Logic: Export ---
+
+        function generateOutput() {
+            if(state.activeTab !== 'code') return;
+            
+            const fmt = el.format.value;
+            let out = '';
+            const count = 256;
+            
+            const toHex = (n) => '0x' + n.toString(16).toUpperCase().padStart(2,'0');
+
+            if (fmt === 'json') {
+                out = JSON.stringify({ width: state.width, height: state.height, data: state.data }, null, 2);
+            } 
+            else if (fmt === 'c_row' || fmt === 'c_col') {
+                out = `// Font Size: ${state.width}x${state.height}, Format: ${fmt}\n`;
+                out += `const uint8_t font[256][${Math.ceil((state.width*state.height)/8)}] = {\n`;
+                
+                for (let i = 0; i < count; i++) {
+                    const d = state.data[i];
+                    const bytes = [];
+                    
+                    if (fmt === 'c_row') {
+                        let b = 0, bit = 0;
+                        for(let p=0; p<d.length; p++) {
+                            if(d[p]) b |= (1 << (7-bit));
+                            bit++;
+                            if(bit===8) { bytes.push(toHex(b)); b=0; bit=0; }
+                        }
+                        if(bit>0) bytes.push(toHex(b));
+                    } else {
+                        // Column Major
+                        for(let x=0; x<state.width; x++) {
+                            let b = 0;
+                            for(let y=0; y<state.height; y++) {
+                                 if(y < 8 && d[y*state.width+x]) b |= (1<<y);
+                            }
+                            bytes.push(toHex(b));
+                        }
+                    }
+                    out += `  { ${bytes.join(', ')} }, // ${i}\n`;
+                }
+                out += `};`;
+            }
+            else if (fmt === 'adafruit') {
+                out = `const uint8_t fontBitmap[] PROGMEM = {\n`;
+                let bits = [], curr = 0, cnt = 0;
+                
+                for(let i=0; i<count; i++) {
+                    const d = state.data[i];
+                    for(let p=0; p<d.length; p++) {
+                        if(d[p]) curr |= (1 << (7-cnt));
+                        cnt++;
+                        if(cnt===8) { bits.push(toHex(curr)); curr=0; cnt=0; }
+                    }
+                }
+                if(cnt>0) bits.push(toHex(curr));
+                
+                for(let k=0; k<bits.length; k+=12) out += "  " + bits.slice(k,k+12).join(",") + ",\n";
+                out += `};\n\nconst GFXglyph fontGlyphs[] PROGMEM = {\n`;
+                
+                let offset = 0;
+                for(let i=0; i<count; i++) {
+                     out += `  { ${offset}, ${state.width}, ${state.height}, ${state.width+1}, 0, 0 },\n`;
+                     offset += Math.ceil((state.width * state.height) / 8); 
+                }
+                out += `};\n`;
+            }
+            
+            el.output.value = out;
+        }
+
+        // --- Helpers ---
+
+        function switchTab(tab) {
+            state.activeTab = tab;
+            el.tabCode.className = tab === 'code' ? 
+                "flex-1 py-2.5 text-xs font-medium text-blue-400 border-b-2 border-blue-500 bg-gray-800/50 focus:outline-none transition-colors" : 
+                "flex-1 py-2.5 text-xs font-medium text-gray-500 hover:text-gray-300 border-b-2 border-transparent focus:outline-none transition-colors";
+            
+            el.tabImage.className = tab === 'image' ? 
+               "flex-1 py-2.5 text-xs font-medium text-blue-400 border-b-2 border-blue-500 bg-gray-800/50 focus:outline-none transition-colors" : 
+               "flex-1 py-2.5 text-xs font-medium text-gray-500 hover:text-gray-300 border-b-2 border-transparent focus:outline-none transition-colors";
+
+            el.panelCode.classList.toggle('hidden', tab !== 'code');
+            el.panelCode.classList.toggle('flex', tab === 'code');
+            el.panelImage.classList.toggle('hidden', tab !== 'image');
+            el.panelImage.classList.toggle('flex', tab === 'image');
+            
+            if(tab === 'code') generateOutput();
+        }
+
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.replace('#', ''), 16);
+            return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+        }
+
+        function setStatus(msg) {
+            el.status.textContent = msg;
+            setTimeout(() => el.status.textContent = "Ready", 3000);
+        }
+
+        function handleKeys(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); return; }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); return; }
+            
+            const k = e.key.toLowerCase();
+            if (k === 'p') setTool('pen');
+            if (k === 'e') setTool('eraser');
+            if (k === 'f') setTool('fill');
+            
+            if (e.key === 'ArrowUp') { e.preventDefault(); shiftChar(0, -1); saveState(); }
+            if (e.key === 'ArrowDown') { e.preventDefault(); shiftChar(0, 1); saveState(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); shiftChar(-1, 0); saveState(); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); shiftChar(1, 0); saveState(); }
+        }
+
+        // Button Functions
+        function copyOutput() { el.output.select(); document.execCommand('copy'); setStatus("Code copied"); }
+        
+        function downloadFile() { 
+            const blob = new Blob([el.output.value], {type:'text/plain'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'font.h'; a.click();
+        }
+
+        function downloadJson() {
+             const out = JSON.stringify({ width: state.width, height: state.height, data: state.data }, null, 2);
+             const blob = new Blob([out], {type:'application/json'});
+             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'font_project.json'; a.click();
+        }
+        
+        function importData() {
+            const str = prompt("Paste JSON data:");
+            if(str) {
+                try {
+                    const json = JSON.parse(str);
+                    if(json.width && json.height && json.data) {
+                        state.width = json.width;
+                        state.height = json.height;
+                        
+                        // Robustly handle sparse or missing data
+                        for(let i=0; i<256; i++) {
+                            // If import has data for 'i', use it, otherwise empty array
+                            state.data[i] = json.data[i] ? json.data[i] : new Array(state.width * state.height).fill(0);
+                        }
+
+                        el.widthInput.value = state.width;
+                        el.heightInput.value = state.height;
+                        saveState();
+                        refreshUI();
+                        setStatus("Data imported");
+                    } else {
+                        alert("Invalid JSON format");
+                    }
+                } catch(e) { alert("Invalid JSON: " + e.message); }
+            }
+        }
+        
+        function downloadImage() {
+            const cols = parseInt(document.getElementById('imgCols').value) || 16;
+            const scale = parseInt(document.getElementById('imgScale').value) || 1;
+            const spacing = parseInt(document.getElementById('imgSpacing').value) || 0;
+            const margin = parseInt(document.getElementById('imgMargin').value) || 0;
+            const fgHex = document.getElementById('imgFgColor').value;
+            const bgHex = document.getElementById('imgBgColor').value;
+            
+            const rows = Math.ceil(256 / cols);
+            const charW = state.width * scale;
+            const charH = state.height * scale;
+            
+            const totalW = margin * 2 + (cols * charW) + ((cols - 1) * spacing);
+            const totalH = margin * 2 + (rows * charH) + ((rows - 1) * spacing);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = totalW;
+            canvas.height = totalH;
+            const ctx = canvas.getContext('2d');
+            
+            // Fill background
+            ctx.fillStyle = bgHex;
+            ctx.fillRect(0, 0, totalW, totalH);
+            
+            ctx.fillStyle = fgHex;
+
+            for (let i = 0; i < 256; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                
+                const x = margin + col * (charW + spacing);
+                const y = margin + row * (charH + spacing);
+                
+                const d = state.data[i];
+                if (!d) continue;
+
+                for(let py=0; py<state.height; py++) {
+                    for(let px=0; px<state.width; px++) {
+                        if (d[py * state.width + px]) {
+                            ctx.fillRect(x + (px * scale), y + (py * scale), scale, scale);
+                        }
+                    }
+                }
+            }
+            
+            const link = document.createElement('a');
+            link.download = `font_${state.width}x${state.height}_sheet.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        init();
+    </script>
+</body>
+</html>
