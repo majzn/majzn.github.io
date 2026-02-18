@@ -1918,7 +1918,7 @@ REICH_API void reich_draw_circle_fill(
 
     for (cy = min_y; cy <= max_y; ++cy) {
         dy = cy - y;
-        dx = (int32)sqrt(r2 - (double)(dy * dy));
+        dx = (int32)reich_sqrt(r2 - (double)(dy * dy));
         
         sx = x - dx;
         ex = x + dx;
@@ -2143,6 +2143,256 @@ REICH_API void reich_draw_grid(
   }
 }
 
+
+
+
+float reich_sqrtf(float number) {
+    long i;
+    float x2, y;
+    const float threehalfs = 1.5F;
+
+    if (number == 0.0f) { return 0.0f; }
+
+    x2 = number * 0.5F;
+    y  = number;
+    i  = * ( long * ) &y;                       /* evil floating point bit level hacking */
+    i  = 0x5f3759df - ( i >> 1 );               /* what the... */
+    y  = * ( float * ) &i;
+    y  = y * ( threehalfs - ( x2 * y * y ) );   /* 1st iteration */
+    y  = y * ( threehalfs - ( x2 * y * y ) );   /* 2nd iteration, this can be removed */
+
+    return number * y;
+}
+
+/* SDF MATH HELPERS (Float-based for precision) */
+static float reich_sdf_len(float x, float y) {
+    return (float)sqrt(x * x + y * y);
+}
+
+static float reich_sdf_max(float a, float b) {
+    return (a > b) ? a : b;
+}
+
+static float reich_sdf_min(float a, float b) {
+    return (a < b) ? a : b;
+}
+
+static float reich_sdf_clamp(float x, float min_val, float max_val) {
+    return (x < min_val) ? min_val : ((x > max_val) ? max_val : x);
+}
+
+static float reich_sdf_mix(float a, float b, float t) {
+    return a * (1.0f - t) + b * t;
+}
+
+static float reich_sdf_abs(float x) {
+    return (x < 0.0f) ? -x : x;
+}
+
+/* PRIMITIVES */
+
+float reich_sd_circle(float x, float y, float r) {
+    return reich_sdf_len(x, y) - r;
+}
+
+float reich_sd_box(float x, float y, float w, float h) {
+    float dx = reich_sdf_abs(x) - w;
+    float dy = reich_sdf_abs(y) - h;
+    float ox = reich_sdf_max(dx, 0.0f);
+    float oy = reich_sdf_max(dy, 0.0f);
+    float ix = reich_sdf_max(dx, dy); /* internal dist if inside */
+    return reich_sdf_len(ox, oy) + reich_sdf_min(ix, 0.0f);
+}
+
+float reich_sd_rounded_box(float x, float y, float w, float h, float r) {
+    return reich_sd_box(x, y, w, h) - r;
+}
+
+/* OPERATORS */
+
+float reich_op_union(float d1, float d2) {
+    return reich_sdf_min(d1, d2);
+}
+
+float reich_op_sub(float d1, float d2) {
+    return reich_sdf_max(-d1, d2);
+}
+
+float reich_op_intersect(float d1, float d2) {
+    return reich_sdf_max(d1, d2);
+}
+
+/* * Smooth Union (The "Bevel" Maker) 
+ * k = radius of the smoothness (e.g., 10.0f)
+ */
+float reich_op_smooth_union(float d1, float d2, float k) {
+    float h = reich_sdf_clamp(0.5f + 0.5f * (d2 - d1) / k, 0.0f, 1.0f);
+    return reich_sdf_mix(d2, d1, h) - k * h * (1.0f - h);
+}
+
+float reich_op_smooth_sub(float d1, float d2, float k) {
+    float h = reich_sdf_clamp(0.5f - 0.5f * (d2 + d1) / k, 0.0f, 1.0f);
+    return reich_sdf_mix(d2, -d1, h) + k * h * (1.0f - h);
+}
+
+/* RENDERER INFRASTRUCTURE */
+
+/* Define the function signature for your arbitrary shape logic */
+typedef float (*reich_sdf_func)(float x, float y, void* userdata);
+
+/* * Calculates the 2D normal (gradient) at a point.
+ * Used for lighting calculations.
+ */
+static void reich_sdf_normal(
+    reich_sdf_func map, void* data, float x, float y, float* nx, float* ny) {
+    float eps = 1.0f;
+    float d = map(x, y, data);
+    *nx = map(x + eps, y, data) - d;
+    *ny = map(x, y + eps, data) - d;
+    
+    /* Normalize */
+    {
+        float l = reich_sdf_len(*nx, *ny);
+        if (l > 0.0f) {
+            *nx /= l;
+            *ny /= l;
+        } else {
+            *nx = 0.0f;
+            *ny = 1.0f;
+        }
+    }
+}
+
+/*
+ * The "One Elegant Function"
+ * Renders any SDF with antialiasing, bevel shading, and clipping.
+ */
+REICH_API void reich_draw_sdf(
+    reichContext* ctx,
+    reichRect bounds,           /* Area on screen to update */
+    reich_sdf_func map,         /* Your shape function */
+    void* userdata,             /* Data passed to map */
+    uint32 color_surface,       /* Flat color of the shape */
+    float bevel_strength        /* 0.0 for flat, 1.0+ for 3D look */
+) {
+    int32 x, y;
+    int32 sx, sy, ex, ey;
+    uint32* pixels;
+    uint32 pitch;
+    
+    /* Precompute lighting colors derived from surface color */
+    uint32 c_base = color_surface;
+    uint32 c_light, c_shadow;
+    
+    /* Simple lighting derivation (lighter top-left, darker bottom-right) */
+    {
+        uint8 r = (c_base >> 16) & 0xFF;
+        uint8 g = (c_base >> 8) & 0xFF;
+        uint8 b = c_base & 0xFF;
+        
+        uint32 lr = (uint32)reich_sdf_min(r * 1.5f, 255.0f);
+        uint32 lg = (uint32)reich_sdf_min(g * 1.5f, 255.0f);
+        uint32 lb = (uint32)reich_sdf_min(b * 1.5f, 255.0f);
+        
+        uint32 sr = (uint32)(r * 0.6f);
+        uint32 sg = (uint32)(g * 0.6f);
+        uint32 sb = (uint32)(b * 0.6f);
+        
+        c_light = 0xFF000000 | (lr << 16) | (lg << 8) | lb;
+        c_shadow = 0xFF000000 | (sr << 16) | (sg << 8) | sb;
+    }
+
+    sx = bounds.x1;
+    sy = bounds.y1;
+    ex = bounds.x2;
+    ey = bounds.y2;
+
+    /* Clip to screen */
+    if (sx < ctx->clip.x1) sx = ctx->clip.x1;
+    if (sy < ctx->clip.y1) sy = ctx->clip.y1;
+    if (ex > ctx->clip.x2) ex = ctx->clip.x2;
+    if (ey > ctx->clip.y2) ey = ctx->clip.y2;
+
+    pixels = ctx->screen.pixels;
+    pitch = ctx->screen.width;
+
+    for (y = sy; y < ey; ++y) {
+        for (x = sx; x < ex; ++x) {
+            /* 1. Sample Distance */
+            /* Center pixel coordinates */
+            float d = map((float)x + 0.5f, (float)y + 0.5f, userdata);
+
+            /* 2. Anti-aliasing / Alpha determination */
+            /* Distance < 0 is inside. We smooth around 0 (-0.5 to 0.5) */
+            float aa_width = 1.0f;
+            float alpha_f = 1.0f - reich_sdf_clamp(d / aa_width + 0.5f, 0.0f, 1.0f);
+
+            if (alpha_f <= 0.0f) {
+                continue; /* Fully outside */
+            }
+
+            /* 3. Shading Logic */
+            {
+                uint32 final_color = c_base;
+                
+                /* Only calculate lighting if inside and bevel requested */
+                if (bevel_strength > 0.0f && d < -0.5f) {
+                    /* Compute Normal */
+                    float nx, ny;
+                    /* Light Vector (Top-Left light source) */
+                    float lx = -0.707f;
+                    float ly = -0.707f; 
+                    float diffuse;
+                    
+                    /* Bevel profile: mix flat inner core with sloped edges */
+                    /* Closer to edge (d close to 0) = stronger slope influence */
+                    float edge_factor = reich_sdf_clamp(-(d + 0.5f) / (bevel_strength * 10.0f), 0.0f, 1.0f);
+                    
+                    /* If we are deep inside the shape, flatten the normal */
+                    if (edge_factor < 1.0f) {
+                        reich_sdf_normal(map, userdata, (float)x, (float)y, &nx, &ny);
+                        
+                        /* Dot product for diffuse lighting */
+                        diffuse = nx * lx + ny * ly;
+                        
+                        /* Mix colors based on diffuse */
+                        if (diffuse > 0.0f) {
+                            /* Lit side */
+                            uint32 r1 = (c_base >> 16) & 0xFF; uint32 g1 = (c_base >> 8) & 0xFF; uint32 b1 = c_base & 0xFF;
+                            uint32 r2 = (c_light >> 16) & 0xFF; uint32 g2 = (c_light >> 8) & 0xFF; uint32 b2 = c_light & 0xFF;
+                            float t = diffuse * (1.0f - edge_factor); /* fade effect inside */
+                            
+                            uint8 ro = (uint8)reich_sdf_mix((float)r1, (float)r2, t);
+                            uint8 go = (uint8)reich_sdf_mix((float)g1, (float)g2, t);
+                            uint8 bo = (uint8)reich_sdf_mix((float)b1, (float)b2, t);
+                            final_color = 0xFF000000 | (ro << 16) | (go << 8) | bo;
+                        } else {
+                            /* Shadow side */
+                            uint32 r1 = (c_base >> 16) & 0xFF; uint32 g1 = (c_base >> 8) & 0xFF; uint32 b1 = c_base & 0xFF;
+                            uint32 r2 = (c_shadow >> 16) & 0xFF; uint32 g2 = (c_shadow >> 8) & 0xFF; uint32 b2 = c_shadow & 0xFF;
+                            float t = -diffuse * (1.0f - edge_factor);
+                            
+                            uint8 ro = (uint8)reich_sdf_mix((float)r1, (float)r2, t);
+                            uint8 go = (uint8)reich_sdf_mix((float)g1, (float)g2, t);
+                            uint8 bo = (uint8)reich_sdf_mix((float)b1, (float)b2, t);
+                            final_color = 0xFF000000 | (ro << 16) | (go << 8) | bo;
+                        }
+                    }
+                }
+
+                /* 4. Apply Alpha Blending */
+                /* Apply calculated alpha to the final color */
+                {
+                    uint8 a_byte = (uint8)(alpha_f * 255.0f);
+                    uint32 c_with_alpha = (final_color & 0x00FFFFFF) | (a_byte << 24);
+                    
+                    uint32 bg = pixels[y * pitch + x];
+                    pixels[y * pitch + x] = reich_draw_blend(c_with_alpha, bg);
+                }
+            }
+        }
+    }
+}
 
 
 /* RUNTIME *******************************************************************/

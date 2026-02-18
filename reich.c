@@ -59,6 +59,23 @@ void reich_stress_test_render(reichContext* ctx, real64 alpha) {
     }
 }
 
+float my_cool_shape(float x, float y, void* userdata) {
+    /* Let's animate it slightly using userdata (optional) */
+    float time = *(float*)userdata;
+    float box_w = 60.0f + reich_sin(time) * 10.0f;
+    
+    /* Center the shapes */
+    float cx = 400.0f;
+    float cy = 300.0f;
+
+    /* Define two primitives */
+    float d_box = reich_sd_rounded_box(x - cx, y - cy, box_w, 40.0f, 10.0f);
+    float d_circle = reich_sd_circle(x - (cx + 50.0f), y - (cy - 50.0f), 40.0f);
+
+    /* Merge them smoothly! k=20.0f is the blend radius */
+    return reich_op_smooth_union(d_box, d_circle, 20.0f);
+}
+
 void update(reichContext* ctx) {
 }
 
@@ -68,10 +85,26 @@ void input(reichContext* ctx) {
 
 int32 t_time = 0;
 
+   static float time = 0.0f;
 void render(reichContext* ctx, real64 alpha) {
+#if 0
 	reich_stress_test_render(ctx, alpha);
+#endif
+    time += 0.05f;
+
+    /* Clear screen */
+    reich_draw_clear(ctx, 0xFF202020);
+
+    /* Define the area to update (optimization) */
+    reichRect bounds = reich_rect(0, 0, ctx->screen.width, ctx->screen.height);
+
+    /* Draw! 
+       color = Red (0xFFE81123)
+       bevel = 5.0 (Nice 3D edge effect)
+    */
+    reich_draw_sdf(ctx, bounds, my_cool_shape, &time, 0xFFE81123, 5.0f);
+
 	t_time++;
-	Sleep(100);
 }
 
 int WINAPI WinMain(
