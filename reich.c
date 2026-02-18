@@ -1,6 +1,64 @@
 #define REICH_IMPLEMENTATION
 #include "reich.h"
 
+void reich_stress_test_render(reichContext* ctx, real64 alpha) {
+    static uint32 s = 0x9E3779B9;
+    int32 i;
+    int32 sw = ctx->screen.width;
+    int32 sh = ctx->screen.height;
+    int32 limit = 10000;
+
+    for (i = 0; i < limit; ++i) {
+        int32 x1, y1, x2, y2, w, h, type;
+        uint32 c;
+
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+        x1 = (int32)(s % (uint32)(sw * 3)) - sw;
+        
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+        y1 = (int32)(s % (uint32)(sh * 3)) - sh;
+        
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+        x2 = (int32)(s % (uint32)(sw * 3)) - sw;
+        
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+        y2 = (int32)(s % (uint32)(sh * 3)) - sh;
+
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+        c = s; 
+
+        if ((c >> 24) == 0) c |= 0xFF000000;
+
+        type = i % 4;
+
+        if (type == 0) {
+#if 0
+            reich_draw_line(ctx, (real32)x1, (real32)y1, (real32)x2, (real32)y2, c);
+#endif
+        } else if (type == 1) {
+            w = (x2 - x1) / 4;
+            h = (y2 - y1) / 4;
+#if 0
+            reich_draw_rect(ctx, x1, y1, w, h, c);
+#endif
+				} else if (type == 2) {
+            w = (x2 - x1) / 4;
+            h = (y2 - y1) / 4;
+#if 0
+            reich_draw_circle_fill(ctx, x1, y1, w, c);
+            reich_draw_rect_fill(ctx, x1, y1, w, h, c);
+#endif
+#if 1
+            reich_draw_circle(ctx, x1, y1, w/10, h, c);
+#endif
+				} else {
+#if 0
+            reich_draw_pixel_safe(ctx, x1, y1, c);
+#endif
+        }
+    }
+}
+
 void update(reichContext* ctx) {
 }
 
@@ -11,13 +69,9 @@ void input(reichContext* ctx) {
 int32 t_time = 0;
 
 void render(reichContext* ctx, real64 alpha) {
-	reich_draw_clear(ctx, 0xFF202020);
-#if 0
-	reich_draw_grid(ctx, 0, 0, ctx->screen.width, ctx->screen.height, t_time, t_time, 32, 0x020202);
-#endif
-	reich_draw_line(ctx, 20, 30, 20 + reich_sin(((real32)t_time)*0.01)*100.0f, 30 + reich_cos(((real32)t_time)*0.01)*100.0f, 0xAAFFFF00);
+	reich_stress_test_render(ctx, alpha);
 	t_time++;
-	Sleep(16);
+	Sleep(100);
 }
 
 int WINAPI WinMain(

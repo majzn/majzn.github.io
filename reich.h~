@@ -92,8 +92,6 @@ typedef struct reichCanvas {
 typedef struct reichInput {
   int32 mouseX;
   int32 mouseY;
-  int32 scaledMouseX;
-  int32 scaledMouseY;
   int32 lastMouseX;
   int32 lastMouseY;
   int32 deltaX;
@@ -726,7 +724,7 @@ LRESULT CALLBACK reich_sys_window_callback(HWND h, UINT m, WPARAM w, LPARAM l) {
     ScreenToClient(h, &ptLocal);
     tbHeight = REICH_TITLE_BAR_HEIGHT * ctx->scale;
     ctx->input.mouseX = ptLocal.x;
-    ctx->input.mouseY = ptLocal.y;
+		ctx->input.mouseY = ptLocal.y;
 		if (ptLocal.y >= 0 && ptLocal.y < tbHeight) {
       btnArea = (REICH_TITLE_BUTTON_WIDTH * ctx->scale) * 3;
       if (ptLocal.x >= ctx->windowWidth - btnArea) { return HTCLIENT; }
@@ -741,6 +739,10 @@ LRESULT CALLBACK reich_sys_window_callback(HWND h, UINT m, WPARAM w, LPARAM l) {
     ctx->windowHeight = height;
     ctx->isMaximized = (w == SIZE_MAXIMIZED);
     reich_sys_resize_canvas(ctx, width, height);
+  	ctx->clip.x1 = 0;
+		ctx->clip.y1 = 0;
+		ctx->clip.x2 = width;
+		ctx->clip.y2 = height;
     if (ctx->userRender) { ctx->userRender(ctx, 1.0); }
     reich_draw_decorations(ctx);
     reich_sys_present(ctx);
@@ -838,7 +840,6 @@ REICH_API int32 reich_sys_window_init(
   DWORD style;
   RECT wr;
   reichPlatformContext* plat = (reichPlatformContext*)ctx->platform;
-  HMODULE winmm;
   SetProcessDPIAware();
   AttachConsole((DWORD)-1);
   if (!plat) {
@@ -906,8 +907,8 @@ REICH_API int32 reich_sys_window_init(
 REICH_API void reich_sys_resize_canvas(
     reichContext* ctx, int32 width, int32 height) {
   reichPlatformContext* pctx = (reichPlatformContext*)ctx->platform;
-  int32 cw = width / ctx->scale;
-  int32 ch = height / ctx->scale;
+  int32 cw = ctx->scale > 0 ? width / ctx->scale : width;
+  int32 ch = ctx->scale > 0 ? height / ctx->scale : height;
   if (cw < 1) { cw = 1; }
   if (ch < 1) { ch = 1; }
   if (cw != ctx->screen.width || ch != ctx->screen.height) {
@@ -1064,10 +1065,6 @@ REICH_API void reich_input_update(reichContext* ctx) {
     int32 newScale = ctx->scale + 1;
     if (newScale > 4) { newScale = 1; }
     reich_set_scale(ctx, newScale);
-  }
-  if (ctx->scale > 0) {
-    ctx->input.scaledMouseX = ctx->input.mouseX / ctx->scale;
-    ctx->input.scaledMouseY = ctx->input.mouseY / ctx->scale;
   }
   ctx->input.deltaX = ctx->input.mouseX - ctx->input.lastMouseX;
   ctx->input.deltaY = ctx->input.mouseY - ctx->input.lastMouseY;
@@ -1701,78 +1698,164 @@ REICH_API void reich_draw_clear(reichContext* ctx, uint32 color) {
 }
 
 REICH_API int32 reich_draw_line(
-		reichContext* ctx,
-		real32 x1, real32 y1, real32 x2, real32 y2, uint32 colour) {
-	real32 dx, dy, dax, day, x, y, step;
-	int32 i, steps;
-	uint32* pixels = ctx->screen.pixels;
-	uint32 pitch = ctx->screen.width;
-	reichRect clip = ctx->clip;
-	uint8 alpha = reich_rgba_channel(colour, 'a');
-	int32 hasAlpha = alpha < 255 ? 1 : 0;
-	if(alpha == 0) { return 0; }
-	if (x1 < clip.x1 && x2 < clip.x1) { return 0; }
-  if (y1 < clip.y1 && y2 < clip.y1) { return 0; }
-  if (x1 >= clip.x2 && x2 >= clip.x2) { return 0; }
-  if (y1 >= clip.y1 && y2 >= clip.y2) { return 0; }
-	dx = (x2 - x1);
-  dy = (y2 - y1);
-  dax = fabs(dx);
-  day = fabs(dy);
-	step = ((dax >= day) ? dax : day);
-	if(step <= 0.0f) { step = 1.0f; }
-	dx /= step;
-	dy /= step;
-	x = x1;
-	y = y1;
-	steps = (int32)step;
-	for(i = 0; i <= steps; i++) {
-		int32 ix = (int32)(x + 0.5f);
-		int32 iy = (int32)(y + 0.5f);
-		switch(hasAlpha) {
-			case(0): {
-				if(reich_rect_bounds(ix, iy, clip.x1, clip.y1, clip.x2, clip.y2)) {
-					reich_draw_pixel(pixels, ix, iy, pitch, colour);
-				}
-				break;
-			}
-			case(1): {
-				if(reich_rect_bounds(ix, iy, clip.x1, clip.y1, clip.x2, clip.y2)) {
-					reich_draw_pixel(pixels, ix, iy, pitch,
-							reich_draw_blend(colour, pixels[ix + iy*pitch]));
-				}
-			}
-		}
-		x += dx;
-		y += dy;
-	}
-	return 0;
+    reichContext* ctx,
+    real32 x1, real32 y1, real32 x2, real32 y2, uint32 colour) {
+    float t0 = 0.0f;
+    float t1 = 1.0f;
+    float dx, dy;
+    float p[4], q[4];
+    float r;
+    float dax, day, step;
+    float x, y;
+    int32 k, i, steps, ix, iy;
+    uint32 alpha, pitch, dst;
+    uint32* pixels;
+
+    dx = x2 - x1;
+    dy = y2 - y1;
+    alpha = (colour >> 24) & 0xFF;
+
+    if (alpha == 0) { return 0; }
+
+    p[0] = -dx; q[0] = x1 - (float)ctx->clip.x1;
+    p[1] = dx;  q[1] = (float)ctx->clip.x2 - 1.0f - x1;
+    p[2] = -dy; q[2] = y1 - (float)ctx->clip.y1;
+    p[3] = dy;  q[3] = (float)ctx->clip.y2 - 1.0f - y1;
+
+    for (k = 0; k < 4; ++k) {
+        if (p[k] == 0.0f) {
+            if (q[k] < 0.0f) { return 0; }
+        } else {
+            r = q[k] / p[k];
+            if (p[k] < 0.0f) {
+                if (r > t1) { return 0; }
+                if (r > t0) { t0 = r; }
+            } else {
+                if (r < t0) { return 0; }
+                if (r < t1) { t1 = r; }
+            }
+        }
+    }
+
+    if (t0 > t1) { return 0; }
+
+    if (t1 < 1.0f) {
+        x2 = x1 + t1 * dx;
+        y2 = y1 + t1 * dy;
+    }
+    if (t0 > 0.0f) {
+        x1 = x1 + t0 * dx;
+        y1 = y1 + t0 * dy;
+    }
+
+    dx = x2 - x1;
+    dy = y2 - y1;
+    dax = (dx < 0.0f) ? -dx : dx;
+    day = (dy < 0.0f) ? -dy : dy;
+    step = (dax >= day) ? dax : day;
+
+    if (step <= 0.0f) {
+        ix = (int32)(x1 + 0.5f);
+        iy = (int32)(y1 + 0.5f);
+        if (ix >= ctx->clip.x1 && ix < ctx->clip.x2 && 
+            iy >= ctx->clip.y1 && iy < ctx->clip.y2) {
+             if (alpha == 255) {
+                 reich_draw_pixel(ctx->screen.pixels, ix, iy, ctx->screen.width, colour);
+             } else {
+                 dst = ctx->screen.pixels[iy * ctx->screen.width + ix];
+                 reich_draw_pixel(ctx->screen.pixels, ix, iy, ctx->screen.width, 
+                    reich_draw_blend(colour, dst));
+             }
+        }
+        return 0;
+    }
+
+    dx /= step;
+    dy /= step;
+    
+    x = x1;
+    y = y1;
+    steps = (int32)step;
+    pitch = ctx->screen.width;
+    pixels = ctx->screen.pixels;
+
+    if (alpha == 255) {
+        for (i = 0; i <= steps; ++i) {
+            ix = (int32)(x + 0.5f);
+            iy = (int32)(y + 0.5f);
+            reich_draw_pixel(pixels, ix, iy, pitch, colour);
+            x += dx;
+            y += dy;
+        }
+    } else {
+        for (i = 0; i <= steps; ++i) {
+            ix = (int32)(x + 0.5f);
+            iy = (int32)(y + 0.5f);
+            dst = pixels[iy * pitch + ix];
+            reich_draw_pixel(pixels, ix, iy, pitch, reich_draw_blend(colour, dst));
+            x += dx;
+            y += dy;
+        }
+    }
+    return 0;
 }
 
-REICH_API void reich_draw_rect_fill(
+REICH_API int32 reich_draw_rect_fill(
     reichContext* ctx, int32 x, int32 y, int32 w, int32 h, uint32 color) {
-  int32 i;
-  int32 j;
-  int32 sx;
-  int32 sy;
-  int32 ex;
-  int32 ey;
-  uint32* pixels;
-  if (!ctx || !ctx->screen.pixels) { return; }
-  pixels = ctx->screen.pixels;
-  sx = x;
-  if (sx < 0) { sx = 0; }
-  sy = y;
-  if (sy < 0) { sy = 0; }
-  ex = x + w;
-  if (ex > ctx->screen.width) { ex = ctx->screen.width; }
-  ey = y + h;
-  if (ey > ctx->screen.height) { ey = ctx->screen.height; }
-  for (j = sy; j < ey; ++j) {
-    for (i = sx; i < ex; ++i) {
-			pixels[j * ctx->screen.width + i] = color;
-		}
-  }
+    int32 minX, minY, maxX, maxY;
+    int32 i, j;
+    uint32* row;
+    uint32 alpha;
+    uint32 pitch;
+    if (!ctx || !ctx->screen.pixels || w <= 0 || h <= 0) return 0;
+    alpha = (color >> 24) & 0xFF;
+    if (alpha == 0) return 0;
+    minX = ctx->clip.x1;
+    minY = ctx->clip.y1;
+    maxX = ctx->clip.x2 - 1;
+    maxY = ctx->clip.y2 - 1;
+    if (x < minX) { w -= (minX - x); x = minX; }
+    if (y < minY) { h -= (minY - y); y = minY; }
+    if (x + w > maxX) w = maxX - x;
+    if (y + h > maxY) h = maxY - y;
+    if (w <= 0 || h <= 0) return 0;
+    pitch = ctx->screen.width;
+    row = ctx->screen.pixels + (y * pitch) + x;
+    if (alpha == 255) {
+        for (j = 0; j < h; ++j) {
+            uint32* p = row;
+            int32 n = w;
+            while (n >= 4) {
+                *p++ = color;
+                *p++ = color;
+                *p++ = color;
+                *p++ = color;
+                n -= 4;
+            }
+            while (n--) {
+                *p++ = color;
+            }
+            row += pitch;
+        }
+    } else {
+        uint32 scale = alpha + (alpha >> 7);
+        uint32 invScale = 256 - scale;
+        uint32 rbSrc = (color & 0x00FF00FF) * scale;
+        uint32 gSrc = (color & 0x0000FF00) * scale;
+        for (j = 0; j < h; ++j) {
+            uint32* p = row;
+            for (i = 0; i < w; ++i) {
+                uint32 dst = *p;
+                uint32 rbDst = (dst & 0x00FF00FF) * invScale;
+                uint32 gDst = (dst & 0x0000FF00) * invScale;
+                uint32 rbOut = (rbSrc + rbDst) >> 8;
+                uint32 gOut = (gSrc + gDst) >> 8;
+                *p++ = 0xFF000000 | (rbOut & 0x00FF00FF) | (gOut & 0x0000FF00);
+            }
+            row += pitch;
+        }
+    }
+		return 0;
 }
 
 REICH_API int32 reich_draw_rect(
@@ -1782,6 +1865,172 @@ REICH_API int32 reich_draw_rect(
 	reich_draw_line(ctx, x, y, x, y + h, colour);
 	reich_draw_line(ctx, x + w, y, x + w, y + h, colour);
 	return 0;
+}
+
+REICH_API static int32 reich_sqrt(uint32 n) {
+    uint32 res = 0;
+    uint32 bit = 1 << 30;
+    
+    while (bit > n) { bit >>= 2; }
+    
+    while (bit != 0) {
+        if (n >= res + bit) {
+            n -= res + bit;
+            res = (res >> 1) + bit;
+        } else {
+            res >>= 1;
+        }
+        bit >>= 2;
+    }
+    return (int32)res;
+}
+
+REICH_API void reich_draw_circle_fill(
+    reichContext* ctx, int32 x, int32 y, int32 r, uint32 color) {
+    int32 cy, dy, dx;
+    int32 min_y, max_y;
+    int32 sx, ex;
+    int32 i, ix, iy;
+    int32 width;
+    double r2;
+    uint32 alpha, pitch, dst;
+    uint32* pixels;
+
+    if (r <= 0) { return; }
+    
+    alpha = (color >> 24) & 0xFF;
+    if (alpha == 0) { return; }
+
+    width = ctx->screen.width;
+    pitch = width;
+    pixels = ctx->screen.pixels;
+    
+    r2 = (double)r * r;
+
+    /* Clip Y Range */
+    min_y = y - r;
+    if (min_y < ctx->clip.y1) { min_y = ctx->clip.y1; }
+    
+    max_y = y + r;
+    if (max_y >= ctx->clip.y2) { max_y = ctx->clip.y2 - 1; }
+
+    if (min_y > max_y) { return; }
+
+    for (cy = min_y; cy <= max_y; ++cy) {
+        dy = cy - y;
+        dx = (int32)sqrt(r2 - (double)(dy * dy));
+        
+        sx = x - dx;
+        ex = x + dx;
+
+        /* Clip X Range */
+        if (sx < ctx->clip.x1) { sx = ctx->clip.x1; }
+        if (ex >= ctx->clip.x2) { ex = ctx->clip.x2 - 1; }
+
+        if (sx > ex) { continue; }
+
+        iy = cy;
+        
+        if (alpha == 255) {
+            for (ix = sx; ix <= ex; ++ix) {
+                reich_draw_pixel(pixels, ix, iy, pitch, color);
+            }
+        } else {
+            for (ix = sx; ix <= ex; ++ix) {
+                dst = pixels[iy * pitch + ix];
+                reich_draw_pixel(pixels, ix, iy, pitch, reich_draw_blend(color, dst));
+            }
+        }
+    }
+}
+
+REICH_API void reich_draw_circle(
+    reichContext* ctx, int32 x, int32 y, int32 r, int32 t, uint32 color) {
+    int32 cy, dy, dx_out, dx_in;
+    int32 min_y, max_y;
+    int32 spans[2][2];
+    int32 s, sp_sx, sp_ex;
+    int32 i, ix, iy;
+    int32 width, rin;
+    double r2, rin2;
+    uint32 alpha, pitch, dst;
+    uint32* pixels;
+
+    if (r <= 0 || t <= 0) { return; }
+    if (t >= r) {
+        reich_draw_circle_fill(ctx, x, y, r, color);
+        return;
+    }
+
+    alpha = (color >> 24) & 0xFF;
+    if (alpha == 0) { return; }
+
+    width = ctx->screen.width;
+    pitch = width;
+    pixels = ctx->screen.pixels;
+
+    rin = r - t;
+    r2 = (double)r * r;
+    rin2 = (double)rin * rin;
+
+    /* Clip Y Range */
+    min_y = y - r;
+    if (min_y < ctx->clip.y1) { min_y = ctx->clip.y1; }
+    
+    max_y = y + r;
+    if (max_y >= ctx->clip.y2) { max_y = ctx->clip.y2 - 1; }
+
+    if (min_y > max_y) { return; }
+
+    for (cy = min_y; cy <= max_y; ++cy) {
+        dy = cy - y;
+        dx_out = (int32)reich_sqrt(r2 - (double)(dy * dy));
+        
+        /* Default: No spans */
+        spans[0][0] = 0; spans[0][1] = -1;
+        spans[1][0] = 0; spans[1][1] = -1;
+
+        if ((double)(dy * dy) > rin2) {
+            /* Solid span (outside inner radius vertical extent) */
+            spans[0][0] = x - dx_out;
+            spans[0][1] = x + dx_out;
+        } else {
+            /* Two spans (hollow part) */
+            dx_in = (int32)reich_sqrt(rin2 - (double)(dy * dy));
+            
+            /* Left part */
+            spans[0][0] = x - dx_out;
+            spans[0][1] = x - dx_in - 1;
+            
+            /* Right part */
+            spans[1][0] = x + dx_in + 1;
+            spans[1][1] = x + dx_out;
+        }
+
+        iy = cy;
+
+        for (s = 0; s < 2; ++s) {
+            sp_sx = spans[s][0];
+            sp_ex = spans[s][1];
+
+            /* Clip X */
+            if (sp_sx < ctx->clip.x1) { sp_sx = ctx->clip.x1; }
+            if (sp_ex >= ctx->clip.x2) { sp_ex = ctx->clip.x2 - 1; }
+
+            if (sp_sx > sp_ex) { continue; }
+
+            if (alpha == 255) {
+                for (ix = sp_sx; ix <= sp_ex; ++ix) {
+                    reich_draw_pixel(pixels, ix, iy, pitch, color);
+                }
+            } else {
+                for (ix = sp_sx; ix <= sp_ex; ++ix) {
+                    dst = pixels[iy * pitch + ix];
+                    reich_draw_pixel(pixels, ix, iy, pitch, reich_draw_blend(color, dst));
+                }
+            }
+        }
+    }
 }
 
 REICH_API void reich_draw_text(
@@ -1831,8 +2080,8 @@ REICH_API void reich_draw_decorations(reichContext* ctx) {
   int32 w = ctx->screen.width;
   int32 btnW = REICH_TITLE_BUTTON_WIDTH;
   int32 h = REICH_TITLE_BAR_HEIGHT;
-  int32 mx = ctx->input.scaledMouseX;
-  int32 my = ctx->input.scaledMouseY;
+  int32 mx = reich_mouse_x(ctx);
+  int32 my = reich_mouse_y(ctx);
   int32 closeX = w - btnW;
   int32 maxX = closeX - btnW;
   int32 minX = maxX - btnW;
@@ -1840,7 +2089,6 @@ REICH_API void reich_draw_decorations(reichContext* ctx) {
   uint32 cMax = 0xFF333333;
   uint32 cMin = 0xFF333333;
   int32 i;
-  ctx->clip = reich_rect(0, 0, ctx->screen.width, ctx->screen.height);
 	reich_draw_rect(ctx, 0, 0, w, h, 0xFF222222);
   reich_draw_rect(ctx, 0, h - 1, w, 1, 0xFF444444);
   if (ctx->windowTitle) {
@@ -1922,7 +2170,7 @@ REICH_API int32 reich_init(
   ctx->accumulator = 0.0;
   ctx->perfFreq = reich_sys_get_freq();
   ctx->lastCounter = reich_sys_get_ticks();
-  memSize = (reichSize)512 * 1024 * 1024;
+	memSize = (reichSize)512 * 1024 * 1024;
   memory = reich_sys_alloc(memSize);
   if (!memory) {
     reich_sys_log(
@@ -1942,6 +2190,7 @@ REICH_API int32 reich_init(
   ctx->screen.height = height;
   ctx->screen.pixels =
       (uint32*)reich_sys_alloc((reichSize)width * height * sizeof(uint32));
+  ctx->clip = reich_rect(0, 0, ctx->screen.width, ctx->screen.height);
   if (!ctx->screen.pixels) {
     reich_sys_log(REICH_LOG_ERROR, "Failed to allocate screen pixels.");
     return 0;
@@ -1967,14 +2216,16 @@ REICH_API void reich_set_callbacks(
 }
 
 REICH_API void reich_update_window_controls(reichContext* ctx) {
-  int32 mx;
-  int32 my;
   int32 btnW;
   int32 h;
   int32 w;
+  int32 mx = 0;
+  int32 my = 0;
   if (!ctx->input.buttons[0] || ctx->input.lastButtons[0]) { return; }
-  mx = ctx->input.scaledMouseX;
-  my = ctx->input.scaledMouseY;
+  if(ctx->scale) {
+		mx = ctx->input.mouseX / ctx->scale;
+ 	 	my = ctx->input.mouseY / ctx->scale;
+	}
   btnW = REICH_TITLE_BUTTON_WIDTH;
   h = REICH_TITLE_BAR_HEIGHT;
   w = ctx->screen.width;
@@ -1996,35 +2247,15 @@ REICH_API void reich_set_scale(reichContext* ctx, int32 scale) {
 }
 
 REICH_API void reich_run(reichContext* ctx) {
-  uint8 bkKP[REICH_KEY_MAX];
-  uint8 bkKR[REICH_KEY_MAX];
-  uint8 bkBP[REICH_MOUSE_BUTTONS];
-  uint8 bkBR[REICH_MOUSE_BUTTONS];
-  int32 first;
   reich_sys_log(REICH_LOG_INFO, "Starting main loop.");
   while (ctx->running) {
     reich_input_update(ctx);
     reich_update_window_controls(ctx);
-    reich_memcpy(bkKP, ctx->input.keysPressed, REICH_KEY_MAX);
-    reich_memcpy(bkKR, ctx->input.keysReleased, REICH_KEY_MAX);
-    reich_memcpy(bkBP, ctx->input.buttonsPressed, REICH_MOUSE_BUTTONS);
-    reich_memcpy(bkBR, ctx->input.buttonsReleased, REICH_MOUSE_BUTTONS);
+		ctx->clip = reich_rect(0, 0, ctx->screen.width, ctx->screen.height);
     reich_timer_tick(ctx);
-    first = 1;
     while (reich_timer_step(ctx)) {
       if (ctx->userUpdate) { ctx->userUpdate(ctx); }
-      if (first) {
-        reich_memset(ctx->input.keysPressed, 0, REICH_KEY_MAX);
-        reich_memset(ctx->input.keysReleased, 0, REICH_KEY_MAX);
-        reich_memset(ctx->input.buttonsPressed, 0, REICH_MOUSE_BUTTONS);
-        reich_memset(ctx->input.buttonsReleased, 0, REICH_MOUSE_BUTTONS);
-        first = 0;
-      }
     }
-    reich_memcpy(ctx->input.keysPressed, bkKP, REICH_KEY_MAX);
-    reich_memcpy(ctx->input.keysReleased, bkKR, REICH_KEY_MAX);
-    reich_memcpy(ctx->input.buttonsPressed, bkBP, REICH_MOUSE_BUTTONS);
-    reich_memcpy(ctx->input.buttonsReleased, bkBR, REICH_MOUSE_BUTTONS);
     if (ctx->userInput) { ctx->userInput(ctx); }
     if (ctx->userRender) { ctx->userRender(ctx, reich_timer_alpha(ctx)); }
     reich_draw_decorations(ctx);
