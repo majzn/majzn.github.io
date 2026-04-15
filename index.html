@@ -1511,6 +1511,17 @@ function attachControlHandlers() {
     addLayer('Metrics', 1536, 256, `void main() {
       OUT = vec4(cubemap_area(iUV), cubemap_dir(iUV) * 0.5 + 0.5);
     }`, 'Cubemap', '#8854d0');
+    addLayer('Cellular', 1536, 256, `void main() {
+  float selfState = step(0.5, VAL().r);
+  float n = SAMPLE(-1, 0).r + SAMPLE(1, 0).r + SAMPLE(0, -1).r + SAMPLE(0, 1).r
+          + SAMPLE(-1, -1).r + SAMPLE(1, -1).r + SAMPLE(-1, 1).r + SAMPLE(1, 1).r;
+  float nextState = selfState > 0.5 ? ((n == 2.0 || n == 3.0) ? 1.0 : 0.0) : (n == 3.0 ? 1.0 : 0.0);
+  if (iFrame < 2) {
+    float seed = fract(sin(dot(vec4(iUV * 12.34, 0.0, 0.0), vec4(12.9898, 78.233, 37.719, 45.164))) * 43758.5453);
+    nextState = step(0.52, seed);
+  }
+  OUT = vec4(nextState, nextState, nextState, 1.0);
+}`, 'Cubemap', '#20bf6b');
     addLayer('Wave', 1536, 256, `uniform float u_wave_stiffness;
 uniform float u_wave_damping;
 uniform float u_wave_impact;
