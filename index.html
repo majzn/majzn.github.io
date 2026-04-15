@@ -1,126 +1,2473 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INDEX</title>
-    <style>
-        :root {
-            --bg: #FFFFFF;
-            --fg: #000000;
-            --accent-default: #000000;
-            --border-w: 4px;
-            --gap: 16px;
-            --grid-min: 240px;
-        }
-        * { box-sizing: border-box; }
-        body { 
-            font-family: Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--fg);
-            margin: 0; padding: 2.0rem; line-height: 1.0;
-            -webkit-font-smoothing: antialiased; 
-            background-image: url('tile.bmp'); background-repeat: repeat; 
-            background-size: auto; background-attachment: fixed;
-        }
-        .container { max-width: 720px; margin: 0 auto; }
-        header { margin-bottom: 3rem; border-bottom: var(--border-w) solid var(--fg); padding-bottom: 4px; }
-        h1 { font-size: 2rem; font-weight: 900; margin: 0; }
-        
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr)); gap: var(--gap); }
-        
-        .card {
-            border: var(--border-w) solid var(--item-accent); 
-            padding: 0.5rem;
-            display: flex; flex-direction: column; justify-content: space-between;
-            background: var(--item-bg); transition: transform 0.5s ease;
-            color: #FFFFFF;
-        }
-        .card:hover { transform: translateY(-2px); }
-
-        .title { 
-            font-size: 1.5rem; font-weight: 800; margin: 0.0rem 0 1.0rem 0; 
-            line-height: 1.0; color: var(--item-accent); /* Matched to border colour */
-        }
-        
-        .card-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-        .main-link, .docs-btn {
-            text-decoration: none; font-size: 0.7rem; font-weight: 900;
-            padding: 0.25rem 0.25rem; border: 2px solid var(--fg); text-transform: uppercase;
-            transition: all 0.5s;
-        }
-        .main-link { border-color: var(--item-accent); color: var(--item-accent); }
-        .main-link:hover { background: var(--item-accent); color: var(--item-bg); }
-        .docs-btn { color: #FFFFFF; border-color: #FFFFFF; opacity: 0.6; }
-        .docs-btn:hover { opacity: 1; background: #FFFFFF; color: var(--item-bg); }
-
-        .footer { 
-            display: flex; justify-content: space-between; align-items: flex-end;
-            padding-top: 4px; border-top: 2px solid rgba(128,128,128,0.15);
-            font-size: 1.0rem; font-family: monospace;
-        }
-        .path, .date { opacity: 0.5; color: #FFFFFF; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GridIDE</title>
+<style>
+:root { --bg: #1e1e1e; --panel: #252526; --surface: #1f1f24; --surface-alt: #16161b; --input-bg: #121217; --input-border: #333; --border: #3c3c3c; --accent: #007acc; --text: #d4d4d4; --text-muted: #8f8f8f; --slider-track: rgba(0,122,204,0.2); --slider-thumb: #007acc; --editor-font-size: 13px; --editor-line-height: 18px; --ui-font-size: 13px; --tab-padding-v: 8px; --tab-padding-h: 12px; --toolbar-button-size: 32px; --button-radius: 5px; --toolbar-gap: 6px; --toolbar-icon-size: 18px; --toolbar-icon-color: #d4d4d4; }
+body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-size: var(--ui-font-size); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; border: 2px solid var(--surface); }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+#toolbar { height: 38px; background: var(--panel); display: flex; align-items: center; padding: 0 8px; gap: var(--toolbar-gap); border-bottom: 1px solid var(--border); }
+button { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; cursor: pointer; font-size: calc(var(--ui-font-size) - 1px); border-radius: var(--button-radius); min-height: var(--toolbar-button-size); }
+.icon { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: var(--toolbar-icon-size) !important; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-flex; align-items: center; justify-content: center; width: var(--toolbar-icon-size); height: var(--toolbar-icon-size); color: var(--toolbar-icon-color); direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; vertical-align: middle; }
+#toolbar button { flex: 0 0 auto; white-space: nowrap; width: var(--toolbar-button-size); height: var(--toolbar-button-size); padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--button-radius); }
+button:hover { background: var(--accent); }
+button.active-btn { background: var(--accent); color: #fff; }
+input { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 3px 6px; width: auto; font-size: calc(var(--ui-font-size) - 1px); }
+input[type="text"] { width: 120px; }
+input[type="color"] { width: 100%; height: 34px; padding: 0; border-radius: 4px; cursor: pointer; }
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+select { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 3px 6px; font-size: calc(var(--ui-font-size) - 1px); outline: none; }
+.modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.65); z-index: 100; backdrop-filter: blur(2px); }
+.modal.open { display: flex; }
+.modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; width: min(560px, calc(100% - 32px)); color: var(--text); box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+.modal-content h2 { margin-top: 0; font-size: calc(var(--ui-font-size) + 3px); margin-bottom: 12px; }
+.modal-close { width: 28px; height: 28px; border: none; background: transparent; color: var(--text); font-size: 18px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.modal-settings-grid { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; padding-right: 6px; }
+.modal-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.modal-setting-row .setting-label { flex: 0 0 160px; font-size: var(--ui-font-size); color: var(--text); white-space: nowrap; }
+.modal-setting-row .field { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
+.modal-setting-row .field input,
+.modal-setting-row .field select,
+.modal-setting-row .field textarea { width: 160px; min-width: 120px; font-size: var(--ui-font-size); padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--input-bg); color: var(--text); box-sizing: border-box; }
+.modal-setting-row .field textarea { resize: vertical; min-height: 60px; }
+.modal-setting-row .field input[type=color] { width: 40px; height: 32px; padding: 0; }
+.modal-setting-row .field input[type=checkbox] { width: auto; margin: 0; transform: scale(1); }
+.modal-setting-row .unit { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+.input-with-unit { display: flex; align-items: center; background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px; width: 160px; box-sizing: border-box; overflow: hidden; transition: border-color 0.2s; }
+.input-with-unit:focus-within { border-color: var(--accent); }
+.input-with-unit input { border: none !important; background: transparent !important; width: 100% !important; padding-right: 2px !important; min-width: 0 !important; outline: none; font-size: var(--ui-font-size) !important; }
+.input-with-unit .unit { padding-right: 8px; color: var(--text-muted); font-size: calc(var(--ui-font-size) - 1px); pointer-events: none; user-select: none; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.modal-actions button { min-width: 80px; }
+.modal-close:hover { background: rgba(255,255,255,0.08); border-radius: 50%; }
+#main { display: flex; flex: 1; overflow: hidden; }
+#sidebar { display: flex; flex-direction: column; background: var(--panel); min-width: 280px; width: 280px; z-index: 10; }
+#splitter { width: 5px; cursor: col-resize; background: var(--border); position: relative; z-index: 11; transition: background 0.2s; }
+#splitter:hover, #splitter:active { background: var(--accent); }
+#viewport-container { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: #000; }
+#tab-row { display: flex; align-items: stretch; }
+#tabs { display: flex; flex: 1; min-width: 0; background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.sidebar-open-btn, .sidebar-toggle-btn { background: var(--panel); border: 1px solid var(--border); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--button-radius); min-width: 32px; width: 32px; height: 100%; }
+.sidebar-open-btn { margin-right: auto; display: none; }
+.sidebar-toggle-btn { margin-left: 8px; }
+#preview-close-btn { position: fixed; top: 12px; right: 12px; z-index: 1000; display: none; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: rgba(24, 24, 24, 0.82); color: var(--text); cursor: pointer; font-size: 16px; }
+.full-preview-mode #preview-close-btn { display: inline-flex; }
+.full-preview-mode #toolbar, .full-preview-mode #sidebar, .full-preview-mode #splitter, .full-preview-mode #tab-row { display: none !important; }
+.full-preview-mode #viewport-container { min-height: 100vh; }
+.sidebar-open-btn:hover, .sidebar-toggle-btn:hover, #preview-close-btn:hover { background: rgba(255,255,255,0.12); }
+.tab { padding: var(--tab-padding-v) var(--tab-padding-h); cursor: pointer; border-right: 1px solid var(--border); white-space: nowrap; display: flex; align-items: center; gap: 8px; opacity: 0.7; transition: background 0.15s, opacity 0.15s; background: rgba(var(--layer-color-rgb, 128, 128, 128), 0.1); }
+.tab:hover { opacity: 1; background: rgba(var(--layer-color-rgb, 128, 128, 128), 0.2); }
+.tab.active { background: rgba(var(--layer-color-rgb, 128, 128, 128), 0.35); border-bottom: 2px solid rgb(var(--layer-color-rgb, 128, 128, 128)); opacity: 1; }
+.tab-controls { display: inline-flex; gap: 2px; margin-left: 8px; }
+.tab-btn { background: transparent; border: 1px solid transparent; color: inherit; padding: 0; font-size: 11px; cursor: pointer; border-radius: 3px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s; }
+.tab-btn .icon { font-size: 14px !important; width: 14px; height: 14px; }
+.tab-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+.tab-btn:focus { outline: none; border-color: var(--accent); }
+.tab-btn.remove-btn:hover { background: rgba(255, 80, 80, 0.2); border-color: rgba(255, 80, 80, 0.4); color: #ff8888; }
+.tab-btn.remove-btn:hover .icon { color: #ff8888; }
+#layer-props { padding: 4px 4px; display: flex; flex-direction: column; align-items: stretch; gap: 4px; border-bottom: 1px solid var(--border); background: rgba(var(--layer-color-rgb, 128, 128, 128), 0.15); transition: background 0.2s; box-sizing: border-box; overflow: hidden; }
+.prop-row { display: flex; align-items: center; gap: 4px; justify-content: space-between; width: 100%; box-sizing: border-box; padding: 2px 0; }
+.prop-group { display: flex; align-items: center; gap: 4px; white-space: nowrap; min-width: 0; }
+.prop-group.stretch { flex: 1; min-width: 0; }
+.prop-group.stretch input[type="text"], .prop-group.stretch input[type="number"], .prop-group.stretch select { flex: 1; min-width: 4ch; width: 100%; box-sizing: border-box; }
+#uniform-panel { padding: 0; border-bottom: 1px solid var(--border); background: var(--surface); max-height: 35%; overflow-y: auto; }
+#uniform-panel h3 { margin: 0; font-size: calc(var(--ui-font-size) - 2px); color: var(--text-muted); padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 2; }
+#uniform-panel .uniform-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; margin: 0; padding: 6px 8px; background: rgba(255,255,255,0.02); transition: background 0.15s ease; border-bottom: 1px solid rgba(255,255,255,0.04); }
+#uniform-panel .uniform-row:hover { background-color: rgba(255,255,255,0.06); }
+#uniform-panel .uniform-label { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: calc(var(--ui-font-size) - 1px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#uniform-panel .uniform-label .uniform-meta { color: var(--text-muted); font-size: calc(var(--ui-font-size) - 2px); opacity: 0.7; }
+#uniform-panel .uniform-inputs { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; min-width: 0; justify-content: flex-end; }
+#uniform-panel .uniform-inputs input[type=text], #uniform-panel .uniform-inputs input[type=number] { width: 56px; max-width: 56px; font-size: calc(var(--ui-font-size) - 1px); padding: 3px 4px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); border-radius: 3px; }
+input[type=range] { width: 100%; max-width: 100%; -webkit-appearance: none; appearance: none; height: 10px; background: transparent; cursor: ew-resize; }
+input[type=range]::-webkit-slider-runnable-track { height: 6px; background: var(--slider-track); border-radius: 999px; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; background: var(--slider-thumb); border: none; border-radius: 50%; margin-top: -3px; cursor: ew-resize; transition: transform 0.1s; }
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+input[type=range]::-moz-range-track { height: 6px; background: var(--slider-track); border-radius: 999px; }
+input[type=range]::-moz-range-thumb { width: 12px; height: 12px; background: var(--slider-thumb); border: none; border-radius: 50%; cursor: ew-resize; transition: transform 0.1s; }
+input[type=range]::-moz-range-thumb:hover { transform: scale(1.2); }
+#uniform-panel .uniform-inputs input[type=checkbox] { transform: scale(1.1); cursor: pointer; }
+#editor-container { flex: 1; display: flex; flex-direction: column; position: relative; min-height: 0; }
+#error-log { color: #ffb3b3; background: #3a0e0e; padding: 8px 12px; font-family: Consolas, monospace; font-size: calc(var(--ui-font-size) - 1px); display: none; white-space: pre-wrap; overflow-y: auto; max-height: 30%; border-bottom: 1px solid var(--border); box-shadow: inset 0 2px 8px rgba(0,0,0,0.2); line-height: 1.4; }
+.ace_editor, .ace_scroller { background: var(--surface) !important; color: var(--text) !important; }
+.ace_gutter { background: var(--panel) !important; color: var(--text-muted) !important; border-right: 1px solid var(--border) !important; }
+.ace_gutter-cell { color: var(--text-muted) !important; }
+.ace_marker-layer .ace_active-line { background: rgba(255,255,255,0.05) !important; }
+.ace_marker-layer .ace_selected-word { background: rgba(0, 122, 204, 0.3) !important; }
+.ace_cursor { border-left: 2px solid var(--accent) !important; }
+.ace_print-margin { background: rgba(255,255,255,0.04) !important; }
+#editor, .ace_editor, .ace_editor * { font-family: Consolas, 'Courier New', monospace !important; font-size: var(--editor-font-size, 13px) !important; line-height: var(--editor-line-height, 18px) !important; font-variant-ligatures: none !important; text-rendering: geometricPrecision !important; -webkit-font-smoothing: subpixel-antialiased !important; -moz-osx-font-smoothing: grayscale !important; }
+#editor, .ace_editor { transform: translateZ(0); backface-visibility: hidden; will-change: transform; }
+#editor { position: relative; flex: 1; min-height: 0; background: transparent; border: none; padding: 10px; box-sizing: border-box; z-index: 1; }
+#editor::selection { background: rgba(255,255,255,0.15); color: transparent; }
+.token-error-line { background: rgba(255, 80, 80, 0.18); display: block; }
+#editor .error-line { background: rgba(255, 80, 80, 0.18); border-left: 3px solid #ff5555; padding-left: 4px; margin-left: -7px; cursor: pointer; transition: background 0.1s; }
+#editor .error-line:hover { background: rgba(255, 80, 80, 0.25); }
+canvas { display: block; width: 100%; height: 100%; outline: none; cursor: crosshair; }
+#playback-status { margin-left: auto; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; white-space: nowrap; text-align: right; min-width: 250px; padding-right: 8px; }
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.15.2/ace.js"></script>
 </head>
 <body>
-    <div class="container">
-        <header><h1>INDEX</h1></header>
-        <div class="grid">
-        <div class="card" style="--item-accent: #f9fafb; --item-bg: #00264b">
-            <h2 class="title">HTML EDITOR</h2>
-            <div class="card-actions">
-                <a href="html_editor.html" class="main-link">Open</a>
-                
+<div id="toolbar">
+    <button type="button" id="btn-play" title="Play / Pause" aria-label="Play / Pause"></button>
+    <button type="button" id="btn-step" title="Step Frame" aria-label="Step Frame"></button>
+    <button type="button" id="btn-reset" title="Reset Time" aria-label="Reset Time"></button>
+    <button id="btn-view3d" title="Toggle 3D Cubemap View" aria-label="Toggle 3D view"></button>
+    <button id="btn-preview-only" title="Preview only" aria-label="Preview only"></button>
+    <button id="btn-screenshot" title="Save Screenshot" aria-label="Save Screenshot"></button>
+    <button id="btn-add" title="Add New Layer" aria-label="Add Layer"></button>
+    <button id="btn-ai" title="Generate AI Shader" aria-label="Generate AI shader"></button>
+    <select id="sel-ai-provider" title="Choose AI shader provider">
+        <option value="gemini">Gemini (Free API-less)</option>
+        <option value="openai">OpenAI (API key)</option>
+        <option value="ollama">Ollama (localhost)</option>
+        <option value="custom">Custom provider</option>
+    </select>
+    <button id="btn-ai-config" title="AI Provider Settings" aria-label="AI Settings"></button>
+    <button id="btn-editor-config" title="Editor Theme & Settings" aria-label="Editor Settings"></button>
+    <button id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo"></button>
+    <button id="btn-redo" title="Redo (Ctrl+Y)" aria-label="Redo"></button>
+    <button id="btn-export" title="Export Project State" aria-label="Export state"></button>
+    <button id="btn-import" title="Import Project State" aria-label="Import state"></button>
+    <div class="prop-group" title="Global Width"><span class="icon material-symbols-outlined" style="font-size: 16px; color: var(--text-muted);">swap_horiz</span><input type="number" id="prop-global-w" min="1"></div>
+    <div class="prop-group" title="Global Height"><span class="icon material-symbols-outlined" style="font-size: 16px; color: var(--text-muted);">swap_vert</span><input type="number" id="prop-global-h" min="1"></div>
+    <div id="playback-status">Frame: 0 | Time: 0.00</div>
+</div>
+<div id="main">
+    <div id="sidebar">
+        <div id="layer-props">
+            <div class="prop-row">
+                <div class="prop-group" title="Buffer Color"><input type="color" id="prop-color" style="width: 24px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; background: transparent;"></div>
+                <div class="prop-group stretch"><span>Name:</span><input type="text" id="prop-name"></div>
+                <button type="button" id="btn-hide-sidebar-name" class="sidebar-toggle-btn" title="Hide sidebar" aria-label="Hide sidebar"></button>
             </div>
-            <div class="footer">
-                <span class="path">html_editor.html</span>
-                <span class="date">25.12.18</span>
+            <div class="prop-row">
+                <div style="display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0;">
+                    <div class="prop-group" style="flex: none;"><span>W:</span><input type="number" id="prop-w" min="1" style="width: 48px; box-sizing: border-box;"></div>
+                    <div class="prop-group" style="flex: none;"><span>H:</span><input type="number" id="prop-h" min="1" style="width: 48px; box-sizing: border-box;"></div>
+                    <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; margin-left: 2px;">
+                        <input type="checkbox" id="prop-use-global-res" style="margin:2px;"> Auto
+                    </label>
+                </div>
+                <div class="prop-group" style="flex: none;">
+                    <span>×</span><input type="number" id="prop-res-mult" min="0.1" step="0.1" style="width: 44px; box-sizing: border-box;">
+                </div>
+            </div>
+            <div class="prop-row">
+                <div class="prop-group stretch">
+                    <span>Topology:</span>
+                    <select id="prop-top">
+                        <option value="Torus">Torus</option>
+                        <option value="Plane">Plane</option>
+                        <option value="Sphere">Sphere</option>
+                        <option value="Moebius">Möbius</option>
+                        <option value="Klein">Klein</option>
+                        <option value="Mirror">Mirror</option>
+                        <option value="Cubemap">Cubemap</option>
+                    </select>
+                </div>
             </div>
         </div>
-        <div class="card" style="--item-accent: #748297; --item-bg: #12223a">
-            <h2 class="title">TILER</h2>
-            <div class="card-actions">
-                <a href="tiler.html" class="main-link">Open</a>
-                
-            </div>
-            <div class="footer">
-                <span class="path">tiler.html</span>
-                <span class="date">25.12.23</span>
-            </div>
+        <div id="uniform-panel">
+            <h3>Uniforms</h3>
+            <div id="uniform-list"></div>
         </div>
-        <div class="card" style="--item-accent: #635f76; --item-bg: #1b1636">
-            <h2 class="title">TILER V2</h2>
-            <div class="card-actions">
-                <a href="tiler_v2.html" class="main-link">Open</a>
-                
-            </div>
-            <div class="footer">
-                <span class="path">tiler_v2.html</span>
-                <span class="date">25.12.26</span>
-            </div>
+        <div id="editor-container">
+            <div id="error-log"></div>
+            <div id="editor" spellcheck="false"></div>
         </div>
-                <div class="card" style="--item-accent: #90b5b9; --item-bg: #0c1735">
-            <h2 class="title">CELLS</h2>
-            <div class="card-actions">
-                <a href="cells.html" class="main-link">Open</a>
-                
-            </div>
-            <div class="footer">
-                <span class="path">cells.html</span>
-                <span class="date">31.12.17</span>
-            </div>
-        </div>
-        <div class="card" style="--item-accent: #68566f; --item-bg: #2c1735">
-            <h2 class="title">WAVES</h2>
-            <div class="card-actions">
-                <a href="waves.html" class="main-link">Open</a>
-                
-            </div>
-            <div class="footer">
-                <span class="path">waves.html</span>
-                <span class="date">25.12.17</span>
-            </div>
-        </div></div>
-        
     </div>
+    <div id="splitter"></div>
+    <div id="viewport-container">
+        <div id="tab-row">
+            <button type="button" id="btn-show-sidebar" class="sidebar-open-btn" title="Show sidebar" aria-label="Show sidebar"></button>
+            <div id="tabs"></div>
+        </div>
+        <canvas id="viewport" tabindex="0"></canvas>
+    </div>
+</div>
+<button type="button" id="preview-close-btn" title="Exit preview" aria-label="Exit preview">×</button>
+<input type="file" id="file-import" accept="application/json" style="display:none">
+<input type="file" id="file-editor-config-import" accept="application/json" style="display:none">
+<div id="ai-config-modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+        <h2>AI Shader Provider</h2>
+        <label style="display: block; margin-bottom: 8px;">
+            Provider
+            <select id="modal-ai-provider" style="width: 100%; margin-top: 4px; box-sizing: border-box;">
+                <option value="gemini">Gemini (Free API-less)</option>
+                <option value="openai">OpenAI (API key)</option>
+                <option value="ollama">Ollama (localhost)</option>
+                <option value="custom">Custom provider</option>
+            </select>
+        </label>
+        <label id="modal-openai-key-row" style="display: block; margin-bottom: 8px;">
+            OpenAI API Key
+            <input type="text" id="modal-openai-key" autocomplete="off" placeholder="sk-..." style="width: 100%; margin-top: 4px; box-sizing: border-box;">
+        </label>
+        <label style="display: block; margin-bottom: 8px;">
+            Endpoint URL
+            <input type="text" id="modal-ai-endpoint" placeholder="https://..." style="width: 100%; margin-top: 4px; box-sizing: border-box;">
+        </label>
+        <label style="display: block; margin-bottom: 8px;">
+            Model
+            <input type="text" id="modal-ai-model" placeholder="gpt-4o-mini" style="width: 100%; margin-top: 4px; box-sizing: border-box;">
+        </label>
+        <label id="modal-headers-row" style="display: block; margin-bottom: 12px;">
+            Extra Headers
+            <textarea id="modal-ai-headers" placeholder='{"Authorization": "Bearer ..."}' style="width: 100%; margin-top: 4px; box-sizing: border-box; min-height: 60px; resize: vertical; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 6px; font-family: inherit; font-size: inherit;"></textarea>
+        </label>
+        <div class="modal-actions" style="justify-content: space-between; border-top: none; margin-top: 0; padding-top: 0;">
+            <button type="button" id="modal-ai-clear" title="Clear API keys & URLs" aria-label="Clear configuration" style="color: #ff8888; border-color: rgba(255, 80, 80, 0.4); background: rgba(255, 80, 80, 0.1);">Clear Data</button>
+            <div style="display:flex; gap:6px;">
+                <button id="modal-ai-save" title="Save configuration" aria-label="Save configuration"></button>
+                <button id="modal-ai-cancel" title="Cancel" aria-label="Cancel"></button>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="ai-generate-modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content" style="width: min(720px, calc(100% - 32px)); max-height: 90vh; display: flex; flex-direction: column;">
+        <h2 style="margin-bottom: 16px;">Generate AI Code</h2>
+        <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px;">
+            <label style="display: block;">
+                Prompt
+                <textarea id="ai-generate-prompt" placeholder="e.g. A 3D simplex noise function, a raymarching loop, or a full shader..." style="width: 100%; margin-top: 4px; box-sizing: border-box; min-height: 80px; resize: vertical; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 8px; font-family: inherit; font-size: inherit;"></textarea>
+            </label>
+            <details>
+                <summary style="cursor: pointer; color: var(--text-muted); font-size: 12px; user-select: none; padding-bottom: 4px;">Advanced: System Prompt & Context</summary>
+                <div style="margin-top: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-size: 12px;">System Prompt Preset</span>
+                        <select id="ai-generate-preset" style="width: auto; font-size: 11px; padding: 2px; margin: 0; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); border-radius: 3px;">
+                            <option value="detailed">Detailed (All Features)</option>
+                            <option value="concise">Concise (Core Features)</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                    </div>
+                    <textarea id="ai-generate-system" style="width: 100%; box-sizing: border-box; min-height: 100px; resize: vertical; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 8px; font-family: inherit; font-size: 11px; color: var(--text-muted);"></textarea>
+                </div>
+            </details>
+            
+            <div id="ai-generate-output-container" style="display: none; flex-direction: column; gap: 4px; flex: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; color: var(--accent); font-weight: bold;">Generated Output</span>
+                    <button id="ai-btn-copy" style="font-size: 11px; padding: 2px 8px; min-height: 24px;">Copy Code</button>
+                </div>
+                <textarea id="ai-generate-output" readonly style="width: 100%; box-sizing: border-box; min-height: 200px; flex: 1; resize: vertical; background: var(--surface-alt); border: 1px solid var(--border); color: var(--text); padding: 8px; font-family: Consolas, 'Courier New', monospace; font-size: 12px; white-space: pre; outline: none;"></textarea>
+            </div>
+        </div>
+        
+        <div id="ai-generate-status" style="display: none; color: var(--accent); font-size: 12px; margin-top: 12px; font-weight: bold;">Generating code... Please wait.</div>
+        <div class="modal-actions" style="justify-content: flex-end; border-top: none; margin-top: 12px; padding-top: 0;">
+            <button id="ai-btn-generate" title="Generate code" style="background: var(--accent); color: #fff;">Generate</button>
+            <button id="ai-btn-cancel" title="Close">Close</button>
+        </div>
+    </div>
+</div>
+<div id="editor-config-modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <h2 style="margin:0;">Editor Settings</h2>
+                <span id="modal-editor-status" style="display:none; color: #ffc107; font-size: 12px; font-weight: bold;">Previewing unsaved changes...</span>
+            </div>
+            <button type="button" id="modal-editor-close" class="modal-close" title="Close editor settings" aria-label="Close editor settings">×</button>
+        </div>
+        <div class="modal-settings-grid">
+            <div class="modal-setting-row">
+                <span class="setting-label">Theme Preset</span>
+                <div class="field">
+                    <select id="modal-editor-theme-preset">
+                        <option value="dark">Dark (VS Code)</option>
+                        <option value="dracula">Dracula</option>
+                        <option value="nord">Nord</option>
+                        <option value="monokai">Monokai</option>
+                        <option value="light">Light</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Syntax Theme</span>
+                <div class="field">
+                    <select id="modal-editor-syntax-theme">
+                        <option value="monokai">Monokai</option>
+                        <option value="dracula">Dracula</option>
+                        <option value="nord_dark">Nord Dark</option>
+                        <option value="chrome">Chrome</option>
+                        <option value="tomorrow">Tomorrow</option>
+                        <option value="solarized_light">Solarized Light</option>
+                        <option value="solarized_dark">Solarized Dark</option>
+                        <option value="twilight">Twilight</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Background Color</span>
+                <div class="field"><input type="color" id="modal-editor-bg" value="#1e1e1e"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Panel Color</span>
+                <div class="field"><input type="color" id="modal-editor-panel" value="#252526"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Border Color</span>
+                <div class="field"><input type="color" id="modal-editor-border" value="#3c3c3c"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Accent Color</span>
+                <div class="field"><input type="color" id="modal-editor-accent" value="#007acc"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Text Color</span>
+                <div class="field"><input type="color" id="modal-editor-text" value="#d4d4d4"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Icon Color</span>
+                <div class="field"><input type="color" id="modal-editor-icon-color" value="#d4d4d4"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">UI Font Size</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-ui-font-size" min="10" max="24" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Tab Vertical Padding</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-tab-padding-v" min="0" max="32" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Tab Horizontal Padding</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-tab-padding-h" min="0" max="48" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Editor Padding</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-padding" min="0" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Editor Font Size</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-font-size" min="10" max="24" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Editor Line Height</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-line-height" min="10" max="40" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Editor Font Family</span>
+                <div class="field"><input type="text" id="modal-editor-font-family" placeholder="Consolas, Courier New, monospace"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Shader Indent Size</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-indent-size" min="1" max="8" step="1"><span class="unit">spaces</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Use Spaces for Indent</span>
+                <div class="field"><input type="checkbox" id="modal-editor-soft-tabs"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Word Wrap</span>
+                <div class="field"><input type="checkbox" id="modal-editor-word-wrap"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Show Line Numbers</span>
+                <div class="field"><input type="checkbox" id="modal-editor-show-line-numbers"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Toolbar Button Size</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-button-size" min="24" max="48" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Toolbar Icon Size</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-icon-size" min="12" max="32" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Toolbar Button Radius</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-button-radius" min="0" max="16" step="1"><span class="unit">px</span></div></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Toolbar Gap</span>
+                <div class="field"><div class="input-with-unit"><input type="number" id="modal-editor-toolbar-gap" min="0" max="16" step="1"><span class="unit">px</span></div></div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" id="modal-editor-save" title="Save editor settings" aria-label="Save editor settings"></button>
+            <button type="button" id="modal-editor-export" title="Export editor config" aria-label="Export editor config"></button>
+            <button type="button" id="modal-editor-import" title="Import editor config" aria-label="Import editor config"></button>
+        </div>
+    </div>
+</div>
+<script>
+const D = document;
+const el = id => D.getElementById(id);
+
+const svgIcons = {
+    play: 'play_arrow',
+    pause: 'pause',
+    step: 'skip_next',
+    reset: 'restart_alt',
+    view3d: 'view_in_ar',
+    screenshot: 'photo_camera',
+    add: 'add',
+    ai: 'smart_toy',
+    settings: 'settings',
+    tune: 'tune',
+    undo: 'undo',
+    redo: 'redo',
+    export: 'download',
+    import: 'upload',
+    lock: 'lock',
+    unlock: 'lock_open',
+    bypass: 'block',
+    enable: 'toggle_on',
+    remove: 'close',
+    cancel: 'close',
+    save: 'save',
+    loading: 'autorenew',
+    left: 'chevron_left',
+    right: 'chevron_right',
+    fullscreen: 'fullscreen',
+    close: 'close'
+};
+
+const renderIcon = name => svgIcons[name] ? `<span class="icon material-symbols-outlined" style="font-size: inherit;">${svgIcons[name]}</span>` : '';
+const setButtonIcon = (button, name) => { if (button) button.innerHTML = renderIcon(name); };
+
+let e_status, e_tabs, e_name, e_color, e_w, e_h, e_useGlobalRes, e_resMult, e_globalW, e_globalH;
+let e_play, e_step, e_reset, e_add, e_ai, e_aiProvider, e_aiConfig, e_top, e_view3d, e_screenshot;
+let e_err, e_uniformList, aceEditor, e_undo, e_redo, e_export, e_import, e_fileImport, e_editorConfig, e_fileEditorConfigImport;
+let e_side, e_split, e_hideSidebarName, e_showSidebar, e_previewOnly, e_previewClose, cvs, gl;
+let aiModal, modalAiProvider, modalOpenAiKey, modalAiEndpoint, modalAiModel, modalAiHeaders, modalAiSave, modalAiCancel, modalAiClear, modalOpenAiKeyRow, modalHeadersRow;
+let aiGenerateModal, aiGeneratePrompt, aiGenerateSystem, aiGeneratePreset, aiBtnGenerate, aiBtnCancel, aiGenerateStatus, aiGenerateOutputContainer, aiGenerateOutput, aiBtnCopy;
+let editorConfigModal, modalEditorThemePreset, modalEditorSyntaxTheme, modalEditorBg, modalEditorPanel, modalEditorBorder, modalEditorAccent, modalEditorText, modalEditorPadding, modalEditorFontSize, modalEditorFontFamily, modalEditorIndentSize, modalEditorSoftTabs, modalEditorButtonSize, modalEditorIconSize, modalEditorIconColor, modalEditorButtonRadius, modalEditorToolbarGap, modalEditorSave, modalEditorExport, modalEditorImport, modalEditorClose, modalEditorStatus;
+let modalEditorUiFontSize, modalEditorTabPaddingV, modalEditorTabPaddingH, modalEditorLineHeight, modalEditorWordWrap, modalEditorShowLineNumbers;
+let editorConfigBackup = null;
+
+const systemPromptPresets = {
+    detailed: `ENVIRONMENT SPECIFICATION: Target: WebGL2 Fragment Shader (#version 300 es). Entry Point: void main(). Output: vec4 fragColor (macro OUT available). Coordinates: in vec2 vUV (macros U, P, fragCoord available). Globals: uniform float iTime; uniform int iFrame; uniform vec3 iResolution; uniform vec4 iMouse; uniform vec3 iMouseDir. Self-Sampling: VAL() returns vec4 at vUV. N(float dx, float dy) returns vec4 at offset. Buffer-Sampling: READ(layerName, uv) and READ_OFF(layerName, uv, offset). Topology Lib: wrap_Torus, wrap_Plane, wrap_Sphere, wrap_Moebius, wrap_Klein, wrap_Mirror, wrap_Cubemap, Cubemap_Area, Cubemap_Dir available. Custom Uniforms: Declared natively. OUTPUT CONSTRAINTS: Output exclusively valid, raw GLSL source code. Omit all markdown formatting and explanations.`,
+    concise: `ENVIRONMENT SPECIFICATION: Target: WebGL2 Fragment Shader (#version 300 es). Entry Point: void main(). Output: vec4 fragColor (macro OUT available). Coordinates: in vec2 vUV (macros U, fragCoord available). Globals: uniform float iTime; uniform int iFrame; uniform vec3 iResolution; uniform vec4 iMouse. Buffer-Sampling: READ(layerName, uv). OUTPUT CONSTRAINTS: Output exclusively valid, raw GLSL source code. Omit all markdown formatting and explanations.`,
+    custom: `ENVIRONMENT SPECIFICATION: Target: WebGL2 Fragment Shader (#version 300 es). Globals available: uniform float iTime; uniform int iFrame; uniform vec3 iResolution; uniform vec4 iMouse; uniform vec3 iMouseDir.\n\n[Add your custom instructions here...]`
+};
+const defaultSystemPrompt = systemPromptPresets.detailed;
+
+function initDOM() {
+    e_status = el('playback-status');
+    e_tabs = el('tabs');
+    e_name = el('prop-name');
+    e_color = el('prop-color');
+    e_w = el('prop-w');
+    e_h = el('prop-h');
+    e_useGlobalRes = el('prop-use-global-res');
+    e_resMult = el('prop-res-mult');
+    e_globalW = el('prop-global-w');
+    e_globalH = el('prop-global-h');
+    e_play = el('btn-play');
+    e_step = el('btn-step');
+    e_reset = el('btn-reset');
+    e_add = el('btn-add');
+    e_ai = el('btn-ai');
+    e_aiProvider = el('sel-ai-provider');
+    e_aiConfig = el('btn-ai-config');
+    e_top = el('prop-top');
+    e_view3d = el('btn-view3d');
+    e_screenshot = el('btn-screenshot');
+    e_err = el('error-log');
+    e_uniformList = el('uniform-list');
+    e_side = el('sidebar');
+    e_split = el('splitter');
+    e_hideSidebarName = el('btn-hide-sidebar-name');
+    e_showSidebar = el('btn-show-sidebar');
+    e_previewOnly = el('btn-preview-only');
+    e_previewClose = el('preview-close-btn');
+    cvs = el('viewport');
+    
+    // WebGL Context setup
+    gl = cvs.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
+    if (!gl) {
+        alert('WebGL2 is required to run this shader editor. Please use a compatible browser.');
+        throw new Error('WebGL2 context not available.');
+    }
+    
+    // Handle WebGL Context Loss/Restore
+    cvs.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        engine.playing = false;
+        setButtonIcon(e_play, 'play');
+        e_err.style.display = 'block';
+        e_err.textContent = '⚠️ WebGL context lost. Please reload the page or wait for recovery.';
+    }, false);
+    
+    cvs.addEventListener('webglcontextrestored', (e) => {
+        initGL();
+        engine.layers.forEach(l => {
+            l.t0 = createTex(l.w, l.h); l.t1 = createTex(l.w, l.h);
+            l.f0 = createFBO(l.t0); l.f1 = createFBO(l.t1);
+        });
+        compileAll();
+        hideErr();
+        render();
+    }, false);
+
+    aceEditor = ace.edit('editor');
+    cvs.width = cvs.clientWidth;
+    cvs.height = cvs.clientHeight;
+    e_undo = el('btn-undo');
+    e_redo = el('btn-redo');
+    e_export = el('btn-export');
+    e_import = el('btn-import');
+    e_fileImport = el('file-import');
+    e_editorConfig = el('btn-editor-config');
+    e_fileEditorConfigImport = el('file-editor-config-import');
+    aiModal = el('ai-config-modal');
+    modalAiProvider = el('modal-ai-provider');
+    modalOpenAiKey = el('modal-openai-key');
+    modalAiEndpoint = el('modal-ai-endpoint');
+    modalAiModel = el('modal-ai-model');
+    modalAiHeaders = el('modal-ai-headers');
+    modalAiSave = el('modal-ai-save');
+    modalAiCancel = el('modal-ai-cancel');
+    modalAiClear = el('modal-ai-clear');
+    modalOpenAiKeyRow = el('modal-openai-key-row');
+    modalHeadersRow = el('modal-headers-row');
+    
+    aiGenerateModal = el('ai-generate-modal');
+    aiGeneratePrompt = el('ai-generate-prompt');
+    aiGenerateSystem = el('ai-generate-system');
+    aiGeneratePreset = el('ai-generate-preset');
+    aiBtnGenerate = el('ai-btn-generate');
+    aiBtnCancel = el('ai-btn-cancel');
+    aiGenerateStatus = el('ai-generate-status');
+    aiGenerateOutputContainer = el('ai-generate-output-container');
+    aiGenerateOutput = el('ai-generate-output');
+    aiBtnCopy = el('ai-btn-copy');
+    
+    aiGeneratePreset.onchange = () => {
+        if (systemPromptPresets[aiGeneratePreset.value]) {
+            aiGenerateSystem.value = systemPromptPresets[aiGeneratePreset.value];
+        }
+    };
+    aiGenerateSystem.oninput = () => {
+        const currentText = aiGenerateSystem.value.trim();
+        const matchedKey = Object.keys(systemPromptPresets).find(key => systemPromptPresets[key].trim() === currentText);
+        aiGeneratePreset.value = matchedKey || 'custom';
+    };
+    
+    editorConfigModal = el('editor-config-modal');
+    modalEditorThemePreset = el('modal-editor-theme-preset');
+    modalEditorSyntaxTheme = el('modal-editor-syntax-theme');
+    modalEditorBg = el('modal-editor-bg');
+    modalEditorPanel = el('modal-editor-panel');
+    modalEditorBorder = el('modal-editor-border');
+    modalEditorAccent = el('modal-editor-accent');
+    modalEditorText = el('modal-editor-text');
+    modalEditorPadding = el('modal-editor-padding');
+    modalEditorFontSize = el('modal-editor-font-size');
+    modalEditorFontFamily = el('modal-editor-font-family');
+    modalEditorIndentSize = el('modal-editor-indent-size');
+    modalEditorSoftTabs = el('modal-editor-soft-tabs');
+    modalEditorButtonSize = el('modal-editor-button-size');
+    modalEditorIconSize = el('modal-editor-icon-size');
+    modalEditorIconColor = el('modal-editor-icon-color');
+    modalEditorButtonRadius = el('modal-editor-button-radius');
+    modalEditorToolbarGap = el('modal-editor-toolbar-gap');
+    modalEditorSave = el('modal-editor-save');
+    modalEditorExport = el('modal-editor-export');
+    modalEditorImport = el('modal-editor-import');
+    modalEditorClose = el('modal-editor-close');
+    modalEditorStatus = el('modal-editor-status');
+    
+    modalEditorUiFontSize = el('modal-editor-ui-font-size');
+    modalEditorTabPaddingV = el('modal-editor-tab-padding-v');
+    modalEditorTabPaddingH = el('modal-editor-tab-padding-h');
+    modalEditorLineHeight = el('modal-editor-line-height');
+    modalEditorWordWrap = el('modal-editor-word-wrap');
+    modalEditorShowLineNumbers = el('modal-editor-show-line-numbers');
+
+    setButtonIcon(e_play, 'play');
+    setButtonIcon(e_step, 'step');
+    setButtonIcon(e_reset, 'reset');
+    setButtonIcon(e_view3d, 'view3d');
+    setButtonIcon(e_screenshot, 'screenshot');
+    setButtonIcon(e_add, 'add');
+    setButtonIcon(e_ai, 'ai');
+    setButtonIcon(e_aiConfig, 'settings');
+    setButtonIcon(e_editorConfig, 'tune');
+    setButtonIcon(e_undo, 'undo');
+    setButtonIcon(e_redo, 'redo');
+    setButtonIcon(e_export, 'export');
+    setButtonIcon(e_import, 'import');
+    setButtonIcon(modalAiSave, 'save');
+    setButtonIcon(modalAiCancel, 'cancel');
+    setButtonIcon(modalEditorSave, 'save');
+    setButtonIcon(modalEditorExport, 'export');
+    setButtonIcon(modalEditorImport, 'import');
+
+    applyEditorSettings(getEditorSettings());
+
+    e_aiProvider.value = getAiProviderSelection();
+    e_aiProvider.onchange = () => setAiProviderSelection(e_aiProvider.value);
+    e_aiConfig.onclick = () => openAiConfig();
+    e_editorConfig.onclick = () => openEditorConfig();
+    e_undo.onclick = undo;
+    e_redo.onclick = redo;
+    e_export.onclick = exportState;
+    e_import.onclick = () => e_fileImport.click();
+    e_fileImport.onchange = e => { importStateFromFile(e.target.files[0]); e.target.value = ''; };
+    e_fileEditorConfigImport.onchange = e => { importEditorConfigFromFile(e.target.files[0]); e.target.value = ''; };
+    
+    modalAiProvider.onchange = () => loadAiConfigModal(modalAiProvider.value);
+    modalAiSave.onclick = saveAiConfigModal;
+    modalAiCancel.onclick = closeAiConfig;
+    modalAiClear.onclick = () => {
+        ['gemini', 'openai', 'ollama', 'custom'].forEach(p => {
+            localStorage.removeItem(`ai_shader_${p}_endpoint`);
+            localStorage.removeItem(`ai_shader_${p}_model`);
+            localStorage.removeItem(`ai_shader_${p}_headers`);
+        });
+        localStorage.removeItem('openai_api_key');
+        loadAiConfigModal(modalAiProvider.value);
+    };
+    aiModal.addEventListener('click', e => { if (e.target === aiModal) closeAiConfig(); });
+    aiGenerateModal.addEventListener('click', e => { if (e.target === aiGenerateModal) aiGenerateModal.classList.remove('open'); });
+
+    const editorConfigInputs = [
+        modalEditorThemePreset, modalEditorSyntaxTheme, modalEditorBg, modalEditorPanel,
+        modalEditorBorder, modalEditorAccent, modalEditorText, modalEditorIconColor,
+        modalEditorPadding, modalEditorFontSize, modalEditorFontFamily, modalEditorIndentSize,
+        modalEditorSoftTabs, modalEditorButtonSize, modalEditorIconSize, modalEditorButtonRadius,
+        modalEditorToolbarGap, modalEditorUiFontSize, modalEditorTabPaddingV, modalEditorTabPaddingH,
+        modalEditorLineHeight, modalEditorWordWrap, modalEditorShowLineNumbers
+    ];
+    editorConfigInputs.forEach(input => {
+        if (!input) return;
+        input.addEventListener('input', () => {
+            const settings = getEditorConfigFromInputs();
+            updateEditorPreview(settings);
+            updateEditorDirtyIndicator(settings);
+        });
+    });
+
+    modalEditorSave.onclick = saveEditorConfigModal;
+    modalEditorExport.onclick = exportEditorConfigToFile;
+    modalEditorImport.onclick = () => e_fileEditorConfigImport.click();
+    modalEditorClose.onclick = e => { e.stopPropagation(); discardEditorConfigChanges(); closeEditorConfig(); };
+    editorConfigModal.addEventListener('click', e => { if (e.target === editorConfigModal) { discardEditorConfigChanges(); closeEditorConfig(); } });
+}
+
+function attachControlHandlers() {
+    let tId = null;
+    e_play.onclick = () => { engine.playing = !engine.playing; setButtonIcon(e_play, engine.playing ? 'pause' : 'play'); };
+    e_step.onclick = () => { step(); render(); };
+    e_reset.onclick = () => { engine.frame = 0; engine.time = 0; render(); };
+    e_screenshot.onclick = () => {
+        render(); // Force latest buffer view
+        cvs.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = D.createElement('a');
+            a.href = url;
+            a.download = `GridIDE_Capture_F${engine.frame}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }, 'image/png');
+    };
+    e_add.onclick = () => { addLayer('NewLayer', 512, 512, 'void main() { fragColor = vec4(1.0, 0.0, 0.0, 1.0); }'); pushHistory(); };
+    setButtonIcon(e_hideSidebarName, 'left');
+    setButtonIcon(e_showSidebar, 'right');
+    setButtonIcon(e_previewOnly, 'fullscreen');
+    setButtonIcon(e_previewClose, 'close');
+    const setSidebarVisible = visible => {
+        if (visible) {
+            e_side.style.display = 'flex';
+            e_split.style.display = 'block';
+            e_hideSidebarName.style.display = 'inline-flex';
+            e_showSidebar.style.display = 'none';
+        } else {
+            e_side.style.display = 'none';
+            e_split.style.display = 'none';
+            e_hideSidebarName.style.display = 'none';
+            e_showSidebar.style.display = 'inline-flex';
+        }
+        aceEditor.resize();
+        if (cvs.width !== cvs.clientWidth || cvs.height !== cvs.clientHeight) {
+            cvs.width = cvs.clientWidth;
+            cvs.height = cvs.clientHeight;
+        }
+        render();
+    };
+    const toggleSidebar = () => setSidebarVisible(getComputedStyle(e_side).display !== 'none' ? false : true);
+    e_hideSidebarName.onclick = () => toggleSidebar();
+    e_showSidebar.onclick = () => setSidebarVisible(true);
+    let previewOnlyMode = false;
+    let prevSidebarVisible = getComputedStyle(e_side).display !== 'none';
+    const setPreviewOnlyMode = visible => {
+        if (visible && !previewOnlyMode) {
+            prevSidebarVisible = getComputedStyle(e_side).display !== 'none';
+        }
+        previewOnlyMode = visible;
+        document.body.classList.toggle('full-preview-mode', visible);
+        e_previewOnly.classList.toggle('active-btn', visible);
+        if (visible) {
+            setSidebarVisible(false);
+        } else {
+            setSidebarVisible(prevSidebarVisible);
+        }
+        aceEditor.resize();
+        if (cvs.width !== cvs.clientWidth || cvs.height !== cvs.clientHeight) {
+            cvs.width = cvs.clientWidth;
+            cvs.height = cvs.clientHeight;
+        }
+        render();
+    };
+    e_previewOnly.onclick = () => setPreviewOnlyMode(!previewOnlyMode);
+    e_previewClose.onclick = () => setPreviewOnlyMode(false);
+    D.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && previewOnlyMode) {
+            setPreviewOnlyMode(false);
+            e.preventDefault();
+            return;
+        }
+        if (!e.ctrlKey && !e.metaKey) return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            compileActiveAndRender();
+        }
+        if (e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            if (e_export) e_export.click();
+        }
+        if (e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            undo();
+        }
+        if (e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            redo();
+        }
+        if (e.key.toLowerCase() === 'f') {
+            e.preventDefault();
+            aceEditor.focus();
+        }
+    });
+    e_ai.onclick = () => {
+        aiGeneratePrompt.value = '';
+        aiGenerateStatus.style.display = 'none';
+        aiGenerateOutputContainer.style.display = 'none';
+        aiGenerateOutput.value = '';
+        aiBtnGenerate.disabled = false;
+        
+        const storedSys = localStorage.getItem('ai_shader_system_prompt') || defaultSystemPrompt;
+        aiGenerateSystem.value = storedSys;
+        
+        const matchedKey = Object.keys(systemPromptPresets).find(key => systemPromptPresets[key].trim() === storedSys.trim());
+        aiGeneratePreset.value = matchedKey || 'custom';
+        
+        aiGenerateModal.classList.add('open');
+        setTimeout(() => aiGeneratePrompt.focus(), 100);
+    };
+    
+    const performGeneration = async () => {
+        const promptText = aiGeneratePrompt.value.trim();
+        if (!promptText) return;
+        
+        const systemPromptText = aiGenerateSystem.value.trim();
+        localStorage.setItem('ai_shader_system_prompt', systemPromptText);
+
+        try {
+            aiGenerateStatus.style.display = 'block';
+            aiGenerateOutputContainer.style.display = 'none';
+            aiBtnGenerate.disabled = true;
+            
+            const code = await requestShaderFromLLM(promptText, systemPromptText);
+            if (!code) throw new Error("No code returned by provider.");
+
+            aiGenerateOutput.value = code;
+            aiGenerateOutputContainer.style.display = 'flex';
+        } catch (err) {
+            alert(`AI Generation failed: ${err.message}`);
+        } finally {
+            aiGenerateStatus.style.display = 'none';
+            aiBtnGenerate.disabled = false;
+        }
+    };
+
+    aiBtnGenerate.onclick = performGeneration;
+    aiBtnCopy.onclick = () => {
+        navigator.clipboard.writeText(aiGenerateOutput.value).then(() => {
+            const oldText = aiBtnCopy.textContent;
+            aiBtnCopy.textContent = 'Copied!';
+            setTimeout(() => aiBtnCopy.textContent = oldText, 2000);
+        }).catch(() => {
+            alert('Failed to copy to clipboard.');
+        });
+    };
+    aiBtnCancel.onclick = () => aiGenerateModal.classList.remove('open');
+    
+    e_view3d.onclick = () => { engine.is3D = !engine.is3D; e_view3d.classList.toggle('active-btn', engine.is3D); render(); };
+    e_color.oninput = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.color = e.target.value; const rgb = hexToRgb(l.color); el('layer-props').style.setProperty('--layer-color-rgb', `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`); updateTabs(); } };
+    e_color.onchange = e => { pushHistory(); };
+    e_name.onchange = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { const newName = normalizeLayerName(e.target.value, l.id); l.name = newName; l.safeName = newName; e.target.value = newName; updateTabs(); compileAll(); pushHistory(); } };
+    e_top.onchange = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.top = e.target.value; compileAll(); render(); pushHistory(); } };
+    e_useGlobalRes.onchange = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.useGlobalRes = e.target.checked; e_w.disabled = l.useGlobalRes; e_h.disabled = l.useGlobalRes; updateLayerResolution(l); compileAll(); render(); pushHistory(); } };
+    
+    const resizeCb = (pushToHistory) => { 
+        const l = engine.layers.find(x => x.id === engine.activeId); 
+        if (l && !l.useGlobalRes) { 
+            const w = parseInt(e_w.value)||1, h = parseInt(e_h.value)||1; 
+            if (w !== l.baseW || h !== l.baseH) { 
+                resizeLayer(l, w, h); 
+                if (pushToHistory) pushHistory(); 
+            } 
+        } 
+    };
+    e_w.oninput = () => resizeCb(false); e_h.oninput = () => resizeCb(false);
+    e_w.onchange = () => resizeCb(true); e_h.onchange = () => resizeCb(true);
+    
+    e_resMult.oninput = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.resMult = Math.max(0.01, parseFloat(e.target.value) || 1.0); updateLayerResolution(l); compileAll(); render(); } };
+    e_resMult.onchange = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.resMult = Math.max(0.01, parseFloat(e.target.value) || 1.0); updateLayerResolution(l); compileAll(); render(); pushHistory(); } };
+
+    e_globalW.oninput = e => {
+        engine.globalResolution.w = Math.max(1, parseInt(e.target.value) || 1);
+        engine.layers.forEach(l => { if (l.useGlobalRes) updateLayerResolution(l); });
+        compileAll(); render();
+    };
+    e_globalW.onchange = e => {
+        engine.globalResolution.w = Math.max(1, parseInt(e.target.value) || 1);
+        engine.layers.forEach(l => { if (l.useGlobalRes) updateLayerResolution(l); });
+        compileAll(); render(); pushHistory();
+    };
+    e_globalH.oninput = e => {
+        engine.globalResolution.h = Math.max(1, parseInt(e.target.value) || 1);
+        engine.layers.forEach(l => { if (l.useGlobalRes) updateLayerResolution(l); });
+        compileAll(); render();
+    };
+    e_globalH.onchange = e => {
+        engine.globalResolution.h = Math.max(1, parseInt(e.target.value) || 1);
+        engine.layers.forEach(l => { if (l.useGlobalRes) updateLayerResolution(l); });
+        compileAll(); render(); pushHistory();
+    };
+    
+    const currentEditorSettings = getEditorSettings();
+    aceEditor.setTheme(`ace/theme/${currentEditorSettings.syntaxTheme || defaultEditorSettings.syntaxTheme}`);
+    aceEditor.session.setMode('ace/mode/glsl');
+    aceEditor.setOptions({
+        fontFamily: currentEditorSettings.editorFontFamily,
+        fontSize: `${currentEditorSettings.editorFontSize}px`,
+        showPrintMargin: false,
+        wrap: currentEditorSettings.wordWrap !== false,
+        showGutter: currentEditorSettings.showLineNumbers === true,
+        useWorker: false,
+        tabSize: currentEditorSettings.indentSize,
+        useSoftTabs: currentEditorSettings.softTabs
+    });
+    aceEditor.renderer.setStyle('fontFamily', currentEditorSettings.editorFontFamily);
+    aceEditor.renderer.setStyle('fontSize', `${currentEditorSettings.editorFontSize}px`);
+    aceEditor.session.on('change', () => {
+        const l = engine.layers.find(x => x.id === engine.activeId);
+        if (l) {
+            l.code = aceEditor.getValue();
+            clearTimeout(tId);
+            tId = setTimeout(() => { compile(l); updateTabs(); render(); }, 300);
+        }
+    });
+    D.addEventListener('keydown', e => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            compileActiveAndRender();
+        }
+        if (e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            if (e_export) e_export.click();
+        }
+        if (e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            undo();
+        }
+        if (e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            redo();
+        }
+        if (e.key.toLowerCase() === 'f') {
+            e.preventDefault();
+            aceEditor.focus();
+        }
+    });
+    e_err.ondblclick = e => {
+        const target = e.target.closest('.error-line');
+        if (target) goToEditorLine(parseInt(target.dataset.line, 10));
+    };
+    
+    let dragging = false;
+    e_split.addEventListener('mousedown', () => { dragging = true; });
+    document.addEventListener('mouseup', () => { dragging = false; });
+    document.addEventListener('mousemove', e => {
+        if (dragging) {
+            const nw = e.clientX;
+            if (nw > 100 && nw < window.innerWidth - 100) {
+                e_side.style.width = nw + 'px';
+                // Trigger an immediate resize when dragging split
+                aceEditor.resize();
+            }
+        }
+    });
+    cvs.onmousedown = e => { engine.mouse.d = e.buttons; };
+    cvs.onmouseup = e => { engine.mouse.d = e.buttons; };
+    cvs.onmousemove = e => {
+        const r = cvs.getBoundingClientRect(); engine.mouse.x = e.clientX - r.left; engine.mouse.y = e.clientY - r.top; engine.mouse.d = e.buttons;
+        if (engine.is3D && (e.buttons === 1 || e.buttons === 4)) {
+            engine.cam3d.rx += e.movementY * 0.01;
+            engine.cam3d.ry += e.movementX * 0.01;
+            engine.cam3d.rx = Math.max(-Math.PI/2, Math.min(Math.PI/2, engine.cam3d.rx));
+            render();
+        } else if (!engine.is3D && (e.buttons === 4 || (e.buttons === 1 && e.shiftKey))) {
+            engine.cam2d.x -= e.movementX / engine.cam2d.z; 
+            engine.cam2d.y += e.movementY / engine.cam2d.z; 
+            render();
+        }
+    };
+    cvs.onwheel = e => {
+        e.preventDefault(); 
+        if (engine.is3D) {
+            engine.cam3d.d *= Math.pow(1.001, e.deltaY);
+            engine.cam3d.d = Math.max(1.1, Math.min(15.0, engine.cam3d.d));
+            render();
+        } else {
+            const r = cvs.getBoundingClientRect();
+            const sx = e.clientX - r.left, sy = (cvs.height - (e.clientY - r.top));
+            const wx1 = (sx - cvs.width * 0.5) / engine.cam2d.z + engine.cam2d.x, wy1 = (sy - cvs.height * 0.5) / engine.cam2d.z + engine.cam2d.y;
+            engine.cam2d.z *= Math.pow(0.99, e.deltaY * 0.5);
+            const wx2 = (sx - cvs.width * 0.5) / engine.cam2d.z + engine.cam2d.x, wy2 = (sy - cvs.height * 0.5) / engine.cam2d.z + engine.cam2d.y;
+            engine.cam2d.x += wx1 - wx2; engine.cam2d.y += wy1 - wy2; 
+            render();
+        }
+    };
+    cvs.oncontextmenu = e => e.preventDefault();
+    
+    // Debounced Resize Observer
+    let resizeTid;
+    const resObs = new ResizeObserver(() => { 
+        if (resizeTid) cancelAnimationFrame(resizeTid);
+        resizeTid = requestAnimationFrame(() => { 
+            if (cvs.width !== cvs.clientWidth || cvs.height !== cvs.clientHeight) { 
+                cvs.width = cvs.clientWidth; cvs.height = cvs.clientHeight; 
+                render(); 
+            } 
+            aceEditor.resize(); 
+        }); 
+    });
+    resObs.observe(cvs);
+    resObs.observe(e_side);
+    
+    initGL();
+    addLayer('Metrics', 1536, 256, `void main() {
+      OUT = vec4(Cubemap_Area(U), Cubemap_Dir(U) * 0.5 + 0.5);
+    }`, 'Cubemap', '#8854d0');
+    addLayer('Wave', 1536, 256, `uniform float u_wave_stiffness;
+uniform float u_wave_damping;
+uniform float u_wave_impact;
+uniform float u_wave_heat;
+
+void main() {
+  vec4 m = READ(Metrics, U);
+  vec3 dir = m.gba * 2.0 - 1.0;
+  float h = VAL().r;
+  float v = VAL().g;
+  vec2 uL = wrap_Cubemap(U, vec2(-1.0, 0.0), iResolution.xy);
+  vec2 uR = wrap_Cubemap(U, vec2( 1.0, 0.0), iResolution.xy);
+  vec2 uD = wrap_Cubemap(U, vec2( 0.0,-1.0), iResolution.xy);
+  vec2 uU = wrap_Cubemap(U, vec2( 0.0, 1.0), iResolution.xy);
+  float a0 = Cubemap_Area(U);
+  float aL = Cubemap_Area(uL);
+  float aR = Cubemap_Area(uR);
+  float aD = Cubemap_Area(uD);
+  float aU = Cubemap_Area(uU);
+  float laplacian = aL * (N(-1,0).r - h) + aR * (N(1,0).r - h) + aD * (N(0,-1).r - h) + aU * (N(0,1).r - h);
+  laplacian /= a0;
+  v += laplacian * u_wave_stiffness;
+  v *= u_wave_damping;
+  h += v;
+  if (iMouse.z > 0.5 && length(iMouseDir) > 0.5 && distance(dir, iMouseDir) < 0.1) { v += u_wave_impact; }
+  if (mod(iTime, 3.0) < 0.1 && distance(dir, normalize(vec3(1.0, 0.5, -0.5))) < 0.05) { h = 1.0; }
+  if (iFrame < 2) h = (dir.y > 0.8) ? 1.0 : 0.0;
+  OUT = vec4(h, v, 0.0, 1.0);
+}`, 'Cubemap', '#3867d6');
+    addLayer('Mantle', 1536, 256, `uniform float u_mantle_diffusion;
+uniform float u_mantle_advection;
+uniform float u_mantle_grad_gain;
+uniform float u_mantle_noise_strength;
+uniform float u_mantle_feature_scale;
+uniform float u_mantle_velocity_damping;
+uniform float u_mantle_temperature_blend;
+
+void main() {
+  vec4 m = READ(Metrics, U);
+  vec3 dir = m.gba * 2.0 - 1.0;
+  vec2 uL = wrap_Cubemap(U, vec2(-1.0, 0.0), iResolution.xy);
+  vec2 uR = wrap_Cubemap(U, vec2( 1.0, 0.0), iResolution.xy);
+  vec2 uD = wrap_Cubemap(U, vec2( 0.0,-1.0), iResolution.xy);
+  vec2 uU = wrap_Cubemap(U, vec2( 0.0, 1.0), iResolution.xy);
+  float a0 = Cubemap_Area(U);
+  float aL = Cubemap_Area(uL);
+  float aR = Cubemap_Area(uR);
+  float aD = Cubemap_Area(uD);
+  float aU = Cubemap_Area(uU);
+  vec4 sL = N(-1,0);
+  vec4 sR = N(1,0);
+  vec4 sD = N(0,-1);
+  vec4 sU = N(0,1);
+  float T0 = VAL().r;
+  vec2 vel = VAL().gb * 2.0 - 1.0;
+  float lapT = aL * (sL.r - T0) + aR * (sR.r - T0) + aD * (sD.r - T0) + aU * (sU.r - T0);
+  lapT /= a0;
+  vec2 gradT = vec2(sR.r - sL.r, sU.r - sD.r) * 0.5;
+  float fs = max(0.25, u_mantle_feature_scale);
+  vec4 noiseCoords = vec4(U * 3.8 / fs, iTime * 0.24 / fs, iTime * 0.07 / fs);
+  float noiseA = fract(sin(dot(noiseCoords, vec4(12.9898, 78.233, 37.719, 45.164))) * 43758.5453);
+  float noiseB = fract(sin(dot(noiseCoords + vec4(5.2, 4.1, 2.3, 7.7), vec4(12.9898, 78.233, 37.719, 45.164))) * 43758.5453);
+  vec2 noiseVel = vec2(noiseA - 0.5, noiseB - 0.5) * u_mantle_noise_strength;
+  vel += vec2(gradT.y, -gradT.x) * u_mantle_advection;
+  vel += gradT * u_mantle_grad_gain;
+  vel += noiseVel;
+  vel *= u_mantle_velocity_damping;
+  float Tadv = READ_OFF(Mantle, U, -vel * 4.0 / fs).r;
+  float Tnew = Tadv + lapT * u_mantle_diffusion;
+  Tnew += (noiseA - 0.5) * 0.03;
+  Tnew += (noiseB - 0.5) * 0.025;
+  Tnew = mix(T0, Tnew, u_mantle_temperature_blend);
+  Tnew = mix(Tnew, 0.5, 0.002);
+  Tnew = clamp(Tnew, 0.0, 1.0);
+  if (iFrame < 2) {
+    float seed = fract(sin(dot(vec4(U * 5.3, 0.0, 0.0), vec4(12.9898, 78.233, 37.719, 45.164))) * 43758.5453);
+    Tnew = 0.52 + (seed - 0.5) * 0.16;
+    vel = vec2(0.0);
+  }
+  OUT = vec4(Tnew, vel * 0.5 + 0.5, 1.0);
+}`, 'Cubemap', '#eb3b5a');
+    addLayer('MantleRender', 1536, 256, `uniform float u_mantle_glow;
+uniform float u_mantle_flow_strength;
+uniform float u_mantle_accent;
+
+void main() {
+  vec4 s = READ(Mantle, U);
+  float t = s.r;
+  vec2 vel = s.gb * 2.0 - 1.0;
+  vec3 base = mix(vec3(0.05, 0.08, 0.25), vec3(0.9, 0.55, 0.15), t);
+  float glow = pow(t, 1.7) * u_mantle_glow + 0.25;
+  vec3 flow = vec3(0.06, 0.12, 0.18) * length(vel) * u_mantle_flow_strength;
+  vec3 accent = vec3(0.2, 0.18, 0.14) * u_mantle_accent * smoothstep(0.1, 0.4, length(vel));
+  OUT = vec4(clamp(base * glow + flow + accent, 0.0, 1.0), 1.0);
+}`, 'Cubemap', '#fa8231');
+    compileAll();
+    setActive(engine.layers[0].id);
+    pushHistory();
+    engine.playing = true;
+    setButtonIcon(e_play, engine.playing ? 'pause' : 'play');
+    step();
+    requestAnimationFrame(loop);
+}
+
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', () => { initDOM(); attachControlHandlers(); });
+} else {
+    initDOM();
+    attachControlHandlers();
+}
+
+let history = [];
+let historyIndex = -1;
+let isRestoringHistory = false;
+
+function captureState() {
+    return JSON.parse(JSON.stringify({
+        globalResolution: engine.globalResolution,
+        activeId: engine.activeId,
+        previewId: engine.previewId,
+        previewLocked: engine.previewLocked,
+        lockedPreviewId: engine.lockedPreviewId,
+        is3D: engine.is3D,
+        cam2d: engine.cam2d,
+        cam3d: engine.cam3d,
+        frame: engine.frame,
+        time: engine.time,
+        layers: engine.layers.map(l => ({
+            id: l.id,
+            name: l.name,
+            safeName: l.safeName,
+            baseW: l.baseW,
+            baseH: l.baseH,
+            useGlobalRes: l.useGlobalRes,
+            resMult: l.resMult,
+            code: l.code,
+            top: l.top,
+            color: l.color,
+            uniforms: l.uniforms,
+            enabled: l.enabled !== false,
+            solo: l.solo || false
+        }))
+    }));
+}
+
+function updateUndoRedoButtons() {
+    if (e_undo) e_undo.disabled = historyIndex <= 0;
+    if (e_redo) e_redo.disabled = historyIndex >= history.length - 1;
+}
+
+function destroyLayers() {
+    engine.layers.forEach(l => {
+        if (l.t0) gl.deleteTexture(l.t0);
+        if (l.t1) gl.deleteTexture(l.t1);
+        if (l.f0) gl.deleteFramebuffer(l.f0);
+        if (l.f1) gl.deleteFramebuffer(l.f1);
+        if (l.prog) gl.deleteProgram(l.prog);
+    });
+    engine.layers = [];
+}
+
+function restoreState(state) {
+    destroyLayers();
+    engine.globalResolution = state.globalResolution || { w: 1536, h: 256 };
+    engine.previewId = state.previewId || null;
+    engine.previewLocked = state.previewLocked || false;
+    engine.lockedPreviewId = state.lockedPreviewId || null;
+    engine.is3D = state.is3D || false;
+    engine.cam2d = state.cam2d || engine.cam2d;
+    engine.cam3d = state.cam3d || engine.cam3d;
+    engine.frame = state.frame || 0;
+    engine.time = state.time || 0;
+    (state.layers || []).forEach(d => {
+        const safeName = normalizeLayerName(d.name || 'Layer', d.id);
+        const l = {
+            id: d.id || genId(),
+            name: safeName,
+            safeName,
+            baseW: d.baseW || 1,
+            baseH: d.baseH || 1,
+            w: d.baseW || 1,
+            h: d.baseH || 1,
+            useGlobalRes: !!d.useGlobalRes,
+            resMult: d.resMult != null ? d.resMult : 1.0,
+            code: d.code || 'void main() { fragColor = vec4(0.0); }',
+            top: d.top || 'Torus',
+            color: d.color || getRandomColor(),
+            uniforms: Array.isArray(d.uniforms) ? d.uniforms : [],
+            uniformLocs: {},
+            prog: null,
+            err: '',
+            r0: true,
+            enabled: d.enabled !== false,
+            solo: d.solo || false
+        };
+        l.t0 = createTex(l.w, l.h);
+        l.t1 = createTex(l.w, l.h);
+        l.f0 = createFBO(l.t0);
+        l.f1 = createFBO(l.t1);
+        engine.layers.push(l);
+        if (l.useGlobalRes) updateLayerResolution(l);
+        compile(l);
+    });
+    engine.activeId = state.activeId || (engine.layers[0] && engine.layers[0].id) || null;
+    updateTabs();
+    setActive(engine.activeId);
+    updatePreviewOptions();
+    render();
+}
+
+function pushHistory() {
+    if (isRestoringHistory) return;
+    historyIndex += 1;
+    history.splice(historyIndex, history.length - historyIndex, captureState());
+    
+    if (history.length > 50) {
+        history.shift();
+        historyIndex--;
+    }
+    updateUndoRedoButtons();
+}
+
+function undo() {
+    if (historyIndex <= 0) return;
+    historyIndex -= 1;
+    isRestoringHistory = true;
+    restoreState(history[historyIndex]);
+    updateUndoRedoButtons();
+    isRestoringHistory = false;
+}
+
+function redo() {
+    if (historyIndex >= history.length - 1) return;
+    historyIndex += 1;
+    isRestoringHistory = true;
+    restoreState(history[historyIndex]);
+    updateUndoRedoButtons();
+    isRestoringHistory = false;
+}
+
+function exportState() {
+    const blob = new Blob([JSON.stringify(captureState(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = D.createElement('a');
+    a.href = url;
+    a.download = 'GridIDE-Project.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importStateFromFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const data = JSON.parse(reader.result);
+            restoreState(data);
+            pushHistory();
+        } catch (err) {
+            alert('Import failed: invalid JSON file.');
+        }
+    };
+    reader.readAsText(file);
+}
+
+function updatePreviewOptions() {
+    if (!engine.previewId || !engine.layers.some(l => l.id === engine.previewId)) {
+        engine.previewId = engine.activeId;
+    }
+}
+
+function openAiConfig() {
+    const provider = getAiProviderSelection();
+    modalAiProvider.value = provider;
+    loadAiConfigModal(provider);
+    aiModal.classList.add('open');
+}
+
+function closeAiConfig() {
+    aiModal.classList.remove('open');
+}
+
+const aiProviderDefs = {
+    gemini: {
+        label: 'Gemini (Free API-less)',
+        defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent',
+        defaultModel: 'gemini-2.5-flash-preview-09-2025',
+        requiresKey: false,
+        defaultHeaders: { 'Content-Type': 'application/json' },
+        payload: (systemPrompt, userPrompt, model) => ({
+            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] }
+        })
+    },
+    openai: {
+        label: 'OpenAI (API key)',
+        defaultEndpoint: 'https://api.openai.com/v1/chat/completions',
+        defaultModel: 'gpt-4o-mini',
+        requiresKey: true,
+        defaultHeaders: {},
+        payload: (systemPrompt, userPrompt, model) => ({
+            model: model || 'gpt-4o-mini',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `User request: ${userPrompt}` }
+            ],
+            temperature: 0.75,
+            max_tokens: 1100
+        })
+    },
+    ollama: {
+        label: 'Ollama (localhost)',
+        defaultEndpoint: 'http://127.0.0.1:11434/api/generate',
+        defaultModel: 'llama2',
+        requiresKey: false,
+        defaultHeaders: { 'Content-Type': 'application/json' },
+        payload: (systemPrompt, userPrompt, model) => ({
+            model: model || 'llama2',
+            prompt: `${systemPrompt}\n\nUser request: ${userPrompt}`,
+            temperature: 0.75,
+            max_tokens: 1100,
+            stream: false
+        })
+    },
+    custom: {
+        label: 'Custom provider',
+        defaultEndpoint: '',
+        defaultModel: '',
+        requiresKey: false,
+        defaultHeaders: { 'Content-Type': 'application/json' },
+        payload: (systemPrompt, userPrompt, model) => {
+            const payload = {
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `User request: ${userPrompt}` }
+                ]
+            };
+            if (model) payload.model = model;
+            return payload;
+        }
+    }
+};
+
+function parseHeaderString(headerString) {
+    if (!headerString) return {};
+    try {
+        const parsed = JSON.parse(headerString);
+        return typeof parsed === 'object' && parsed ? parsed : {};
+    } catch {
+        return headerString.split(/\r?\n/).reduce((acc, line) => {
+            const [key, ...tail] = line.split(':');
+            if (!key || tail.length === 0) return acc;
+            acc[key.trim()] = tail.join(':').trim();
+            return acc;
+        }, {});
+    }
+}
+
+function getAiProviderSelection() {
+    return localStorage.getItem('ai_shader_provider') || 'gemini';
+}
+
+function setAiProviderSelection(value) {
+    localStorage.setItem('ai_shader_provider', value);
+    if (e_aiProvider) e_aiProvider.value = value;
+}
+
+function getProviderEndpoint(provider) {
+    const def = aiProviderDefs[provider];
+    const stored = localStorage.getItem(`ai_shader_${provider}_endpoint`);
+    return stored || def.defaultEndpoint || '';
+}
+
+function getProviderHeaders(provider) {
+    const stored = localStorage.getItem(`ai_shader_${provider}_headers`);
+    const def = aiProviderDefs[provider] || {};
+    return Object.assign({ 'Content-Type': 'application/json' }, def.defaultHeaders || {}, parseHeaderString(stored));
+}
+
+function getProviderModel(provider) {
+    const def = aiProviderDefs[provider] || {};
+    return localStorage.getItem(`ai_shader_${provider}_model`) || def.defaultModel || '';
+}
+
+function getOpenAIKey() {
+    const stored = localStorage.getItem('openai_api_key');
+    if (stored) return stored;
+    const key = prompt('Enter your OpenAI API key to generate AI shaders:');
+    if (!key) return null;
+    localStorage.setItem('openai_api_key', key.trim());
+    return key.trim();
+}
+
+function loadAiConfigModal(provider) {
+    const def = aiProviderDefs[provider] || aiProviderDefs.gemini;
+    modalAiEndpoint.value = getProviderEndpoint(provider) || def.defaultEndpoint || '';
+    modalAiModel.value = getProviderModel(provider) || def.defaultModel || '';
+    modalAiHeaders.value = localStorage.getItem(`ai_shader_${provider}_headers`) || '';
+    modalOpenAiKey.value = localStorage.getItem('openai_api_key') || '';
+    
+    modalOpenAiKeyRow.style.display = def.requiresKey ? 'block' : 'none';
+    modalHeadersRow.style.display = provider === 'custom' ? 'block' : 'none';
+}
+
+function saveAiConfigModal() {
+    const provider = modalAiProvider.value;
+    setAiProviderSelection(provider);
+    localStorage.setItem(`ai_shader_${provider}_endpoint`, modalAiEndpoint.value.trim());
+    localStorage.setItem(`ai_shader_${provider}_model`, modalAiModel.value.trim());
+    if (provider === 'custom') {
+        localStorage.setItem(`ai_shader_${provider}_headers`, modalAiHeaders.value.trim());
+    }
+    if (provider === 'openai' && modalOpenAiKey.value.trim()) {
+        localStorage.setItem('openai_api_key', modalOpenAiKey.value.trim());
+    }
+    closeAiConfig();
+}
+
+function extractShaderCode(text) {
+    const codeFence = /`{3}(?:glsl)?\n?([\s\S]*?)`{3}/i.exec(text);
+    if (codeFence) return codeFence[1].trim();
+    const start = text.search(/#version\s+300\s+es|void\s+main\s*\(/i);
+    if (start !== -1) return text.slice(start).trim();
+    return text.trim();
+}
+
+async function requestShaderFromLLM(userPrompt, systemPromptText) {
+    const provider = getAiProviderSelection();
+    const def = aiProviderDefs[provider] || aiProviderDefs.openai;
+    if (def.requiresKey && !getOpenAIKey()) return null;
+    let endpoint = getProviderEndpoint(provider);
+    if (!endpoint) {
+        throw new Error(`No endpoint configured for ${def.label}. Use AI Config to set it up.`);
+    }
+    
+    if (provider === 'gemini') {
+        const apiKey = "";
+        if (!endpoint.includes('?key=')) endpoint += `?key=${apiKey}`;
+    }
+    
+    const systemPrompt = systemPromptText || defaultSystemPrompt;
+    const payload = def.payload(systemPrompt, userPrompt, getProviderModel(provider));
+    const headers = getProviderHeaders(provider);
+    if (def.requiresKey) {
+        headers.Authorization = `Bearer ${getOpenAIKey()}`;
+    }
+    
+    let res;
+    let lastError;
+    const delays = [1000, 2000, 4000, 8000, 16000];
+    
+    // Exponential Backoff Retry Loop
+    for (let i = 0; i <= 5; i++) {
+        try {
+            res = await fetch(endpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+                mode: 'cors',
+                cache: 'no-store'
+            });
+            if (res.ok) break;
+            const errText = await res.text();
+            lastError = new Error(`${def.label} request failed: ${res.status} ${res.statusText} ${errText}`);
+        } catch (fetchErr) {
+            lastError = new Error(`${def.label} network error: ${fetchErr.message}. Check CORS and connectivity.`);
+        }
+        
+        if (i < 5) {
+            await new Promise(r => setTimeout(r, delays[i]));
+        }
+    }
+
+    if (!res || !res.ok) {
+        throw lastError || new Error("Unknown AI fetch error.");
+    }
+
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+        || data?.choices?.[0]?.message?.content
+        || data?.choices?.[0]?.text
+        || data?.results?.[0]?.output?.[0]?.content
+        || data?.response
+        || data?.text
+        || data?.output
+        || data?.result?.choices?.[0]?.message?.content
+        || data?.result?.choices?.[0]?.text;
+
+    if (!text) {
+        throw new Error(`No shader text returned from ${def.label}. Response shape: ${JSON.stringify(data).slice(0, 500)}`);
+    }
+    return extractShaderCode(text);
+}
+
+const defaultEditorSettings = {
+    themePreset: 'dark',
+    bg: '#1e1e1e',
+    panel: '#252526',
+    border: '#3c3c3c',
+    accent: '#007acc',
+    text: '#d4d4d4',
+    syntaxTheme: 'monokai',
+    uiFontSize: 13,
+    tabPaddingV: 8,
+    tabPaddingH: 12,
+    editorPadding: 10,
+    editorFontSize: 13,
+    editorLineHeight: 18,
+    editorFontFamily: 'Consolas, "Courier New", monospace',
+    indentSize: 2,
+    softTabs: true,
+    wordWrap: true,
+    showLineNumbers: false,
+    iconColor: '#d4d4d4',
+    buttonSize: 32,
+    iconSize: 18,
+    buttonRadius: 5,
+    toolbarGap: 6
+};
+
+function getEditorSettings() {
+    try {
+        const stored = JSON.parse(localStorage.getItem('shadergoy_editor_settings') || 'null');
+        return { ...defaultEditorSettings, ...stored };
+    } catch {
+        return { ...defaultEditorSettings };
+    }
+}
+
+function applyEditorSettings(settings) {
+    const root = document.documentElement.style;
+    root.setProperty('--bg', settings.bg);
+    root.setProperty('--panel', settings.panel);
+    root.setProperty('--surface', settings.panel);
+    root.setProperty('--surface-alt', settings.panel);
+    root.setProperty('--input-bg', settings.panel);
+    root.setProperty('--input-border', settings.border);
+    root.setProperty('--border', settings.border);
+    root.setProperty('--accent', settings.accent);
+    root.setProperty('--text', settings.text);
+    root.setProperty('--ui-font-size', `${settings.uiFontSize}px`);
+    root.setProperty('--tab-padding-v', `${settings.tabPaddingV}px`);
+    root.setProperty('--tab-padding-h', `${settings.tabPaddingH}px`);
+    root.setProperty('--editor-line-height', `${settings.editorLineHeight}px`);
+    
+    const editorEl = el('editor');
+    if (editorEl) {
+        editorEl.style.padding = `${settings.editorPadding}px`;
+    }
+    document.documentElement.style.setProperty('--editor-font-size', `${settings.editorFontSize}px`);
+    if (typeof aceEditor !== 'undefined' && aceEditor) {
+        aceEditor.setOption('fontSize', `${settings.editorFontSize}px`);
+        aceEditor.setOption('fontFamily', settings.editorFontFamily);
+        aceEditor.setOption('tabSize', settings.indentSize);
+        aceEditor.setOption('useSoftTabs', settings.softTabs);
+        aceEditor.setOption('wrap', settings.wordWrap !== false);
+        aceEditor.setOption('showGutter', settings.showLineNumbers === true);
+        aceEditor.setTheme(`ace/theme/${settings.syntaxTheme || defaultEditorSettings.syntaxTheme}`);
+        aceEditor.renderer.setStyle('fontFamily', settings.editorFontFamily);
+    }
+    root.setProperty('--toolbar-button-size', `${settings.buttonSize}px`);
+    root.setProperty('--toolbar-icon-size', `${settings.iconSize}px`);
+    root.setProperty('--toolbar-icon-color', settings.iconColor || defaultEditorSettings.iconColor);
+    root.setProperty('--button-radius', `${settings.buttonRadius}px`);
+    root.setProperty('--toolbar-gap', `${settings.toolbarGap}px`);
+}
+
+function getEditorConfigFromInputs() {
+    const settings = {
+        themePreset: modalEditorThemePreset.value,
+        bg: modalEditorBg.value,
+        panel: modalEditorPanel.value,
+        border: modalEditorBorder.value,
+        accent: modalEditorAccent.value,
+        text: modalEditorText.value,
+        syntaxTheme: modalEditorSyntaxTheme.value,
+        uiFontSize: Number(modalEditorUiFontSize.value) || defaultEditorSettings.uiFontSize,
+        tabPaddingV: modalEditorTabPaddingV.value !== '' ? Number(modalEditorTabPaddingV.value) : defaultEditorSettings.tabPaddingV,
+        tabPaddingH: modalEditorTabPaddingH.value !== '' ? Number(modalEditorTabPaddingH.value) : defaultEditorSettings.tabPaddingH,
+        editorPadding: modalEditorPadding.value !== '' ? Number(modalEditorPadding.value) : defaultEditorSettings.editorPadding,
+        editorFontSize: Number(modalEditorFontSize.value) || defaultEditorSettings.editorFontSize,
+        editorLineHeight: Number(modalEditorLineHeight.value) || defaultEditorSettings.editorLineHeight,
+        editorFontFamily: modalEditorFontFamily.value || defaultEditorSettings.editorFontFamily,
+        indentSize: Number(modalEditorIndentSize.value) || defaultEditorSettings.indentSize,
+        softTabs: modalEditorSoftTabs.checked,
+        wordWrap: modalEditorWordWrap.checked,
+        showLineNumbers: modalEditorShowLineNumbers.checked,
+        iconColor: modalEditorIconColor.value || defaultEditorSettings.iconColor,
+        buttonSize: Number(modalEditorButtonSize.value) || defaultEditorSettings.buttonSize,
+        iconSize: Number(modalEditorIconSize.value) || defaultEditorSettings.iconSize,
+        buttonRadius: modalEditorButtonRadius.value !== '' ? Number(modalEditorButtonRadius.value) : defaultEditorSettings.buttonRadius,
+        toolbarGap: modalEditorToolbarGap.value !== '' ? Number(modalEditorToolbarGap.value) : defaultEditorSettings.toolbarGap
+    };
+    
+    // Auto-sync palettes if a preset is chosen
+    if (settings.themePreset !== 'custom') {
+        const palettes = {
+            dark: { bg: '#1e1e1e', panel: '#252526', border: '#3c3c3c', text: '#d4d4d4', accent: '#007acc', syntaxTheme: 'monokai' },
+            light: { bg: '#f6f6f6', panel: '#ffffff', border: '#d0d0d0', text: '#1d1d1d', accent: '#007acc', syntaxTheme: 'chrome' },
+            dracula: { bg: '#282a36', panel: '#21222c', border: '#44475a', text: '#f8f8f2', accent: '#bd93f9', syntaxTheme: 'dracula' },
+            nord: { bg: '#2e3440', panel: '#3b4252', border: '#434c5e', text: '#d8dee9', accent: '#88c0d0', syntaxTheme: 'nord_dark' },
+            monokai: { bg: '#272822', panel: '#1e1f1c', border: '#3e3d32', text: '#f8f8f2', accent: '#a6e22e', syntaxTheme: 'monokai' }
+        };
+        const p = palettes[settings.themePreset] || palettes.dark;
+        settings.bg = p.bg; 
+        settings.panel = p.panel; 
+        settings.border = p.border; 
+        settings.text = p.text; 
+        settings.accent = p.accent; 
+        settings.iconColor = p.text;
+        
+        // Only force syntax theme if we are explicitly changing the preset
+        if (editorConfigBackup && editorConfigBackup.themePreset !== settings.themePreset) {
+            settings.syntaxTheme = p.syntaxTheme;
+        }
+    }
+    return settings;
+}
+
+function updateThemeInputs(settings) {
+    modalEditorThemePreset.value = settings.themePreset;
+    modalEditorBg.value = settings.bg;
+    modalEditorPanel.value = settings.panel;
+    modalEditorBorder.value = settings.border;
+    modalEditorAccent.value = settings.accent;
+    modalEditorText.value = settings.text;
+    modalEditorIconColor.value = settings.iconColor || settings.text;
+    modalEditorSyntaxTheme.value = settings.syntaxTheme || 'monokai';
+}
+
+function updateEditorPreview(settings) {
+    if (!settings) settings = getEditorConfigFromInputs();
+    updateThemeInputs(settings);
+    applyEditorSettings(settings);
+    updateEditorDirtyIndicator(settings);
+}
+
+function updateEditorDirtyIndicator(settings) {
+    if (!editorConfigBackup) {
+        modalEditorStatus.textContent = '';
+        modalEditorStatus.style.display = 'none';
+        return;
+    }
+    const clean = JSON.stringify(editorConfigBackup) === JSON.stringify(settings);
+    modalEditorStatus.textContent = clean ? '' : 'Previewing unsaved changes...';
+    modalEditorStatus.style.display = clean ? 'none' : 'inline-block';
+}
+
+function discardEditorConfigChanges() {
+    if (editorConfigBackup) {
+        applyEditorSettings(editorConfigBackup);
+        editorConfigBackup = null;
+    }
+    modalEditorStatus.textContent = '';
+    modalEditorStatus.style.display = 'none';
+}
+
+function openEditorConfig() {
+    editorConfigBackup = getEditorSettings();
+    const settings = { ...editorConfigBackup };
+    modalEditorThemePreset.value = settings.themePreset || 'dark';
+    modalEditorSyntaxTheme.value = settings.syntaxTheme || defaultEditorSettings.syntaxTheme;
+    modalEditorBg.value = settings.bg;
+    modalEditorPanel.value = settings.panel;
+    modalEditorBorder.value = settings.border;
+    modalEditorAccent.value = settings.accent;
+    modalEditorText.value = settings.text;
+    modalEditorIconColor.value = settings.iconColor || defaultEditorSettings.iconColor;
+    
+    modalEditorUiFontSize.value = settings.uiFontSize;
+    modalEditorTabPaddingV.value = settings.tabPaddingV;
+    modalEditorTabPaddingH.value = settings.tabPaddingH;
+    
+    modalEditorPadding.value = settings.editorPadding;
+    modalEditorFontSize.value = settings.editorFontSize;
+    modalEditorLineHeight.value = settings.editorLineHeight;
+    modalEditorFontFamily.value = settings.editorFontFamily;
+    modalEditorIndentSize.value = settings.indentSize;
+    modalEditorSoftTabs.checked = settings.softTabs;
+    modalEditorWordWrap.checked = settings.wordWrap !== false; // handle legacy defaults
+    modalEditorShowLineNumbers.checked = settings.showLineNumbers === true;
+    
+    modalEditorButtonSize.value = settings.buttonSize;
+    modalEditorIconSize.value = settings.iconSize;
+    modalEditorButtonRadius.value = settings.buttonRadius;
+    modalEditorToolbarGap.value = settings.toolbarGap;
+    
+    modalEditorStatus.textContent = '';
+    modalEditorStatus.style.display = 'none';
+    editorConfigModal.classList.add('open');
+}
+
+function closeEditorConfig() {
+    editorConfigModal.classList.remove('open');
+}
+
+function saveEditorConfigModal() {
+    const settings = getEditorConfigFromInputs();
+    localStorage.setItem('shadergoy_editor_settings', JSON.stringify(settings));
+    applyEditorSettings(settings);
+    editorConfigBackup = null;
+    modalEditorStatus.textContent = '';
+    modalEditorStatus.style.display = 'none';
+    closeEditorConfig();
+}
+
+function exportEditorConfigToFile() {
+    const settings = getEditorSettings();
+    const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'GridIDE-Editor-Config.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importEditorConfigFromFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const settings = JSON.parse(reader.result);
+            const merged = { ...defaultEditorSettings, ...settings };
+            localStorage.setItem('shadergoy_editor_settings', JSON.stringify(merged));
+            applyEditorSettings(merged);
+            closeEditorConfig();
+        } catch (err) {
+            alert('Import failed: invalid configuration file.');
+        }
+    };
+    reader.readAsText(file);
+}
+
+function escapeHTML(text) {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function parseShaderErrors(log, prefixLines) {
+    const errors = [];
+    const regex = /ERROR:\s*0:(\d+):\s*(.+)/g;
+    let match;
+    while ((match = regex.exec(log))) {
+        const rawLine = parseInt(match[1], 10);
+        const line = Math.max(1, rawLine - prefixLines - 1);
+        errors.push({ line, message: match[2].trim() });
+    }
+    return errors;
+}
+function formatShaderErrors(errors) {
+    if (!errors.length) return '<div>' + e_err.textContent + '</div>';
+    return errors.map(e => `<div class="error-line" data-line="${e.line}" title="Go to line">Line ${e.line}: ${escapeHTML(e.message)}</div>`).join('');
+}
+function goToEditorLine(line) {
+    aceEditor.focus();
+    aceEditor.gotoLine(line, 0, true);
+}
+
+function hexToRgb(hex) {
+    let h = String(hex).replace('#', '');
+    if (h.length === 3) h = [...h].map(c => c+c).join('');
+    const n = parseInt(h, 16);
+    return isNaN(n) ? [136,136,136] : [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+let engine = {
+    layers: [], activeId: null, previewId: null, previewLocked: false, lockedPreviewId: null, playing: false, is3D: false, frame: 0, time: 0, lastTime: 0,
+    globalResolution: { w: 1536, h: 256 }, cam2d: { x: 0, y: 0, z: 1 }, cam3d: { rx: 0.5, ry: -0.5, d: 3.0 }, mouse: { x: 0, y: 0, d: 0 }, quad: null, displayProg: null
+};
+
+const topoLib = `
+vec2 wrap_Torus(vec2 uv, vec2 d, vec2 R) { return fract(uv + d/R); }
+vec2 wrap_Plane(vec2 uv, vec2 d, vec2 R) { return clamp(uv + d/R, 0.0, 1.0); }
+vec2 wrap_Sphere(vec2 uv, vec2 d, vec2 R) { uv += d/R; float yf = floor(uv.y); uv.y = fract(uv.y); if (mod(yf, 2.0) != 0.0) { uv.y = 1.0 - uv.y; uv.x += 0.5; } uv.x = fract(uv.x); return uv; }
+vec2 wrap_Moebius(vec2 uv, vec2 d, vec2 R) { uv += d/R; float xf = floor(uv.x); uv.x = fract(uv.x); if (mod(xf, 2.0) != 0.0) uv.y = 1.0 - uv.y; uv.y = clamp(uv.y, 0.0, 1.0); return uv; }
+vec2 wrap_Klein(vec2 uv, vec2 d, vec2 R) { uv += d/R; float xf = floor(uv.x); uv.x = fract(uv.x); if (mod(xf, 2.0) != 0.0) uv.y = 1.0 - uv.y; uv.y = fract(uv.y); return uv; }
+vec2 wrap_Mirror(vec2 uv, vec2 d, vec2 R) { vec2 p = fract((uv + d/R) * 0.5) * 2.0; return vec2(p.x > 1.0 ? 2.0 - p.x : p.x, p.y > 1.0 ? 2.0 - p.y : p.y); }
+
+vec3 _face2dir(int f, vec2 uv) {
+    vec2 p = uv * 2.0 - 1.0;
+    if (f == 0) return vec3( 1.0, -p.y, -p.x);
+    if (f == 1) return vec3(-1.0, -p.y,  p.x);
+    if (f == 2) return vec3( p.x,  1.0,  p.y);
+    if (f == 3) return vec3( p.x, -1.0, -p.y);
+    if (f == 4) return vec3( p.x, -p.y,  1.0);
+    return vec3(-p.x, -p.y, -1.0);
+}
+
+void _dir2face(vec3 d, out int f, out vec2 uv) {
+    vec3 a = abs(d);
+    if (a.x >= a.y && a.x >= a.z) { f = d.x > 0.0 ? 0 : 1; uv = d.x > 0.0 ? vec2(-d.z, -d.y)/a.x : vec2(d.z, -d.y)/a.x; } 
+    else if (a.y >= a.x && a.y >= a.z) { f = d.y > 0.0 ? 2 : 3; uv = d.y > 0.0 ? vec2(d.x, d.z)/a.y : vec2(d.x, -d.z)/a.y; } 
+    else { f = d.z > 0.0 ? 4 : 5; uv = d.z > 0.0 ? vec2(d.x, -d.y)/a.z : vec2(-d.x, -d.y)/a.z; }
+    uv = uv * 0.5 + 0.5;
+}
+
+vec2 wrap_Cubemap(vec2 uv, vec2 d, vec2 R) {
+    float faces = 6.0;
+    int f = int(clamp(floor(uv.x * faces), 0.0, faces - 1.0));
+    vec2 luv = vec2(fract(uv.x * faces), uv.y);
+    vec2 R_face = vec2(R.x / faces, R.y);
+    luv += d / R_face;
+    vec2 half_px = 0.5 / R_face;
+    if (luv.x >= 0.0 && luv.x < 1.0 && luv.y >= 0.0 && luv.y < 1.0) {
+        luv = clamp(luv, half_px, 1.0 - half_px);
+        return vec2((float(f) + luv.x) / faces, luv.y);
+    }
+    vec3 dir = _face2dir(f, luv);
+    int nf; vec2 nuv;
+    _dir2face(dir, nf, nuv);
+    nuv = clamp(nuv, half_px, 1.0 - half_px);
+    return vec2((float(nf) + nuv.x) / faces, nuv.y);
+}
+
+vec2 apply_wrap(int t, vec2 uv, vec2 d, vec2 R) {
+    if(t==0) return wrap_Torus(uv, d, R); 
+    if(t==1) return wrap_Plane(uv, d, R); 
+    if(t==2) return wrap_Sphere(uv, d, R);
+    if(t==3) return wrap_Moebius(uv, d, R); 
+    if(t==4) return wrap_Klein(uv, d, R); 
+    if(t==5) return wrap_Mirror(uv, d, R);
+    if(t==6) return wrap_Cubemap(uv, d, R); 
+    return uv;
+}
+
+float Cubemap_Area(vec2 uv) { vec2 p = fract(vec2(uv.x * 6.0, uv.y)) * 2.0 - 1.0; return pow(1.0 + p.x*p.x + p.y*p.y, -1.5); }
+vec3 Cubemap_Dir(vec2 uv) { int f = int(clamp(uv.x * 6.0, 0.0, 5.0)); vec2 luv = vec2(fract(uv.x * 6.0), uv.y); return normalize(_face2dir(f, luv)); }
+`;
+
+const topoMap = { 'Torus':0, 'Plane':1, 'Sphere':2, 'Moebius':3, 'Klein':4, 'Mirror':5, 'Cubemap':6 };
+
+const vsSrc = `#version 300 es\nin vec2 pos;\nout vec2 vUV;\nvoid main(){vUV=pos*0.5+0.5;gl_Position=vec4(pos,0.0,1.0);}`;
+const fsDisplaySrc = `#version 300 es\nprecision highp float;\nin vec2 vUV;\nout vec4 fragColor;\nuniform sampler2D tex;\nuniform vec2 res, cRes, cam;\nuniform float zoom;\nuniform int topMode, view3d;\nuniform vec3 cam3d;\n${topoLib}\nvoid main(){\n
+    if (view3d == 1 && topMode == 6) {
+        vec2 p = (vUV * 2.0 - 1.0) * vec2(cRes.x/cRes.y, 1.0);
+        vec3 ro = vec3(0.0, 0.0, cam3d.z);
+        vec3 rd = normalize(vec3(p, -2.0));
+        float ax = cam3d.x; float ay = cam3d.y;
+        mat3 rx = mat3(1,0,0, 0,cos(ax),-sin(ax), 0,sin(ax),cos(ax));
+        mat3 ry = mat3(cos(ay),0,sin(ay), 0,1,0, -sin(ay),0,cos(ay));
+        mat3 rot = ry * rx;
+        ro = rot * ro; rd = rot * rd;
+        float b = dot(ro, rd);
+        float c = dot(ro, ro) - 1.0;
+        float h = b*b - c;
+        if (h < 0.0) { fragColor = vec4(0.1, 0.1, 0.1, 1.0); return; }
+        float t = -b - sqrt(h);
+        if (t < 0.0) { fragColor = vec4(0.1, 0.1, 0.1, 1.0); return; }
+        vec3 pos = ro + t * rd;
+        int f; vec2 fuv; _dir2face(pos, f, fuv);
+        vec2 suv = vec2((float(f) + fuv.x)/6.0, fuv.y);
+        vec4 col = texture(tex, suv);
+        vec3 light = normalize(vec3(1.0, 1.0, 2.0));
+        col.rgb *= mix(1.0, max(dot(pos, light), 0.1), 0.5); 
+        fragColor = vec4(col.rgb, 1.0);
+        return;
+    }
+    vec2 sc=vUV*cRes; vec2 wc=(sc-cRes*0.5)/zoom+cam; vec2 tuv=wc/res+0.5;
+    bool outB = (tuv.x<0.0||tuv.x>1.0||tuv.y<0.0||tuv.y>1.0);
+    vec4 c=texture(tex,apply_wrap(topMode,tuv,vec2(0.0),res));
+    if(outB){vec2 b=abs(tuv-0.5)*2.0;if(max(b.x,b.y)<1.005&&max(b.x,b.y)>0.995)c.rgb=mix(c.rgb,vec3(1.0,0.5,0.0),0.8);else c.rgb*=0.4;}
+    if(topMode==6 && !outB) { float fx = fract(tuv.x * 6.0); if(fx < 0.01 || fx > 0.99) c.rgb = mix(c.rgb, vec3(1.0), 0.5); }
+    fragColor = vec4(c.rgb, 1.0);
+}`;
+
+function buildShader(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) return { err: gl.getShaderInfoLog(s) }; return { s };
+}
+function buildProg(vsSrc, fsSrc) {
+    const vs = buildShader(gl.VERTEX_SHADER, vsSrc); if (vs.err) return { err: "VS: " + vs.err };
+    const fs = buildShader(gl.FRAGMENT_SHADER, fsSrc); if (fs.err) return { err: "FS: " + fs.err };
+    const p = gl.createProgram(); gl.attachShader(p, vs.s); gl.attachShader(p, fs.s); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) return { err: "Link: " + gl.getProgramInfoLog(p) }; return { p };
+}
+
+function initGL() {
+    if (!gl.getExtension('EXT_color_buffer_float')) {
+        alert('EXT_color_buffer_float is required for float render targets. Your browser or GPU may not support this feature.');
+        throw new Error('EXT_color_buffer_float not available.');
+    }
+    engine.quad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, engine.quad);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    engine.displayProg = buildProg(vsSrc, fsDisplaySrc).p;
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+}
+
+function createTex(w, h) {
+    const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+}
+
+function createFBO(t) {
+    const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); return f;
+}
+
+function genId() { return 'L' + Math.random().toString(36).substr(2, 9); }
+
+function getDefaultUniforms(name) {
+    if (name === 'Wave') return [
+        { name: 'u_wave_stiffness', type: 'float', value: 0.15, min: 0.0, max: 1.0, step: 0.001 },
+        { name: 'u_wave_damping', type: 'float', value: 0.99, min: 0.9, max: 1.0, step: 0.001 },
+        { name: 'u_wave_impact', type: 'float', value: 0.5, min: 0.0, max: 2.0, step: 0.01 },
+        { name: 'u_wave_heat', type: 'float', value: 0.1, min: 0.0, max: 1.0, step: 0.01 }
+    ];
+    if (name === 'Mantle') return [
+        { name: 'u_mantle_diffusion', type: 'float', value: 0.02, min: 0.0, max: 0.1, step: 0.001 },
+        { name: 'u_mantle_advection', type: 'float', value: 0.08, min: 0.0, max: 0.2, step: 0.001 },
+        { name: 'u_mantle_grad_gain', type: 'float', value: 0.018, min: 0.0, max: 0.05, step: 0.0005 },
+        { name: 'u_mantle_noise_strength', type: 'float', value: 0.08, min: 0.0, max: 1.0, step: 0.01 },
+        { name: 'u_mantle_feature_scale', type: 'float', value: 1.0, min: 0.25, max: 4.0, step: 0.05 },
+        { name: 'u_mantle_velocity_damping', type: 'float', value: 0.993, min: 0.9, max: 1.0, step: 0.0005 },
+        { name: 'u_mantle_temperature_blend', type: 'float', value: 0.86, min: 0.0, max: 1.0, step: 0.01 }
+    ];
+    if (name === 'MantleRender') return [
+        { name: 'u_mantle_glow', type: 'float', value: 0.55, min: 0.0, max: 2.0, step: 0.01 },
+        { name: 'u_mantle_flow_strength', type: 'float', value: 0.18, min: 0.0, max: 0.5, step: 0.01 },
+        { name: 'u_mantle_accent', type: 'float', value: 0.2, min: 0.0, max: 1.0, step: 0.01 }
+    ];
+    return [];
+}
+
+function getLayerBaseResolution(l) {
+    if (l.useGlobalRes) return { w: engine.globalResolution.w, h: engine.globalResolution.h };
+    return { w: l.baseW, h: l.baseH };
+}
+function getLayerResolution(l) {
+    const base = getLayerBaseResolution(l);
+    const scale = Math.max(0.01, l.resMult || 1.0);
+    return { w: Math.max(1, Math.round(base.w * scale)), h: Math.max(1, Math.round(base.h * scale)) };
+}
+function setLayerResolution(l, w, h) {
+    if (l.w === w && l.h === h) return;
+    gl.deleteTexture(l.t0); gl.deleteTexture(l.t1); gl.deleteFramebuffer(l.f0); gl.deleteFramebuffer(l.f1);
+    l.w = w; l.h = h;
+    l.t0 = createTex(w, h); l.t1 = createTex(w, h); l.f0 = createFBO(l.t0); l.f1 = createFBO(l.t1);
+}
+function updateLayerResolution(l) {
+    const { w, h } = getLayerResolution(l);
+    setLayerResolution(l, w, h);
+}
+function resizeLayer(l, baseW, baseH) {
+    if (baseW != null && baseH != null) { l.baseW = baseW; l.baseH = baseH; }
+    updateLayerResolution(l);
+    engine.frame = 0; engine.time = 0; render();
+}
+
+function getRandomColor() {
+    const colors = ['#ff5252', '#ff793f', '#d1ccc0', '#ffb142', '#ffda79', '#b33939', '#cd6133', '#84817a', '#cc8e35', '#ccae62', '#34ace0', '#33d9b2', '#227093', '#218c74', '#706fd3', '#474787'];
+    return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function addLayer(name, w, h, code, top = 'Torus', color = null) {
+    const safeName = normalizeLayerName(name);
+    const l = { id: genId(), name: safeName, safeName, baseW: w, baseH: h, w, h, useGlobalRes: false, resMult: 1.0, code, top, color: color || getRandomColor(), uniforms: getDefaultUniforms(safeName), uniformLocs: {}, prog: null, err: '', r0: true, enabled: true, solo: false };
+    l.t0 = createTex(w, h); l.t1 = createTex(w, h);
+    l.f0 = createFBO(l.t0); l.f1 = createFBO(l.t1);
+    engine.layers.push(l); compile(l);
+    if (!engine.activeId) setActive(l.id); updateTabs(); return l;
+}
+
+function compile(l) {
+    const compileStart = performance.now();
+    const code = l.code || '';
+    syncUniformsFromSource(l);
+    const hasVersion = /^\s*#version\b/im.test(code);
+    const hasPrecision = /\bprecision\s+(lowp|mediump|highp)\s+float\s*;/.test(code);
+    const hasVUV = /\bin\s+vec2\s+vUV\b/.test(code);
+    const hasFragColor = /\bout\s+vec4\s+fragColor\b/.test(code);
+    const hasMain = /\bvoid\s+main\s*\(/.test(code);
+
+    let prefix = '';
+    if (!hasPrecision) prefix += 'precision highp float;\n';
+    if (!hasVUV) prefix += 'in vec2 vUV;\n';
+    if (!hasFragColor) prefix += 'out vec4 fragColor;\n';
+    prefix += 'uniform float iTime;\nuniform int iFrame;\nuniform vec3 iResolution;\nuniform vec4 iMouse;\nuniform vec3 iMouseDir;\n';
+    prefix += topoLib + '\n';
+
+    engine.layers.forEach(x => {
+        prefix += `uniform sampler2D tex_${x.id};\nuniform vec2 res_${x.id};\n`;
+        prefix += `vec2 wrap_${x.id}(vec2 uv, vec2 d, vec2 R) { return wrap_${x.top}(uv, d, R); }\n`;
+        prefix += `vec4 READ_${x.safeName}(vec2 uv) { return texture(tex_${x.id}, wrap_${x.id}(uv, vec2(0.0), res_${x.id})); }\n`;
+        prefix += `vec4 READ_OFF_${x.safeName}(vec2 uv, vec2 offset) { return texture(tex_${x.id}, wrap_${x.id}(uv, offset, res_${x.id})); }\n`;
+    });
+
+    prefix += '#define OUT fragColor\n';
+    prefix += '#define U vUV\n';
+    prefix += '#define P (vUV * iResolution.xy)\n';
+    prefix += '#define fragCoord (vUV * iResolution.xy)\n';
+    prefix += 'uniform sampler2D tex_self;\n';
+
+    l.uniforms.forEach(u => {
+        if (u.sourceDefined) return;
+        const name = u.name;
+        if (u.type === 'float') prefix += `uniform float ${name};\n`;
+        else if (u.type === 'int') prefix += `uniform int ${name};\n`;
+        else if (u.type === 'bool') prefix += `uniform bool ${name};\n`;
+        else if (u.type === 'vec2') prefix += `uniform vec2 ${name};\n`;
+        else if (u.type === 'vec3') prefix += `uniform vec3 ${name};\n`;
+        else if (u.type === 'vec4') prefix += `uniform vec4 ${name};\n`;
+    });
+
+    prefix += `vec4 N(float dx, float dy) { return texture(tex_self, wrap_${l.id}(vUV, vec2(dx, dy), iResolution.xy)); }\n`;
+    prefix += `vec4 N(int dx, int dy) { return texture(tex_self, wrap_${l.id}(vUV, vec2(float(dx), float(dy)), iResolution.xy)); }\n`;
+    prefix += `vec4 VAL() { return texture(tex_self, vUV); }\n`;
+    l.prefixLineCount = prefix.split('\n').length;
+
+    let fs = code.replace(/\r\n/g, '\n');
+    fs = fs.replace(/\bREAD_OFF\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/g,
+        (match, name, uv, off) => {
+            const layer = engine.layers.find(x => x.safeName === name);
+            return layer ? `READ_OFF_${name}(${uv.trim()}, ${off.trim()})` : match;
+        }
+    );
+    fs = fs.replace(/\bREAD\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([^)]+?)\s*\)/g,
+        (match, name, uv) => {
+            const layer = engine.layers.find(x => x.safeName === name);
+            return layer ? `READ_${name}(${uv.trim()})` : match;
+        }
+    );
+
+    if (hasVersion) {
+        const lines = fs.split('\n');
+        const versionLine = lines.shift();
+        fs = [versionLine, prefix, ...lines].join('\n');
+    } else {
+        fs = `#version 300 es\n${prefix}${fs}`;
+    }
+
+    if (!hasMain) {
+        l.err = 'Shader source must define a standard GLSL `void main()` entry point.';
+        if (engine.activeId === l.id) showErr();
+        return;
+    }
+
+    const res = buildProg(vsSrc, fs);
+    l.compileTime = performance.now() - compileStart;
+    engine.lastCompileTime = l.compileTime;
+    if (res.err) {
+        l.err = res.err;
+        if (engine.activeId === l.id) showErr();
+    } else {
+        l.err = '';
+        if (l.prog) gl.deleteProgram(l.prog);
+        l.prog = res.p;
+        l.uniformLocs = Object.fromEntries(l.uniforms.map(u => [u.name, gl.getUniformLocation(l.prog, u.name)]));
+        if (engine.activeId === l.id) {
+            hideErr();
+            updateUniformPanel();
+        }
+    }
+}
+
+function compileActiveAndRender() {
+    const l = engine.layers.find(x => x.id === engine.activeId);
+    if (l) {
+        compile(l);
+        updateTabs();
+        render();
+    }
+}
+function compileAll() { engine.layers.forEach(compile); }
+function parseUniformValue(type, raw) {
+    if (type === 'float') return Number(raw) || 0.0;
+    if (type === 'int') return parseInt(raw) || 0;
+    if (type === 'bool') return raw === true || raw === 'true' || raw === '1';
+    const parts = (Array.isArray(raw) ? raw : String(raw).split(/[,\s]+/)).filter(x => x.length).map(Number);
+    if (type === 'vec2') return [parts[0] || 0.0, parts[1] || 0.0];
+    if (type === 'vec3') return [parts[0] || 0.0, parts[1] || 0.0, parts[2] || 0.0];
+    if (type === 'vec4') return [parts[0] || 0.0, parts[1] || 0.0, parts[2] || 0.0, parts[3] || 0.0];
+    return raw;
+}
+function formatUniformValue(type, value) {
+    if (type === 'bool') return value ? 'true' : 'false';
+    if (Array.isArray(value)) return value.join(', ');
+    return String(value);
+}
+function normalizeUniformName(name) { return String(name).trim().replace(/[^a-zA-Z0-9_]/g, ''); }
+function normalizeLayerName(name, ignoreId) {
+    let value = String(name || '').trim().replace(/[^a-zA-Z0-9_]/g, '');
+    if (!value) value = 'Layer';
+    if (!/^[A-Za-z_]/.test(value)) value = 'Layer_' + value;
+    let unique = value;
+    let counter = 1;
+    while (engine.layers.some(l => l.safeName === unique && l.id !== ignoreId)) {
+        unique = `${value}_${counter++}`;
+    }
+    return unique;
+}
+function defaultUniformValue(type) {
+    if (type === 'float') return 0.0;
+    if (type === 'int') return 0;
+    if (type === 'bool') return false;
+    if (type === 'vec2') return [0.0, 0.0];
+    if (type === 'vec3') return [0.0, 0.0, 0.0];
+    if (type === 'vec4') return [0.0, 0.0, 0.0, 0.0];
+    return 0.0;
+}
+function parseAnnotationComment(comment, type) {
+    const meta = {};
+    const regex = /@([a-zA-Z_][a-zA-Z0-9_-]*)\s+((?:"[^"]*"|'[^']*'|[^@\s]+))(?:\s+|$)/g;
+    let match;
+    while ((match = regex.exec(comment))) {
+        const key = match[1];
+        let value = match[2];
+        value = value.replace(/^['"]|['"]$/g, '');
+        if (key === 'range') {
+            const parts = value.split(/[\s,]+/).map(Number).filter(n => !Number.isNaN(n));
+            if (parts.length >= 2) { meta.min = parts[0]; meta.max = parts[1]; }
+        } else if (key === 'step' || key === 'snap') {
+            const num = Number(value);
+            if (!Number.isNaN(num)) meta.step = num;
+            if (key === 'snap') meta.snap = num;
+        } else if (key === 'label') {
+            meta.label = value;
+        } else if (key === 'color') {
+            meta.color = value;
+        } else if (key === 'default') {
+            meta.value = parseUniformValue(type, value);
+        }
+    }
+    return meta;
+}
+function parseUniformsFromSource(code) {
+    const uniforms = [];
+    const regex = /uniform\s+(float|int|bool|vec2|vec3|vec4)\s+([^;]+);([^\n]*)/g;
+    let match;
+    while ((match = regex.exec(code))) {
+        const type = match[1];
+        const decl = match[2];
+        const comment = match[3] || '';
+        const meta = parseAnnotationComment(comment, type);
+        const parts = decl.split(',');
+        parts.forEach(part => {
+            let [namePart, initPart] = part.split('=').map(s => s.trim());
+            if (!namePart) return;
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(namePart)) return;
+            const name = namePart;
+            let value = defaultUniformValue(type);
+            if (initPart != null) {
+                value = parseUniformValue(type, initPart);
+            }
+            if (meta.value !== undefined) value = meta.value;
+            const uniform = {
+                name,
+                type,
+                value,
+                sourceDefined: true,
+                min: meta.min,
+                max: meta.max,
+                step: meta.step,
+                snap: meta.snap,
+                label: meta.label,
+                color: meta.color
+            };
+            uniforms.push(uniform);
+        });
+    }
+    return uniforms;
+}
+function syncUniformsFromSource(l) {
+    const parsed = parseUniformsFromSource(l.code);
+    if (!parsed.length) return;
+    const existing = Object.fromEntries(l.uniforms.map(u => [u.name, u]));
+    l.uniforms = parsed.map(u => {
+        const prev = existing[u.name];
+        if (prev && prev.type === u.type) {
+            return { ...u, min: prev.min, max: prev.max, step: prev.step, value: prev.value };
+        }
+        return { ...u, min: u.type === 'int' ? 0 : -2.0, max: u.type === 'int' ? 10 : 2.0, step: u.type === 'int' ? 1 : 0.001 };
+    });
+}
+function parseColorString(color) {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.fillStyle = color;
+    const computed = ctx.fillStyle;
+    if (!computed || computed === '#000000' && color.toLowerCase() !== 'black') return null;
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(computed);
+    if (!m) return null;
+    let hex = m[1];
+    if (hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
+    return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+}
+function updateUniformPanel() {
+    const l = engine.layers.find(x => x.id === engine.activeId);
+    if (!l) { e_uniformList.innerHTML = ''; return; }
+    e_uniformList.innerHTML = '';
+    const typeColors = { float: '#d4b97f', int: '#569cd6', bool: '#6a9955', vec2: '#9cdcfe', vec3: '#4ec9b0', vec4: '#c586c0' };
+    l.uniforms.forEach((u, idx) => {
+        const row = D.createElement('div'); row.className = 'uniform-row';
+        const colorHex = u.color || typeColors[u.type] || '#888';
+        const rgb = parseColorString(colorHex) || parseColorString(typeColors[u.type]) || [136, 136, 136];
+        row.style.backgroundColor = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.22)`;
+        const label = D.createElement('div'); label.className = 'uniform-label';
+        const labelText = D.createElement('span');
+        labelText.textContent = `${u.name} (${u.type})`;
+        label.append(labelText);
+        if (u.label) {
+            const meta = D.createElement('span'); meta.className = 'uniform-meta'; meta.textContent = ` ${u.label}`;
+            label.append(meta);
+        }
+        const controls = D.createElement('div'); controls.className = 'uniform-inputs';
+        const min = u.min != null ? u.min : (u.type === 'int' ? -10 : -2.0);
+        const max = u.max != null ? u.max : (u.type === 'int' ? 10 : 2.0);
+        const step = u.step != null ? u.step : (u.type === 'int' ? 1 : 0.001);
+        const snap = u.snap != null ? u.snap : null;
+        
+        if (u.type === 'float') {
+            const range = D.createElement('input'); range.type = 'range'; range.min = min; range.max = max; range.step = step; range.value = u.value;
+            range.style.setProperty('--slider-thumb', colorHex);
+            range.style.setProperty('--slider-track', `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.2)`);
+            const number = D.createElement('input'); number.type = 'number'; number.step = step; number.value = u.value; number.min = min; number.max = max;
+            const syncFloat = (v, formatField) => {
+                let value = Math.min(max, Math.max(min, parseUniformValue('float', v)));
+                if (snap != null && snap > 0) value = Math.round(value / snap) * snap;
+                u.value = value;
+                range.value = u.value;
+                if (formatField) number.value = u.value;
+                render();
+            };
+            range.oninput = () => syncFloat(range.value, true);
+            range.onchange = () => syncFloat(range.value, true);
+            number.oninput = () => syncFloat(number.value, false);
+            number.onchange = () => syncFloat(number.value, true);
+            controls.append(range, number);
+        } else if (u.type === 'int') {
+            const number = D.createElement('input'); number.type = 'number'; number.step = step; number.value = u.value; number.min = min; number.max = max;
+            const syncInt = (v, formatField) => {
+                let value = Math.min(max, Math.max(min, parseUniformValue('int', v)));
+                if (snap != null && snap > 0) value = Math.round(value / snap) * snap;
+                u.value = value;
+                if (formatField) number.value = u.value;
+                render();
+            };
+            number.oninput = () => syncInt(number.value, false);
+            number.onchange = () => syncInt(number.value, true);
+            controls.append(number);
+        } else if (u.type === 'bool') {
+            const checkbox = D.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = u.value;
+            checkbox.onchange = () => { u.value = checkbox.checked; render(); };
+            controls.append(checkbox);
+        } else {
+            const text = D.createElement('input'); text.type = 'text'; text.value = formatUniformValue(u.type, u.value);
+            const syncText = (v, formatField) => {
+                u.value = parseUniformValue(u.type, v);
+                if (formatField) text.value = formatUniformValue(u.type, u.value);
+                render();
+            };
+            text.oninput = () => syncText(text.value, false);
+            text.onchange = () => syncText(text.value, true);
+            controls.append(text);
+        }
+        row.append(label, controls);
+        e_uniformList.appendChild(row);
+    });
+}
+function showErr() { const l = engine.layers.find(x => x.id === engine.activeId); if (!l || !l.err) return; const errors = parseShaderErrors(l.err, l.prefixLineCount || 0); l.errorLines = errors.map(x => x.line); e_err.style.display = 'block'; e_err.innerHTML = formatShaderErrors(errors.length ? errors : [{ line: 0, message: l.err }]); aceEditor.getSession().setAnnotations(errors.map(err => ({ row: err.line - 1, column: 0, text: err.message, type: 'error' }))); aceEditor.resize(); }
+function hideErr() { e_err.style.display = 'none'; e_err.textContent = ''; const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.errorLines = []; aceEditor.getSession().setAnnotations([]); } aceEditor.resize(); }
+
+function moveLayer(id, direction) {
+    const idx = engine.layers.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= engine.layers.length) return;
+    
+    const temp = engine.layers[idx];
+    engine.layers[idx] = engine.layers[newIdx];
+    engine.layers[newIdx] = temp;
+    
+    updateTabs();
+    compileAll();
+    pushHistory();
+}
+
+function setActive(id) {
+    engine.activeId = id;
+    if (!engine.previewLocked) {
+        engine.previewId = id;
+    }
+    updateTabs(); const l = engine.layers.find(x => x.id === id);
+    if (l) {
+        e_name.value = l.name; e_color.value = l.color || '#ffffff'; e_w.value = l.baseW; e_h.value = l.baseH; e_top.value = l.top;
+        e_useGlobalRes.checked = l.useGlobalRes;
+        e_resMult.value = l.resMult;
+        e_w.disabled = l.useGlobalRes;
+        e_h.disabled = l.useGlobalRes;
+        e_globalW.value = engine.globalResolution.w;
+        e_globalH.value = engine.globalResolution.h;
+        const rgb = hexToRgb(l.color || '#888888');
+        el('layer-props').style.setProperty('--layer-color-rgb', `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`);
+        if (aceEditor.getValue() !== l.code) aceEditor.setValue(l.code, -1);
+        if (l.err) showErr(); else hideErr();
+    } else {
+        // Handle empty active layer gracefully
+        e_name.value = ''; aceEditor.setValue('', -1); hideErr();
+        el('layer-props').style.removeProperty('--layer-color-rgb');
+    }
+    updateUniformPanel();
+    updatePreviewOptions();
+    render();
+}
+
+function updateTabs() {
+    e_tabs.innerHTML = '';
+    const previewId = engine.previewLocked && engine.lockedPreviewId ? engine.lockedPreviewId : engine.previewId;
+    engine.layers.forEach((l, i) => {
+        const d = D.createElement('div');
+        d.className = 'tab' + (engine.activeId === l.id ? ' active' : '');
+        const rgb = hexToRgb(l.color || '#888888');
+        d.style.setProperty('--layer-color-rgb', `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`);
+        const previewMark = previewId === l.id ? '▶ ' : '';
+        const compileHint = l.compileTime != null ? ` (${l.compileTime.toFixed(1)}ms)` : '';
+        const title = D.createElement('span');
+        title.textContent = `${previewMark}${l.name}${compileHint}${l.err ? ' ⚠️' : ''}`;
+        const controls = D.createElement('div');
+        controls.className = 'tab-controls';
+
+        // Reordering arrows
+        if (i > 0) {
+            const leftBtn = D.createElement('button');
+            leftBtn.className = 'tab-btn'; setButtonIcon(leftBtn, 'left');
+            leftBtn.title = 'Move buffer left (evaluate earlier)';
+            leftBtn.onclick = e => { e.stopPropagation(); moveLayer(l.id, -1); };
+            controls.append(leftBtn);
+        }
+        if (i < engine.layers.length - 1) {
+            const rightBtn = D.createElement('button');
+            rightBtn.className = 'tab-btn'; setButtonIcon(rightBtn, 'right');
+            rightBtn.title = 'Move buffer right (evaluate later)';
+            rightBtn.onclick = e => { e.stopPropagation(); moveLayer(l.id, 1); };
+            controls.append(rightBtn);
+        }
+
+        const lockBtn = D.createElement('button');
+        lockBtn.className = 'tab-btn lock-btn';
+        setButtonIcon(lockBtn, engine.previewLocked && engine.lockedPreviewId === l.id ? 'lock' : 'unlock');
+        lockBtn.title = engine.previewLocked && engine.lockedPreviewId === l.id ? 'Unlock preview' : 'Lock preview';
+        lockBtn.onclick = e => {
+            e.stopPropagation();
+            if (engine.previewLocked && engine.lockedPreviewId === l.id) {
+                engine.previewLocked = false;
+                engine.lockedPreviewId = null;
+            } else {
+                engine.previewLocked = true;
+                engine.lockedPreviewId = l.id;
+                engine.previewId = l.id;
+            }
+            updateTabs();
+            render();
+        };
+
+        const bypassBtn = D.createElement('button');
+        bypassBtn.className = 'tab-btn bypass-btn';
+        setButtonIcon(bypassBtn, l.enabled ? 'bypass' : 'enable');
+        bypassBtn.title = l.enabled ? 'Bypass buffer' : 'Enable buffer';
+        bypassBtn.onclick = e => {
+            e.stopPropagation();
+            l.enabled = !l.enabled;
+            if (engine.previewLocked && engine.lockedPreviewId === l.id && !l.enabled) {
+                engine.previewLocked = false;
+                engine.lockedPreviewId = null;
+            }
+            updateTabs();
+            render();
+            pushHistory();
+        };
+
+        const removeBtn = D.createElement('button');
+        removeBtn.className = 'tab-btn remove-btn';
+        setButtonIcon(removeBtn, 'remove');
+        removeBtn.title = 'Remove buffer';
+        removeBtn.onclick = e => {
+            e.stopPropagation();
+            engine.layers = engine.layers.filter(x => x.id !== l.id);
+            if (engine.activeId === l.id) engine.activeId = engine.layers.length ? engine.layers[0].id : null;
+            if (engine.previewId === l.id) engine.previewId = engine.activeId;
+            if (engine.lockedPreviewId === l.id) {
+                engine.previewLocked = false;
+                engine.lockedPreviewId = null;
+            }
+            compileAll();
+            setActive(engine.activeId);
+            pushHistory();
+        };
+
+        controls.append(lockBtn, bypassBtn, removeBtn);
+        d.append(title, controls);
+        d.title = l.err ? l.err : `Compile ${l.compileTime ? l.compileTime.toFixed(1) : '--'}ms`;
+        d.onclick = () => setActive(l.id);
+        e_tabs.appendChild(d);
+    });
+}
+
+function step() {
+    if (!engine.layers.length) return;
+    let mx = engine.mouse.x, my = engine.mouse.y, md = [0, 0, 0];
+    if (engine.is3D) {
+        let p_x = (mx / cvs.width * 2.0 - 1.0) * (cvs.width / cvs.height);
+        let p_y = ((cvs.height - my) / cvs.height * 2.0 - 1.0);
+        let ro = [0, 0, engine.cam3d.d];
+        let rd = [p_x, p_y, -2.0];
+        let len = Math.sqrt(rd[0]*rd[0] + rd[1]*rd[1] + rd[2]*rd[2]);
+        rd = [rd[0]/len, rd[1]/len, rd[2]/len];
+        let ax = engine.cam3d.rx, ay = engine.cam3d.ry;
+        let cx = Math.cos(ax), sx = Math.sin(ax);
+        let cy = Math.cos(ay), sy = Math.sin(ay);
+        let rot = (v) => {
+            let y1 = v[1]*cx - v[2]*sx;
+            let z1 = v[1]*sx + v[2]*cx;
+            return [v[0]*cy + z1*sy, y1, -v[0]*sy + z1*cy];
+        };
+        ro = rot(ro); rd = rot(rd);
+        let b = ro[0]*rd[0] + ro[1]*rd[1] + ro[2]*rd[2];
+        let c = ro[0]*ro[0] + ro[1]*ro[1] + ro[2]*ro[2] - 1.0;
+        let h = b*b - c;
+        if (h > 0) {
+            let t = -b - Math.sqrt(h);
+            if (t > 0) md = [ro[0] + t*rd[0], ro[1] + t*rd[1], ro[2] + t*rd[2]];
+        }
+    }
+
+    const soloLayers = engine.layers.filter(x => x.solo && x.enabled);
+    const targetLayers = soloLayers.length ? engine.layers.filter(x => x.solo && x.enabled) : engine.layers.filter(x => x.enabled);
+    targetLayers.forEach(l => {
+        if (!l.prog) return;
+        gl.useProgram(l.prog);
+        const { w: lw, h: lh } = getLayerResolution(l);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, l.r0 ? l.f1 : l.f0); gl.viewport(0, 0, lw, lh);
+        gl.uniform1f(gl.getUniformLocation(l.prog, 'iTime'), engine.time);
+        gl.uniform1i(gl.getUniformLocation(l.prog, 'iFrame'), engine.frame);
+        gl.uniform3f(gl.getUniformLocation(l.prog, 'iResolution'), lw, lh, 1.0);
+        let wc_x = (mx - cvs.width * 0.5) / engine.cam2d.z + engine.cam2d.x;
+        let wc_y = ((cvs.height - my) - cvs.height * 0.5) / engine.cam2d.z + engine.cam2d.y;
+        gl.uniform4f(gl.getUniformLocation(l.prog, 'iMouse'), wc_x + l.w * 0.5, wc_y + l.h * 0.5, engine.mouse.d, 0.0);
+        gl.uniform3f(gl.getUniformLocation(l.prog, 'iMouseDir'), md[0], md[1], md[2]);
+        engine.layers.forEach((ol, i) => {
+            gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, ol.r0 ? ol.t0 : ol.t1);
+            gl.uniform1i(gl.getUniformLocation(l.prog, `tex_${ol.id}`), i); gl.uniform2f(gl.getUniformLocation(l.prog, `res_${ol.id}`), ol.w, ol.h);
+        });
+        const sid = engine.layers.length; gl.activeTexture(gl.TEXTURE0 + sid); gl.bindTexture(gl.TEXTURE_2D, l.r0 ? l.t0 : l.t1);
+        gl.uniform1i(gl.getUniformLocation(l.prog, 'tex_self'), sid);
+        l.uniforms.forEach(u => {
+            const loc = (l.uniformLocs && l.uniformLocs[u.name]) || gl.getUniformLocation(l.prog, u.name);
+            if (!loc) return;
+            if (u.type === 'float') gl.uniform1f(loc, u.value);
+            else if (u.type === 'int') gl.uniform1i(loc, u.value);
+            else if (u.type === 'bool') gl.uniform1i(loc, u.value ? 1 : 0);
+            else if (u.type === 'vec2') gl.uniform2fv(loc, new Float32Array(u.value));
+            else if (u.type === 'vec3') gl.uniform3fv(loc, new Float32Array(u.value));
+            else if (u.type === 'vec4') gl.uniform4fv(loc, new Float32Array(u.value));
+        });
+        gl.bindBuffer(gl.ARRAY_BUFFER, engine.quad);
+        const pLoc = gl.getAttribLocation(l.prog, 'pos'); gl.enableVertexAttribArray(pLoc);
+        gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    });
+    engine.layers.forEach(l => l.r0 = !l.r0); engine.frame++;
+}
+
+function render() {
+    const renderStart = performance.now();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cvs.width, cvs.height);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0); gl.clear(gl.COLOR_BUFFER_BIT);
+    
+    if (engine.layers.length === 0) return;
+    
+    const viewId = engine.previewLocked && engine.lockedPreviewId ? engine.lockedPreviewId : (engine.previewId || engine.activeId);
+    const al = engine.layers.find(x => x.id === viewId);
+    if (al && engine.displayProg) {
+        gl.useProgram(engine.displayProg);
+        gl.uniform2f(gl.getUniformLocation(engine.displayProg, 'cRes'), cvs.width, cvs.height);
+        gl.uniform2f(gl.getUniformLocation(engine.displayProg, 'res'), al.w, al.h);
+        gl.uniform2f(gl.getUniformLocation(engine.displayProg, 'cam'), engine.cam2d.x, engine.cam2d.y);
+        gl.uniform1f(gl.getUniformLocation(engine.displayProg, 'zoom'), engine.cam2d.z);
+        gl.uniform3f(gl.getUniformLocation(engine.displayProg, 'cam3d'), engine.cam3d.rx, engine.cam3d.ry, engine.cam3d.d);
+        gl.uniform1i(gl.getUniformLocation(engine.displayProg, 'topMode'), topoMap[al.top]);
+        gl.uniform1i(gl.getUniformLocation(engine.displayProg, 'view3d'), engine.is3D ? 1 : 0);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, al.r0 ? al.t0 : al.t1);
+        gl.uniform1i(gl.getUniformLocation(engine.displayProg, 'tex'), 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, engine.quad);
+        const pLoc = gl.getAttribLocation(engine.displayProg, 'pos'); gl.enableVertexAttribArray(pLoc);
+        gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    engine.lastRenderTime = performance.now() - renderStart;
+    const compileMs = ` | Compile: ${engine.lastCompileTime != null ? engine.lastCompileTime.toFixed(1) : '--'}ms`;
+    const renderMs = ` | Render: ${engine.lastRenderTime != null ? engine.lastRenderTime.toFixed(1) : '--'}ms`;
+    e_status.textContent = `Frame: ${engine.frame} | Time: ${engine.time.toFixed(2)}${renderMs}${compileMs}`;
+}
+
+function loop(t) {
+    if (!engine.lastTime) engine.lastTime = t; const dt = (t - engine.lastTime) / 1000.0; engine.lastTime = t;
+    if (engine.playing) { engine.time += dt; step(); } render(); requestAnimationFrame(loop);
+}
+</script>
 </body>
 </html>
