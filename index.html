@@ -126,6 +126,8 @@ canvas { display: block; width: 100%; height: 100%; outline: none; cursor: cross
     <button id="btn-preview-only" title="Preview only" aria-label="Preview only"></button>
     <button id="btn-screenshot" title="Save Screenshot" aria-label="Save Screenshot"></button>
     <button id="btn-add" title="Add New Layer" aria-label="Add Layer"></button>
+    <button id="btn-snippet-library" title="Snippet Library" aria-label="Snippet Library"></button>
+    <button id="btn-help" title="Editor Help" aria-label="Help"></button>
     <button id="btn-ai" title="Generate AI Shader" aria-label="Generate AI shader"></button>
     <select id="sel-ai-provider" title="Choose AI shader provider">
         <option value="gemini">Gemini (Free API-less)</option>
@@ -165,6 +167,14 @@ canvas { display: block; width: 100%; height: 100%; outline: none; cursor: cross
             </div>
             <div class="prop-row">
                 <div class="prop-group stretch">
+                    <span>Passes:</span><input type="number" id="prop-passes" min="-1" step="1" placeholder="-1" style="width: 80px; box-sizing: border-box;">
+                </div>
+                <div class="prop-group" style="flex: none; min-width: 110px; color: var(--text-muted); font-size: 11px;">
+                    <span>-1 = continuous</span>
+                </div>
+            </div>
+            <div class="prop-row">
+                <div class="prop-group stretch">
                     <span>Topology:</span>
                     <select id="prop-top">
                         <option value="Torus">Torus</option>
@@ -199,6 +209,156 @@ canvas { display: block; width: 100%; height: 100%; outline: none; cursor: cross
 <button type="button" id="preview-close-btn" title="Exit preview" aria-label="Exit preview">×</button>
 <input type="file" id="file-import" accept="application/json" style="display:none">
 <input type="file" id="file-editor-config-import" accept="application/json" style="display:none">
+<div id="add-layer-modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px;">
+            <h2 style="margin:0;">Create New Layer</h2>
+            <button type="button" class="modal-close" title="Close" aria-label="Close">×</button>
+        </div>
+        <div class="modal-settings-grid">
+            <div class="modal-setting-row">
+                <span class="setting-label">Layer Name</span>
+                <div class="field"><input type="text" id="add-layer-name" placeholder="MyLayer"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Color</span>
+                <div class="field"><input type="color" id="add-layer-color" value="#888888" style="width: 48px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: transparent;"></div>
+            </div>
+            <div class="modal-setting-row">
+                <span class="setting-label">Preset</span>
+                <div class="field">
+                    <select id="add-layer-preset">
+                        <option value="blank">Blank Buffer</option>
+                        <option value="empty">Empty</option>
+                        <option value="white">White</option>
+                        <option value="checker">Checkerboard</option>
+                        <option value="noise">Noise</option>
+                        <option value="filter">Emboss Filter</option>
+                        <option value="memory">Cached One-Pass</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions" style="justify-content: flex-end; margin-top: 10px;">
+            <button type="button" id="add-layer-cancel" title="Cancel">Cancel</button>
+            <button type="button" id="add-layer-confirm" title="Create Layer" style="background: var(--accent); color: #fff;">Create</button>
+        </div>
+    </div>
+</div>
+<div id="snippet-library-modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px;">
+            <h2 style="margin:0;">Snippet Library</h2>
+            <button type="button" class="modal-close" title="Close" aria-label="Close">×</button>
+        </div>
+        <div id="snippet-library-list" class="modal-settings-grid"></div>
+    </div>
+</div>
+<div id="help-modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content" style="max-height: 80vh; overflow-y: auto; width: min(760px, calc(100% - 32px));">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px;">
+            <h2 style="margin:0;">Editor Help & Reference</h2>
+            <button type="button" class="modal-close" title="Close" aria-label="Close">×</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 18px; color: var(--text);">
+            <section>
+                <h3 style="margin:0 0 8px 0;">Shader Globals</h3>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><strong>iUV</strong> – normalized UV coordinates in [0,1]. Alias: <code>U</code>.</li>
+                    <li><strong>iPixel</strong> – pixel-space position in viewport space. Alias: <code>P</code>.</li>
+                    <li><strong>iFragCoord</strong> – fragment coordinate in pixels. Alias: <code>fragCoord</code>.</li>
+                    <li><strong>iTime</strong> – elapsed time in seconds.</li>
+                    <li><strong>iFrame</strong> – current frame count.</li>
+                    <li><strong>iResolution</strong> – viewport resolution as <code>vec3</code> (x/y/1).</li>
+                    <li><strong>iMouse</strong> – mouse state as <code>vec4</code>.</li>
+                    <li><strong>iMouseDir</strong> – normalized mouse direction vector.</li>
+                    <li><strong>fragColor</strong> – fragment output target.</li>
+                    <li><strong>OUT</strong> – alias for <code>fragColor</code>.</li>
+                </ul>
+            </section>
+            <section>
+                <h3 style="margin:0 0 8px 0;">Shader Helper Functions</h3>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><code>VAL()</code> – sample the current buffer at <code>iUV</code>.</li>
+                    <li><code>SAMPLE(float dx, float dy)</code> – sample the current buffer at offset <code>(dx,dy)</code>.</li>
+                    <li><code>SAMPLE(int dx, int dy)</code> – integer offset sample of the current buffer.</li>
+                    <li><code>READ(layerName, uv)</code> – sample another layer by name at <code>uv</code>.</li>
+                    <li><code>READ_OFF(layerName, uv, offset)</code> – sample another layer with an offset.</li>
+                    <li><code>READ(tex_self, iUV)</code> – alias for <code>VAL()</code>.</li>
+                    <li><code>READ_OFF(tex_self, iUV, offset)</code> – alias for <code>tex_self_read_off(iUV, offset)</code>.</li>
+                    <li><code>READ(tex_prev, iUV)</code> – sample the prior frame's texture.</li>
+                    <li><code>READ_OFF(tex_prev, iUV, offset)</code> – offset sample from the prior frame.</li>
+                </ul>
+            </section>
+            <section>
+                <h3 style="margin:0 0 8px 0;">Internal Texture Helpers</h3>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><code>tex_self_read_off(uv, offset)</code> – low-level self texture read at offset.</li>
+                    <li><code>tex_prev(uv)</code> – low-level previous-frame sample.</li>
+                    <li><code>tex_prev_off(uv, offset)</code> – low-level previous-frame offset sample.</li>
+                </ul>
+            </section>
+            <section>
+                <h3 style="margin:0 0 8px 0;">Topology Helpers</h3>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><code>wrap_plane</code>, <code>wrap_torus</code>, <code>wrap_sphere</code>, <code>wrap_moebius</code>, <code>wrap_klein</code>, <code>wrap_mirror</code>, <code>wrap_cubemap</code> – coordinate wrap functions for texture space.</li>
+                    <li><code>cubemap_area(uv)</code> – cubemap pixel area correction.</li>
+                    <li><code>cubemap_dir(uv)</code> – cubemap direction vector from UV.</li>
+                </ul>
+            </section>
+            <section>
+                <h3 style="margin:0 0 8px 0;">Editor Features</h3>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><strong>Play / Pause</strong> – toggle continuous render updates.</li>
+                    <li><strong>Step</strong> – advance exactly one frame.</li>
+                    <li><strong>Reset</strong> – reset time, frame count, and feedback state.</li>
+                    <li><strong>Preview Only</strong> – hide the sidebar and maximize the viewport.</li>
+                    <li><strong>3D View</strong> – toggle cubemap preview mode.</li>
+                    <li><strong>Screenshot</strong> – capture the current viewport image.</li>
+                    <li><strong>Add Layer</strong> – create a new buffer layer with name, color, preset, and pass settings.</li>
+                    <li><strong>Snippet Library</strong> – browse and insert reusable GLSL snippets.</li>
+                    <li><strong>Help</strong> – open this reference panel.</li>
+                    <li><strong>AI Shader</strong> – generate shader code with prompt-driven AI.</li>
+                    <li><strong>AI Settings</strong> – configure provider, API keys, endpoint, model, and headers.</li>
+                    <li><strong>Editor Settings</strong> – adjust the editor theme, font, spacing, and toolbar style.</li>
+                    <li><strong>Undo / Redo</strong> – revert or reapply layer and code edits.</li>
+                    <li><strong>Export / Import</strong> – save or restore the full project state as JSON.</li>
+                    <li><strong>Global Resolution</strong> – force all layers to a shared width/height.</li>
+                    <li><strong>Per-layer Resolution</strong> – set the layer pixel size and automatic scaling.</li>
+                    <li><strong>Passes</strong> – control how many compute passes the layer runs per frame.</li>
+                    <li><strong>Layer Color</strong> – assign a UI color for each buffer layer.</li>
+                    <li><strong>Sidebar Toggle</strong> – show/hide layer properties and editor panels.</li>
+                </ul>
+            </section>
+            <section>
+                <h3 style="margin:0 0 8px 0;">Layer Panel & Tabs</h3>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><strong>Layer Name</strong> – rename the active buffer layer.</li>
+                    <li><strong>Buffer Color</strong> – choose a UI color for the layer tab and controls.</li>
+                    <li><strong>Width / Height</strong> – set the current layer's resolution.</li>
+                    <li><strong>Auto</strong> – use global resolution for the layer.</li>
+                    <li><strong>Resolution Multiplier</strong> – scale the layer relative to the base resolution.</li>
+                    <li><strong>Passes</strong> – run the shader multiple times per frame for iterative effects.</li>
+                    <li><strong>Layer Tabs</strong> – select which buffer is active and visible.</li>
+                    <li><strong>Lock Preview</strong> – keep a layer pinned in the output preview.</li>
+                    <li><strong>Bypass / Enable</strong> – temporarily disable a layer without deleting it.</li>
+                    <li><strong>Remove Layer</strong> – delete a layer and its render targets.</li>
+                </ul>
+            </section>
+            <section>
+                <h3 style="margin:0 0 8px 0;">Preset Layers</h3>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><strong>Empty</strong> – blank shader output.</li>
+                    <li><strong>White</strong> – constant white buffer.</li>
+                    <li><strong>Checkerboard</strong> – grid pattern using <code>iUV</code>.</li>
+                    <li><strong>Noise</strong> – procedural noise based on <code>iUV</code>.</li>
+                    <li><strong>Emboss Filter</strong> – self-convolution using <code>READ_OFF(tex_self, iUV, offset)</code>.</li>
+                    <li><strong>Cached One-Pass</strong> – one-pass memory effect using <code>tex_prev</code>.</li>
+                </ul>
+            </section>
+        </div>
+    </div>
+</div>
 <div id="ai-config-modal" class="modal" role="dialog" aria-modal="true">
     <div class="modal-content">
         <h2>AI Shader Provider</h2>
@@ -420,6 +580,7 @@ const svgIcons = {
     ai: 'smart_toy',
     settings: 'settings',
     tune: 'tune',
+    help: 'help_outline',
     undo: 'undo',
     redo: 'redo',
     export: 'download',
@@ -432,6 +593,7 @@ const svgIcons = {
     cancel: 'close',
     save: 'save',
     loading: 'autorenew',
+    snippet: 'code',
     left: 'chevron_left',
     right: 'chevron_right',
     fullscreen: 'fullscreen',
@@ -441,8 +603,343 @@ const svgIcons = {
 const renderIcon = name => svgIcons[name] ? `<span class="icon material-symbols-outlined" style="font-size: inherit;">${svgIcons[name]}</span>` : '';
 const setButtonIcon = (button, name) => { if (button) button.innerHTML = renderIcon(name); };
 
-let e_status, e_tabs, e_name, e_color, e_w, e_h, e_useGlobalRes, e_resMult, e_globalW, e_globalH;
-let e_play, e_step, e_reset, e_add, e_ai, e_aiProvider, e_aiConfig, e_top, e_view3d, e_screenshot;
+const layerPresets = {
+    empty: { label: 'Empty', w: 512, h: 512, top: 'Torus', color: '#888888', code: 'void main() { fragColor = vec4(0.0); }', passes: -1 },
+    white: { label: 'White', w: 512, h: 512, top: 'Plane', color: '#f5f6fa', code: 'void main() { fragColor = vec4(1.0); }', passes: -1 },
+    checker: { label: 'Checkerboard', w: 512, h: 512, top: 'Plane', color: '#ffb142', code: 'void main() { vec2 c = floor(iUV * 16.0); float m = mod(c.x + c.y, 2.0); fragColor = vec4(vec3(m), 1.0); }', passes: -1 },
+    noise: { label: 'Noise', w: 512, h: 512, top: 'Plane', color: '#34ace0', code: 'float n(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); } void main() { fragColor = vec4(vec3(n(iUV * 32.0)), 1.0); }', passes: -1 },
+    filter: { label: 'Emboss Filter', w: 512, h: 512, top: 'Plane', color: '#ffb8b8', code: 'void main() { float offset = 1.0 / iResolution.x; float tl = READ_OFF(tex_self, iUV, vec2(-offset, -offset)).r; float tr = READ_OFF(tex_self, iUV, vec2( offset, -offset)).r; float bl = READ_OFF(tex_self, iUV, vec2(-offset,  offset)).r; float br = READ_OFF(tex_self, iUV, vec2( offset,  offset)).r; float edge = (tr + br) - (tl + bl); float v = clamp(0.5 + edge * 4.0, 0.0, 1.0); fragColor = vec4(vec3(v), 1.0); }', passes: -1 },
+    memory: { label: 'Cached One-Pass', w: 512, h: 512, top: 'Plane', color: '#2f3542', code: 'void main() { fragColor = vec4(vec3(0.4 + 0.2 * vec3(sin(iUV.x * 10.0), cos(iUV.y * 10.0), sin((iUV.x + iUV.y) * 10.0))), 1.0); }', passes: 1 }
+};
+
+const snippetLibrary = [
+    {
+        title: 'Simple Noise',
+        description: 'Pseudo-random 2D noise function.',
+        code: `float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float noise(in vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
+             mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+}`
+    },
+    {
+        title: 'RGB to Grayscale',
+        description: 'Convert a color to grayscale.',
+        code: `vec3 grayscale(vec3 color) {
+  float gray = dot(color, vec3(0.299, 0.587, 0.114));
+  return vec3(gray);
+}`
+    },
+    {
+        title: 'Smoothstep Blend',
+        description: 'Smooth interpolation between two values.',
+        code: `float smoothBlend(float edge0, float edge1, float x) {
+  float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+  return t * t * (3.0 - 2.0 * t);
+}`
+    },
+    {
+        title: 'Circle Mask',
+        description: 'Create a soft circular mask in UV space.',
+        code: `float circleMask(vec2 uv, vec2 center, float radius, float softness) {
+  float dist = length(uv - center);
+  return smoothstep(radius, radius - softness, dist);
+}`
+    },
+    {
+        title: 'Bump from Height',
+        description: 'Compute a simple normal from height map values.',
+        code: `vec3 bumpNormal(sampler2D tex, vec2 uv, vec2 res) {
+  float h = texture(tex, uv).r;
+  float hx = texture(tex, uv + vec2(1.0 / res.x, 0.0)).r;
+  float hy = texture(tex, uv + vec2(0.0, 1.0 / res.y)).r;
+  return normalize(vec3(hx - h, hy - h, 1.0));
+}`
+    },
+    {
+        title: 'SDF Sphere',
+        description: 'Signed distance to a sphere centered at the origin.',
+        code: `float sdfSphere(vec3 p, float radius) {
+  return length(p) - radius;
+}`
+    },
+    {
+        title: 'SDF Box',
+        description: 'Signed distance to an axis-aligned box.',
+        code: `float sdfBox(vec3 p, vec3 b) {
+  vec3 d = abs(p) - b;
+  return min(max(d.x, max(d.y, d.z)), 0.0) + length(max(d, 0.0));
+}`
+    },
+    {
+        title: 'SDF Torus',
+        description: 'Signed distance to a torus around the XY plane.',
+        code: `float sdfTorus(vec3 p, vec2 t) {
+  vec2 q = vec2(length(p.xz) - t.x, p.y);
+  return length(q) - t.y;
+}`
+    },
+    {
+        title: 'Texture to SDF',
+        description: 'Convert a grayscale texture into an approximate signed distance field.',
+        code: `float textureSdf(sampler2D tex, vec2 uv, vec2 res, float threshold) {
+  float v = texture(tex, uv).r;
+  float dx = texture(tex, uv + vec2(1.0 / res.x, 0.0)).r - v;
+  float dy = texture(tex, uv + vec2(0.0, 1.0 / res.y)).r - v;
+  float grad = length(vec2(dx, dy));
+  return (v - threshold) / max(grad, 1e-4);
+}`
+    },
+    {
+        title: 'Slope Field',
+        description: 'Compute local height slope from a heightmap texture.',
+        code: `vec2 slopeField(sampler2D heightTex, vec2 uv, vec2 res) {
+  float h = texture(heightTex, uv).r;
+  float hx = texture(heightTex, uv + vec2(1.0 / res.x, 0.0)).r - h;
+  float hy = texture(heightTex, uv + vec2(0.0, 1.0 / res.y)).r - h;
+  return vec2(hx, hy) * vec2(res.x, res.y);
+}`
+    },
+    {
+        title: 'Normal from Heightmap',
+        description: 'Compute a normal vector from a heightmap or SDF texture.',
+        code: `vec3 normalFromHeight(sampler2D heightTex, vec2 uv, vec2 res, float scale) {
+  float h = texture(heightTex, uv).r;
+  float hx = texture(heightTex, uv + vec2(1.0 / res.x, 0.0)).r - h;
+  float hy = texture(heightTex, uv + vec2(0.0, 1.0 / res.y)).r - h;
+  vec3 n = normalize(vec3(-hx * scale, -hy * scale, 1.0));
+  return n;
+}`
+    },
+    {
+        title: 'Derivative Map',
+        description: 'Compute first derivatives (dx, dy) and approximate Laplacian from a height texture.',
+        code: `vec3 derivativeMap(sampler2D tex, vec2 uv, vec2 res) {
+  float c = texture(tex, uv).r;
+  float dx = texture(tex, uv + vec2(1.0 / res.x, 0.0)).r - texture(tex, uv - vec2(1.0 / res.x, 0.0)).r;
+  float dy = texture(tex, uv + vec2(0.0, 1.0 / res.y)).r - texture(tex, uv - vec2(0.0, 1.0 / res.y)).r;
+  float lap = texture(tex, uv + vec2(1.0 / res.x, 0.0)).r + texture(tex, uv - vec2(1.0 / res.x, 0.0)).r + texture(tex, uv + vec2(0.0, 1.0 / res.y)).r + texture(tex, uv - vec2(0.0, 1.0 / res.y)).r - 4.0 * c;
+  return vec3(dx * 0.5 * res.x, dy * 0.5 * res.y, lap * 0.25);
+}`
+    },
+    {
+        title: 'Gaussian Blur',
+        description: 'A 3x3 separable Gaussian blur pass.',
+        code: `vec4 gaussianBlur(sampler2D tex, vec2 uv, vec2 res) {
+  vec2 off = 1.0 / res;
+  vec4 sum = vec4(0.0);
+  sum += texture(tex, uv + vec2(-off.x, -off.y)) * 1.0;
+  sum += texture(tex, uv + vec2( 0.0, -off.y)) * 2.0;
+  sum += texture(tex, uv + vec2( off.x, -off.y)) * 1.0;
+  sum += texture(tex, uv + vec2(-off.x,  0.0)) * 2.0;
+  sum += texture(tex, uv) * 4.0;
+  sum += texture(tex, uv + vec2( off.x,  0.0)) * 2.0;
+  sum += texture(tex, uv + vec2(-off.x,  off.y)) * 1.0;
+  sum += texture(tex, uv + vec2( 0.0,  off.y)) * 2.0;
+  sum += texture(tex, uv + vec2( off.x,  off.y)) * 1.0;
+  return sum / 16.0;
+}`
+    },
+    {
+        title: 'Sobel Edge',
+        description: 'Simple Sobel edge detection on a texture.',
+        code: `float sobelEdge(sampler2D tex, vec2 uv, vec2 res) {
+  vec2 off = 1.0 / res;
+  float tl = texture(tex, uv + vec2(-off.x, -off.y)).r;
+  float tc = texture(tex, uv + vec2( 0.0, -off.y)).r;
+  float tr = texture(tex, uv + vec2( off.x, -off.y)).r;
+  float ml = texture(tex, uv + vec2(-off.x,  0.0)).r;
+  float mr = texture(tex, uv + vec2( off.x,  0.0)).r;
+  float bl = texture(tex, uv + vec2(-off.x,  off.y)).r;
+  float bc = texture(tex, uv + vec2( 0.0,  off.y)).r;
+  float br = texture(tex, uv + vec2( off.x,  off.y)).r;
+  float gx = -tl - 2.0 * ml - bl + tr + 2.0 * mr + br;
+  float gy = -tl - 2.0 * tc - tr + bl + 2.0 * bc + br;
+  return length(vec2(gx, gy));
+}`
+    },
+    {
+        title: 'Contrast Adjustment',
+        description: 'Boost or reduce contrast around midtones.',
+        code: `vec3 adjustContrast(vec3 color, float contrast) {
+  return mix(vec3(0.5), color, contrast);
+}`
+    },
+    {
+        title: 'Hue Shift',
+        description: 'Rotate hue around the color wheel.',
+        code: `vec3 hueShift(vec3 color, float angle) {
+  const mat3 rgb2yiq = mat3(0.299, 0.587, 0.114, 0.596, -0.274, -0.322, 0.211, -0.523, 0.312);
+  const mat3 yiq2rgb = mat3(1.0, 0.956, 0.621, 1.0, -0.272, -0.647, 1.0, -1.106, 1.703);
+  vec3 yiq = rgb2yiq * color;
+  float cs = cos(angle);
+  float sn = sin(angle);
+  mat3 rot = mat3(1.0, 0.0, 0.0,
+                  0.0, cs, -sn,
+                  0.0, sn, cs);
+  yiq.yz = rot * yiq.yz;
+  return yiq2rgb * yiq;
+}`
+    },
+    {
+        title: 'Unsharp Mask',
+        description: 'Sharpen details by combining blur and original texture.',
+        code: `vec4 unsharpMask(sampler2D tex, vec2 uv, vec2 res, float amount) {
+  vec4 original = texture(tex, uv);
+  vec4 blur = gaussianBlur(tex, uv, res);
+  return clamp(original + amount * (original - blur), 0.0, 1.0);
+}`
+    },
+    {
+        title: 'Vignette',
+        description: 'Darken edges with a smooth vignette effect.',
+        code: `float vignette(vec2 uv, vec2 center, float radius, float softness) {
+  float dist = distance(uv, center);
+  return smoothstep(radius, radius - softness, dist);
+}`
+    },
+    {
+        title: 'Posterize',
+        description: 'Quantize colors into discrete steps.',
+        code: `vec3 posterize(vec3 color, float levels) {
+  return floor(color * levels) / levels;
+}`
+    },
+    {
+        title: 'Perlin Noise',
+        description: 'Classic Perlin noise with smooth gradients.',
+        code: `vec2 fade(vec2 t) {
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+float grad(vec2 hash, vec2 p) {
+  return dot((hash * 2.0 - 1.0), p);
+}
+vec2 permute(vec2 x) {
+  return mod((34.0 * x + 1.0) * x, 289.0);
+}
+float perlin(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = fade(f);
+  vec2 a = permute(permute(i.y + vec2(0.0, 1.0)) + i.x);
+  vec2 b = permute(permute(i.y + vec2(0.0, 1.0)) + i.x + 1.0);
+  vec2 ga = vec2(grad(fract(a / 41.0), f - vec2(0.0, 0.0)), grad(fract((a + 1.0) / 41.0), f - vec2(1.0, 0.0)));
+  vec2 gb = vec2(grad(fract(b / 41.0), f - vec2(0.0, 1.0)), grad(fract((b + 1.0) / 41.0), f - vec2(1.0, 1.0)));
+  return mix(mix(ga.x, ga.y, u.x), mix(gb.x, gb.y, u.x), u.y);
+}`
+    },
+    {
+        title: 'Fractal Brownian Motion',
+        description: 'Build richer textures by summing multiple noise octaves.',
+        code: `float fbm(vec2 uv, int octaves, float lacunarity, float gain) {
+  float sum = 0.0;
+  float amp = 0.5;
+  float freq = 1.0;
+  for (int i = 0; i < octaves; i++) {
+    sum += amp * perlin(uv * freq);
+    freq *= lacunarity;
+    amp *= gain;
+  }
+  return sum;
+}`
+    },
+    {
+        title: 'Phong Lighting',
+        description: 'Compute diffuse and specular lighting with normals and view direction.',
+        code: `vec3 phongLighting(vec3 normal, vec3 lightDir, vec3 viewDir, vec3 lightColor, float shininess) {
+  vec3 N = normalize(normal);
+  vec3 L = normalize(lightDir);
+  vec3 V = normalize(viewDir);
+  vec3 H = normalize(L + V);
+  float diff = max(dot(N, L), 0.0);
+  float spec = pow(max(dot(N, H), 0.0), shininess);
+  return lightColor * (diff + spec);
+}`
+    },
+    {
+        title: 'Normal-Based Displacement',
+        description: 'Offset texture lookup by sampled height to create displacement.',
+        code: `vec2 displacementUV(sampler2D heightTex, vec2 uv, vec2 res, float amount) {
+  float height = texture(heightTex, uv).r;
+  vec2 grad = vec2(
+    texture(heightTex, uv + vec2(1.0 / res.x, 0.0)).r - height,
+    texture(heightTex, uv + vec2(0.0, 1.0 / res.y)).r - height
+  );
+  return uv + normalize(grad) * amount / res;
+}`
+    },
+    {
+        title: 'Bloom',
+        description: 'Softly add bright highlights back into the image for a bloom effect.',
+        code: `vec4 bloom(sampler2D tex, vec2 uv, vec2 res, float threshold, float intensity) {
+  vec4 c = texture(tex, uv);
+  float bright = max(max(c.r, c.g), c.b);
+  float mask = smoothstep(threshold, threshold + 0.2, bright);
+  vec4 blur = gaussianBlur(tex, uv, res);
+  return c + blur * mask * intensity;
+}`
+    },
+    {
+        title: 'Normal Map Sample',
+        description: 'Convert a normal map sample from texture space to world normals.',
+        code: `vec3 sampleNormal(sampler2D normalTex, vec2 uv) {
+  vec3 n = texture(normalTex, uv).rgb;
+  return normalize(n * 2.0 - 1.0);
+}`
+    },
+    {
+        title: 'Edge Glow',
+        description: 'Glow result around edges by combining edge detection and blur.',
+        code: `vec4 edgeGlow(sampler2D tex, vec2 uv, vec2 res, float threshold, float intensity) {
+  float edge = sobelEdge(tex, uv, res);
+  vec4 blur = gaussianBlur(tex, uv, res);
+  return mix(texture(tex, uv), blur, edge * intensity * smoothstep(0.0, 1.0, edge - threshold));
+}`
+    },
+    {
+        title: 'Bevel',
+        description: 'Simulate a simple bevel effect using screen-space normals.',
+        code: `float bevelMask(sampler2D tex, vec2 uv, vec2 res, float radius) {
+  vec2 off = radius / res;
+  float center = texture(tex, uv).r;
+  float left = texture(tex, uv - vec2(off.x, 0.0)).r;
+  float right = texture(tex, uv + vec2(off.x, 0.0)).r;
+  float up = texture(tex, uv + vec2(0.0, off.y)).r;
+  float down = texture(tex, uv - vec2(0.0, off.y)).r;
+  return clamp((left + right + up + down - 4.0 * center) * 0.5 + 0.5, 0.0, 1.0);
+}`
+    },
+    {
+        title: 'Drop Shadow',
+        description: 'Sample a shifted dark copy of the image for a drop shadow effect.',
+        code: `vec4 dropShadow(sampler2D tex, vec2 uv, vec2 res, vec2 offset, float darkness) {
+  vec4 orig = texture(tex, uv);
+  vec4 shadow = texture(tex, uv - offset / res);
+  shadow.rgb *= vec3(darkness);
+  shadow.a *= 0.6;
+  return max(orig, shadow * shadow.a);
+}`
+    },
+    {
+        title: 'Glow',
+        description: 'Add a soft glow around bright areas of the image.',
+        code: `vec4 glow(sampler2D tex, vec2 uv, vec2 res, float threshold, float intensity) {
+  vec4 c = texture(tex, uv);
+  float bright = max(max(c.r, c.g), c.b);
+  float glowMask = smoothstep(threshold, 1.0, bright);
+  vec4 blurred = gaussianBlur(tex, uv, res);
+  return mix(c, blurred, glowMask * intensity);
+}`
+    }
+];
+
+let e_status, e_tabs, e_name, e_color, e_w, e_h, e_useGlobalRes, e_resMult, e_globalW, e_globalH, e_passes;
+let e_play, e_step, e_reset, e_add, e_snippetLibrary, e_help, e_ai, e_aiProvider, e_aiConfig, e_top, e_view3d, e_screenshot;
+let e_addLayerModal, e_addLayerName, e_addLayerColor, e_addLayerPreset, e_addLayerConfirm, e_addLayerCancel;
+let snippetModal, helpModal, snippetList;
 let e_err, e_uniformList, aceEditor, e_undo, e_redo, e_export, e_import, e_fileImport, e_editorConfig, e_fileEditorConfigImport;
 let e_side, e_split, e_hideSidebarName, e_showSidebar, e_previewOnly, e_previewClose, cvs, gl;
 let aiModal, modalAiProvider, modalOpenAiKey, modalAiEndpoint, modalAiModel, modalAiHeaders, modalAiSave, modalAiCancel, modalAiClear, modalOpenAiKeyRow, modalHeadersRow;
@@ -452,8 +949,8 @@ let modalEditorUiFontSize, modalEditorTabPaddingV, modalEditorTabPaddingH, modal
 let editorConfigBackup = null;
 
 const systemPromptPresets = {
-    detailed: `ENVIRONMENT SPECIFICATION: Target: WebGL2 Fragment Shader (#version 300 es). Entry Point: void main(). Output: vec4 fragColor (macro OUT available). Coordinates: in vec2 vUV (macros U, P, fragCoord available). Globals: uniform float iTime; uniform int iFrame; uniform vec3 iResolution; uniform vec4 iMouse; uniform vec3 iMouseDir. Self-Sampling: VAL() returns vec4 at vUV. N(float dx, float dy) returns vec4 at offset. Buffer-Sampling: READ(layerName, uv) and READ_OFF(layerName, uv, offset). Topology Lib: wrap_Torus, wrap_Plane, wrap_Sphere, wrap_Moebius, wrap_Klein, wrap_Mirror, wrap_Cubemap, Cubemap_Area, Cubemap_Dir available. Custom Uniforms: Declared natively. OUTPUT CONSTRAINTS: Output exclusively valid, raw GLSL source code. Omit all markdown formatting and explanations.`,
-    concise: `ENVIRONMENT SPECIFICATION: Target: WebGL2 Fragment Shader (#version 300 es). Entry Point: void main(). Output: vec4 fragColor (macro OUT available). Coordinates: in vec2 vUV (macros U, fragCoord available). Globals: uniform float iTime; uniform int iFrame; uniform vec3 iResolution; uniform vec4 iMouse. Buffer-Sampling: READ(layerName, uv). OUTPUT CONSTRAINTS: Output exclusively valid, raw GLSL source code. Omit all markdown formatting and explanations.`,
+    detailed: `ENVIRONMENT SPECIFICATION: Target: WebGL2 Fragment Shader (#version 300 es). Entry Point: void main(). Output: vec4 fragColor (macro OUT available). Coordinates: in vec2 vUV (macros iUV, U, iPixel, P, iFragCoord, fragCoord available). Globals: uniform float iTime; uniform int iFrame; uniform vec3 iResolution; uniform vec4 iMouse; uniform vec3 iMouseDir. Self-Sampling: VAL() returns vec4 at vUV. SAMPLE(float dx, float dy) returns vec4 at offset. Buffer-Sampling: READ(layerName, uv) and READ_OFF(layerName, uv, offset). Topology Lib: wrap_torus, wrap_plane, wrap_sphere, wrap_moebius, wrap_klein, wrap_mirror, wrap_cubemap, cubemap_area, cubemap_dir available. Custom Uniforms: Declared natively. OUTPUT CONSTRAINTS: Output exclusively valid, raw GLSL source code. Omit all markdown formatting and explanations.`,
+    concise: `ENVIRONMENT SPECIFICATION: Target: WebGL2 Fragment Shader (#version 300 es). Entry Point: void main(). Output: vec4 fragColor (macro OUT available). Coordinates: in vec2 vUV (macros iUV, U, iFragCoord, fragCoord available). Globals: uniform float iTime; uniform int iFrame; uniform vec3 iResolution; uniform vec4 iMouse. Buffer-Sampling: READ(layerName, uv). OUTPUT CONSTRAINTS: Output exclusively valid, raw GLSL source code. Omit all markdown formatting and explanations.`,
     custom: `ENVIRONMENT SPECIFICATION: Target: WebGL2 Fragment Shader (#version 300 es). Globals available: uniform float iTime; uniform int iFrame; uniform vec3 iResolution; uniform vec4 iMouse; uniform vec3 iMouseDir.\n\n[Add your custom instructions here...]`
 };
 const defaultSystemPrompt = systemPromptPresets.detailed;
@@ -469,16 +966,28 @@ function initDOM() {
     e_resMult = el('prop-res-mult');
     e_globalW = el('prop-global-w');
     e_globalH = el('prop-global-h');
+    e_passes = el('prop-passes');
     e_play = el('btn-play');
     e_step = el('btn-step');
     e_reset = el('btn-reset');
     e_add = el('btn-add');
+    e_snippetLibrary = el('btn-snippet-library');
+    e_help = el('btn-help');
     e_ai = el('btn-ai');
     e_aiProvider = el('sel-ai-provider');
     e_aiConfig = el('btn-ai-config');
     e_top = el('prop-top');
     e_view3d = el('btn-view3d');
     e_screenshot = el('btn-screenshot');
+    e_addLayerModal = el('add-layer-modal');
+    e_addLayerName = el('add-layer-name');
+    e_addLayerColor = el('add-layer-color');
+    e_addLayerPreset = el('add-layer-preset');
+    e_addLayerConfirm = el('add-layer-confirm');
+    e_addLayerCancel = el('add-layer-cancel');
+    snippetModal = el('snippet-library-modal');
+    helpModal = el('help-modal');
+    snippetList = el('snippet-library-list');
     e_err = el('error-log');
     e_uniformList = el('uniform-list');
     e_side = el('sidebar');
@@ -597,6 +1106,8 @@ function initDOM() {
     setButtonIcon(e_view3d, 'view3d');
     setButtonIcon(e_screenshot, 'screenshot');
     setButtonIcon(e_add, 'add');
+    setButtonIcon(e_snippetLibrary, 'snippet');
+    setButtonIcon(e_help, 'help');
     setButtonIcon(e_ai, 'ai');
     setButtonIcon(e_aiConfig, 'settings');
     setButtonIcon(e_editorConfig, 'tune');
@@ -635,6 +1146,30 @@ function initDOM() {
         localStorage.removeItem('openai_api_key');
         loadAiConfigModal(modalAiProvider.value);
     };
+    e_addLayerConfirm.onclick = () => {
+        const name = String(e_addLayerName.value).trim() || 'NewLayer';
+        const color = e_addLayerColor?.value || getRandomColor();
+        const presetKey = e_addLayerPreset.value || 'blank';
+        if (presetKey === 'blank') {
+            addLayer(name, 512, 512, 'void main() { fragColor = vec4(0.0); }', 'Torus', color);
+        } else {
+            const preset = layerPresets[presetKey] || layerPresets.empty;
+            addLayer(name, preset.w, preset.h, preset.code, preset.top, color, preset.passes);
+        }
+        closeAddLayerModal();
+        setActive(engine.layers[engine.layers.length - 1].id);
+        pushHistory();
+    };
+    e_addLayerCancel.onclick = () => closeAddLayerModal();
+    const addLayerCloseBtn = e_addLayerModal?.querySelector('.modal-close');
+    if (addLayerCloseBtn) addLayerCloseBtn.onclick = closeAddLayerModal;
+    e_addLayerModal?.addEventListener('click', e => { if (e.target === e_addLayerModal) closeAddLayerModal(); });
+    const snippetCloseBtn = snippetModal?.querySelector('.modal-close');
+    if (snippetCloseBtn) snippetCloseBtn.onclick = closeSnippetLibrary;
+    snippetModal?.addEventListener('click', e => { if (e.target === snippetModal) closeSnippetLibrary(); });
+    const helpCloseBtn = helpModal?.querySelector('.modal-close');
+    if (helpCloseBtn) helpCloseBtn.onclick = closeHelpModal;
+    helpModal?.addEventListener('click', e => { if (e.target === helpModal) closeHelpModal(); });
     aiModal.addEventListener('click', e => { if (e.target === aiModal) closeAiConfig(); });
     aiGenerateModal.addEventListener('click', e => { if (e.target === aiGenerateModal) aiGenerateModal.classList.remove('open'); });
 
@@ -678,7 +1213,7 @@ function attachControlHandlers() {
             URL.revokeObjectURL(url);
         }, 'image/png');
     };
-    e_add.onclick = () => { addLayer('NewLayer', 512, 512, 'void main() { fragColor = vec4(1.0, 0.0, 0.0, 1.0); }'); pushHistory(); };
+    e_add.onclick = () => openAddLayerModal();
     setButtonIcon(e_hideSidebarName, 'left');
     setButtonIcon(e_showSidebar, 'right');
     setButtonIcon(e_previewOnly, 'fullscreen');
@@ -810,11 +1345,17 @@ function attachControlHandlers() {
     };
     aiBtnCancel.onclick = () => aiGenerateModal.classList.remove('open');
     
+    e_snippetLibrary.onclick = () => openSnippetLibrary();
+    e_help.onclick = () => openHelpModal();
+    setButtonIcon(e_snippetLibrary, 'snippet');
+    renderSnippetLibrary();
+    
     e_view3d.onclick = () => { engine.is3D = !engine.is3D; e_view3d.classList.toggle('active-btn', engine.is3D); render(); };
     e_color.oninput = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.color = e.target.value; const rgb = hexToRgb(l.color); el('layer-props').style.setProperty('--layer-color-rgb', `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`); updateTabs(); } };
     e_color.onchange = e => { pushHistory(); };
     e_name.onchange = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { const newName = normalizeLayerName(e.target.value, l.id); l.name = newName; l.safeName = newName; e.target.value = newName; updateTabs(); compileAll(); pushHistory(); } };
     e_top.onchange = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.top = e.target.value; compileAll(); render(); pushHistory(); } };
+    e_passes.onchange = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { let passes = parseInt(e.target.value, 10); if (Number.isNaN(passes)) passes = -1; l.passes = passes; if (passes < 0) l.passesRun = 0; compileAll(); render(); pushHistory(); } };
     e_useGlobalRes.onchange = e => { const l = engine.layers.find(x => x.id === engine.activeId); if (l) { l.useGlobalRes = e.target.checked; e_w.disabled = l.useGlobalRes; e_h.disabled = l.useGlobalRes; updateLayerResolution(l); compileAll(); render(); pushHistory(); } };
     
     const resizeCb = (pushToHistory) => { 
@@ -968,7 +1509,7 @@ function attachControlHandlers() {
     
     initGL();
     addLayer('Metrics', 1536, 256, `void main() {
-      OUT = vec4(Cubemap_Area(U), Cubemap_Dir(U) * 0.5 + 0.5);
+      OUT = vec4(cubemap_area(iUV), cubemap_dir(iUV) * 0.5 + 0.5);
     }`, 'Cubemap', '#8854d0');
     addLayer('Wave', 1536, 256, `uniform float u_wave_stiffness;
 uniform float u_wave_damping;
@@ -976,20 +1517,20 @@ uniform float u_wave_impact;
 uniform float u_wave_heat;
 
 void main() {
-  vec4 m = READ(Metrics, U);
+  vec4 m = READ(Metrics, iUV);
   vec3 dir = m.gba * 2.0 - 1.0;
   float h = VAL().r;
   float v = VAL().g;
-  vec2 uL = wrap_Cubemap(U, vec2(-1.0, 0.0), iResolution.xy);
-  vec2 uR = wrap_Cubemap(U, vec2( 1.0, 0.0), iResolution.xy);
-  vec2 uD = wrap_Cubemap(U, vec2( 0.0,-1.0), iResolution.xy);
-  vec2 uU = wrap_Cubemap(U, vec2( 0.0, 1.0), iResolution.xy);
-  float a0 = Cubemap_Area(U);
-  float aL = Cubemap_Area(uL);
-  float aR = Cubemap_Area(uR);
-  float aD = Cubemap_Area(uD);
-  float aU = Cubemap_Area(uU);
-  float laplacian = aL * (N(-1,0).r - h) + aR * (N(1,0).r - h) + aD * (N(0,-1).r - h) + aU * (N(0,1).r - h);
+  vec2 uL = wrap_cubemap(iUV, vec2(-1.0, 0.0), iResolution.xy);
+  vec2 uR = wrap_cubemap(iUV, vec2( 1.0, 0.0), iResolution.xy);
+  vec2 uD = wrap_cubemap(iUV, vec2( 0.0,-1.0), iResolution.xy);
+  vec2 uU = wrap_cubemap(iUV, vec2( 0.0, 1.0), iResolution.xy);
+  float a0 = cubemap_area(iUV);
+  float aL = cubemap_area(uL);
+  float aR = cubemap_area(uR);
+  float aD = cubemap_area(uD);
+  float aU = cubemap_area(uU);
+  float laplacian = aL * (SAMPLE(-1,0).r - h) + aR * (SAMPLE(1,0).r - h) + aD * (SAMPLE(0,-1).r - h) + aU * (SAMPLE(0,1).r - h);
   laplacian /= a0;
   v += laplacian * u_wave_stiffness;
   v *= u_wave_damping;
@@ -1008,28 +1549,28 @@ uniform float u_mantle_velocity_damping;
 uniform float u_mantle_temperature_blend;
 
 void main() {
-  vec4 m = READ(Metrics, U);
+  vec4 m = READ(Metrics, iUV);
   vec3 dir = m.gba * 2.0 - 1.0;
-  vec2 uL = wrap_Cubemap(U, vec2(-1.0, 0.0), iResolution.xy);
-  vec2 uR = wrap_Cubemap(U, vec2( 1.0, 0.0), iResolution.xy);
-  vec2 uD = wrap_Cubemap(U, vec2( 0.0,-1.0), iResolution.xy);
-  vec2 uU = wrap_Cubemap(U, vec2( 0.0, 1.0), iResolution.xy);
-  float a0 = Cubemap_Area(U);
-  float aL = Cubemap_Area(uL);
-  float aR = Cubemap_Area(uR);
-  float aD = Cubemap_Area(uD);
-  float aU = Cubemap_Area(uU);
-  vec4 sL = N(-1,0);
-  vec4 sR = N(1,0);
-  vec4 sD = N(0,-1);
-  vec4 sU = N(0,1);
+  vec2 uL = wrap_cubemap(iUV, vec2(-1.0, 0.0), iResolution.xy);
+  vec2 uR = wrap_cubemap(iUV, vec2( 1.0, 0.0), iResolution.xy);
+  vec2 uD = wrap_cubemap(iUV, vec2( 0.0,-1.0), iResolution.xy);
+  vec2 uU = wrap_cubemap(iUV, vec2( 0.0, 1.0), iResolution.xy);
+  float a0 = cubemap_area(iUV);
+  float aL = cubemap_area(uL);
+  float aR = cubemap_area(uR);
+  float aD = cubemap_area(uD);
+  float aU = cubemap_area(uU);
+  vec4 sL = SAMPLE(-1,0);
+  vec4 sR = SAMPLE(1,0);
+  vec4 sD = SAMPLE(0,-1);
+  vec4 sU = SAMPLE(0,1);
   float T0 = VAL().r;
   vec2 vel = VAL().gb * 2.0 - 1.0;
   float lapT = aL * (sL.r - T0) + aR * (sR.r - T0) + aD * (sD.r - T0) + aU * (sU.r - T0);
   lapT /= a0;
   vec2 gradT = vec2(sR.r - sL.r, sU.r - sD.r) * 0.5;
   float fs = max(0.25, u_mantle_feature_scale);
-  vec4 noiseCoords = vec4(U * 3.8 / fs, iTime * 0.24 / fs, iTime * 0.07 / fs);
+  vec4 noiseCoords = vec4(iUV * 3.8 / fs, iTime * 0.24 / fs, iTime * 0.07 / fs);
   float noiseA = fract(sin(dot(noiseCoords, vec4(12.9898, 78.233, 37.719, 45.164))) * 43758.5453);
   float noiseB = fract(sin(dot(noiseCoords + vec4(5.2, 4.1, 2.3, 7.7), vec4(12.9898, 78.233, 37.719, 45.164))) * 43758.5453);
   vec2 noiseVel = vec2(noiseA - 0.5, noiseB - 0.5) * u_mantle_noise_strength;
@@ -1037,7 +1578,7 @@ void main() {
   vel += gradT * u_mantle_grad_gain;
   vel += noiseVel;
   vel *= u_mantle_velocity_damping;
-  float Tadv = READ_OFF(Mantle, U, -vel * 4.0 / fs).r;
+  float Tadv = READ_OFF(Mantle, iUV, -vel * 4.0 / fs).r;
   float Tnew = Tadv + lapT * u_mantle_diffusion;
   Tnew += (noiseA - 0.5) * 0.03;
   Tnew += (noiseB - 0.5) * 0.025;
@@ -1045,7 +1586,7 @@ void main() {
   Tnew = mix(Tnew, 0.5, 0.002);
   Tnew = clamp(Tnew, 0.0, 1.0);
   if (iFrame < 2) {
-    float seed = fract(sin(dot(vec4(U * 5.3, 0.0, 0.0), vec4(12.9898, 78.233, 37.719, 45.164))) * 43758.5453);
+    float seed = fract(sin(dot(vec4(iUV * 5.3, 0.0, 0.0), vec4(12.9898, 78.233, 37.719, 45.164))) * 43758.5453);
     Tnew = 0.52 + (seed - 0.5) * 0.16;
     vel = vec2(0.0);
   }
@@ -1056,7 +1597,7 @@ uniform float u_mantle_flow_strength;
 uniform float u_mantle_accent;
 
 void main() {
-  vec4 s = READ(Mantle, U);
+  vec4 s = READ(Mantle, iUV);
   float t = s.r;
   vec2 vel = s.gb * 2.0 - 1.0;
   vec3 base = mix(vec3(0.05, 0.08, 0.25), vec3(0.9, 0.55, 0.15), t);
@@ -1110,7 +1651,9 @@ function captureState() {
             color: l.color,
             uniforms: l.uniforms,
             enabled: l.enabled !== false,
-            solo: l.solo || false
+            solo: l.solo || false,
+            passes: l.passes != null ? l.passes : -1,
+            passesRun: l.passesRun || 0
         }))
     }));
 }
@@ -1163,7 +1706,9 @@ function restoreState(state) {
             err: '',
             r0: true,
             enabled: d.enabled !== false,
-            solo: d.solo || false
+            solo: d.solo || false,
+            passes: d.passes != null ? d.passes : -1,
+            passesRun: d.passesRun || 0
         };
         l.t0 = createTex(l.w, l.h);
         l.t1 = createTex(l.w, l.h);
@@ -1172,6 +1717,7 @@ function restoreState(state) {
         engine.layers.push(l);
         if (l.useGlobalRes) updateLayerResolution(l);
         compile(l);
+        if (!l.enabled) clearLayerBuffers(l);
     });
     engine.activeId = state.activeId || (engine.layers[0] && engine.layers[0].id) || null;
     updateTabs();
@@ -1499,6 +2045,68 @@ function getEditorSettings() {
     }
 }
 
+function openAddLayerModal() {
+    if (!e_addLayerModal) return;
+    e_addLayerName.value = 'NewLayer';
+    if (e_addLayerColor) e_addLayerColor.value = getRandomColor();
+    e_addLayerPreset.value = 'blank';
+    e_addLayerModal.classList.add('open');
+    setTimeout(() => e_addLayerName.focus(), 100);
+}
+
+function closeAddLayerModal() {
+    if (!e_addLayerModal) return;
+    e_addLayerModal.classList.remove('open');
+}
+
+function openSnippetLibrary() {
+    if (!snippetModal) return;
+    snippetModal.classList.add('open');
+}
+
+function closeSnippetLibrary() {
+    if (!snippetModal) return;
+    snippetModal.classList.remove('open');
+}
+
+function openHelpModal() {
+    if (!helpModal) return;
+    helpModal.classList.add('open');
+}
+
+function closeHelpModal() {
+    if (!helpModal) return;
+    helpModal.classList.remove('open');
+}
+
+function renderSnippetLibrary() {
+    if (!snippetList) return;
+    snippetList.innerHTML = snippetLibrary.map(snippet => `
+        <div class="modal-setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <div style="display:flex; justify-content: space-between; align-items: center; gap: 8px; width:100%;">
+                <div>
+                    <div style="font-weight:700; margin-bottom:4px;">${snippet.title}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">${snippet.description}</div>
+                </div>
+                <button type="button" class="tab-btn" data-snippet="${encodeURIComponent(snippet.code)}" style="min-width: 80px;">Copy</button>
+            </div>
+            <pre style="margin:0; padding:10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 5px; overflow:auto; white-space: pre-wrap; font-family: Consolas, 'Courier New', monospace; font-size: 12px;">${escapeHTML(snippet.code)}</pre>
+        </div>
+    `).join('');
+    snippetList.querySelectorAll('button[data-snippet]').forEach(button => {
+        button.onclick = () => {
+            const code = decodeURIComponent(button.dataset.snippet || '');
+            navigator.clipboard.writeText(code).then(() => {
+                const old = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => button.textContent = old, 1500);
+            }).catch(() => {
+                alert('Copy failed.');
+            });
+        };
+    });
+}
+
 function applyEditorSettings(settings) {
     const root = document.documentElement.style;
     root.setProperty('--bg', settings.bg);
@@ -1741,12 +2349,12 @@ let engine = {
 };
 
 const topoLib = `
-vec2 wrap_Torus(vec2 uv, vec2 d, vec2 R) { return fract(uv + d/R); }
-vec2 wrap_Plane(vec2 uv, vec2 d, vec2 R) { return clamp(uv + d/R, 0.0, 1.0); }
-vec2 wrap_Sphere(vec2 uv, vec2 d, vec2 R) { uv += d/R; float yf = floor(uv.y); uv.y = fract(uv.y); if (mod(yf, 2.0) != 0.0) { uv.y = 1.0 - uv.y; uv.x += 0.5; } uv.x = fract(uv.x); return uv; }
-vec2 wrap_Moebius(vec2 uv, vec2 d, vec2 R) { uv += d/R; float xf = floor(uv.x); uv.x = fract(uv.x); if (mod(xf, 2.0) != 0.0) uv.y = 1.0 - uv.y; uv.y = clamp(uv.y, 0.0, 1.0); return uv; }
-vec2 wrap_Klein(vec2 uv, vec2 d, vec2 R) { uv += d/R; float xf = floor(uv.x); uv.x = fract(uv.x); if (mod(xf, 2.0) != 0.0) uv.y = 1.0 - uv.y; uv.y = fract(uv.y); return uv; }
-vec2 wrap_Mirror(vec2 uv, vec2 d, vec2 R) { vec2 p = fract((uv + d/R) * 0.5) * 2.0; return vec2(p.x > 1.0 ? 2.0 - p.x : p.x, p.y > 1.0 ? 2.0 - p.y : p.y); }
+vec2 wrap_torus(vec2 uv, vec2 d, vec2 R) { return fract(uv + d/R); }
+vec2 wrap_plane(vec2 uv, vec2 d, vec2 R) { return clamp(uv + d/R, 0.0, 1.0); }
+vec2 wrap_sphere(vec2 uv, vec2 d, vec2 R) { uv += d/R; float yf = floor(uv.y); uv.y = fract(uv.y); if (mod(yf, 2.0) != 0.0) { uv.y = 1.0 - uv.y; uv.x += 0.5; } uv.x = fract(uv.x); return uv; }
+vec2 wrap_moebius(vec2 uv, vec2 d, vec2 R) { uv += d/R; float xf = floor(uv.x); uv.x = fract(uv.x); if (mod(xf, 2.0) != 0.0) uv.y = 1.0 - uv.y; uv.y = clamp(uv.y, 0.0, 1.0); return uv; }
+vec2 wrap_klein(vec2 uv, vec2 d, vec2 R) { uv += d/R; float xf = floor(uv.x); uv.x = fract(uv.x); if (mod(xf, 2.0) != 0.0) uv.y = 1.0 - uv.y; uv.y = fract(uv.y); return uv; }
+vec2 wrap_mirror(vec2 uv, vec2 d, vec2 R) { vec2 p = fract((uv + d/R) * 0.5) * 2.0; return vec2(p.x > 1.0 ? 2.0 - p.x : p.x, p.y > 1.0 ? 2.0 - p.y : p.y); }
 
 vec3 _face2dir(int f, vec2 uv) {
     vec2 p = uv * 2.0 - 1.0;
@@ -1766,7 +2374,7 @@ void _dir2face(vec3 d, out int f, out vec2 uv) {
     uv = uv * 0.5 + 0.5;
 }
 
-vec2 wrap_Cubemap(vec2 uv, vec2 d, vec2 R) {
+vec2 wrap_cubemap(vec2 uv, vec2 d, vec2 R) {
     float faces = 6.0;
     int f = int(clamp(floor(uv.x * faces), 0.0, faces - 1.0));
     vec2 luv = vec2(fract(uv.x * faces), uv.y);
@@ -1785,18 +2393,18 @@ vec2 wrap_Cubemap(vec2 uv, vec2 d, vec2 R) {
 }
 
 vec2 apply_wrap(int t, vec2 uv, vec2 d, vec2 R) {
-    if(t==0) return wrap_Torus(uv, d, R); 
-    if(t==1) return wrap_Plane(uv, d, R); 
-    if(t==2) return wrap_Sphere(uv, d, R);
-    if(t==3) return wrap_Moebius(uv, d, R); 
-    if(t==4) return wrap_Klein(uv, d, R); 
-    if(t==5) return wrap_Mirror(uv, d, R);
-    if(t==6) return wrap_Cubemap(uv, d, R); 
+    if(t==0) return wrap_torus(uv, d, R); 
+    if(t==1) return wrap_plane(uv, d, R); 
+    if(t==2) return wrap_sphere(uv, d, R);
+    if(t==3) return wrap_moebius(uv, d, R); 
+    if(t==4) return wrap_klein(uv, d, R); 
+    if(t==5) return wrap_mirror(uv, d, R);
+    if(t==6) return wrap_cubemap(uv, d, R); 
     return uv;
 }
 
-float Cubemap_Area(vec2 uv) { vec2 p = fract(vec2(uv.x * 6.0, uv.y)) * 2.0 - 1.0; return pow(1.0 + p.x*p.x + p.y*p.y, -1.5); }
-vec3 Cubemap_Dir(vec2 uv) { int f = int(clamp(uv.x * 6.0, 0.0, 5.0)); vec2 luv = vec2(fract(uv.x * 6.0), uv.y); return normalize(_face2dir(f, luv)); }
+float cubemap_area(vec2 uv) { vec2 p = fract(vec2(uv.x * 6.0, uv.y)) * 2.0 - 1.0; return pow(1.0 + p.x*p.x + p.y*p.y, -1.5); }
+vec3 cubemap_dir(vec2 uv) { int f = int(clamp(uv.x * 6.0, 0.0, 5.0)); vec2 luv = vec2(fract(uv.x * 6.0), uv.y); return normalize(_face2dir(f, luv)); }
 `;
 
 const topoMap = { 'Torus':0, 'Plane':1, 'Sphere':2, 'Moebius':3, 'Klein':4, 'Mirror':5, 'Cubemap':6 };
@@ -1913,6 +2521,18 @@ function setLayerResolution(l, w, h) {
     l.w = w; l.h = h;
     l.t0 = createTex(w, h); l.t1 = createTex(w, h); l.f0 = createFBO(l.t0); l.f1 = createFBO(l.t1);
 }
+function clearLayerBuffers(l) {
+    const prevFb = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, l.f0);
+    gl.viewport(0, 0, l.w, l.h);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, l.f1);
+    gl.viewport(0, 0, l.w, l.h);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prevFb);
+}
 function updateLayerResolution(l) {
     const { w, h } = getLayerResolution(l);
     setLayerResolution(l, w, h);
@@ -1928,9 +2548,36 @@ function getRandomColor() {
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
-function addLayer(name, w, h, code, top = 'Torus', color = null) {
+function addLayerFromPreset(key) {
+    const preset = layerPresets[key] || layerPresets.empty;
+    addLayer(preset.label, preset.w, preset.h, preset.code, preset.top, preset.color, preset.passes);
+}
+
+function addLayer(name, w, h, code, top = 'Torus', color = null, passes = -1) {
     const safeName = normalizeLayerName(name);
-    const l = { id: genId(), name: safeName, safeName, baseW: w, baseH: h, w, h, useGlobalRes: false, resMult: 1.0, code, top, color: color || getRandomColor(), uniforms: getDefaultUniforms(safeName), uniformLocs: {}, prog: null, err: '', r0: true, enabled: true, solo: false };
+    const l = {
+        id: genId(),
+        name: safeName,
+        safeName,
+        baseW: w,
+        baseH: h,
+        w,
+        h,
+        useGlobalRes: false,
+        resMult: 1.0,
+        code,
+        top,
+        color: color || getRandomColor(),
+        uniforms: getDefaultUniforms(safeName),
+        uniformLocs: {},
+        prog: null,
+        err: '',
+        r0: true,
+        enabled: true,
+        solo: false,
+        passes: passes != null ? passes : -1,
+        passesRun: 0
+    };
     l.t0 = createTex(w, h); l.t1 = createTex(w, h);
     l.f0 = createFBO(l.t0); l.f1 = createFBO(l.t1);
     engine.layers.push(l); compile(l);
@@ -1940,6 +2587,8 @@ function addLayer(name, w, h, code, top = 'Torus', color = null) {
 function compile(l) {
     const compileStart = performance.now();
     const code = l.code || '';
+    const currentIndex = engine.layers.findIndex(x => x.id === l.id);
+    const prevLayer = currentIndex > 0 ? engine.layers[currentIndex - 1] : l;
     syncUniformsFromSource(l);
     const hasVersion = /^\s*#version\b/im.test(code);
     const hasPrecision = /\bprecision\s+(lowp|mediump|highp)\s+float\s*;/.test(code);
@@ -1956,16 +2605,21 @@ function compile(l) {
 
     engine.layers.forEach(x => {
         prefix += `uniform sampler2D tex_${x.id};\nuniform vec2 res_${x.id};\n`;
-        prefix += `vec2 wrap_${x.id}(vec2 uv, vec2 d, vec2 R) { return wrap_${x.top}(uv, d, R); }\n`;
+        prefix += `vec2 wrap_${x.id}(vec2 uv, vec2 d, vec2 R) { return wrap_${x.top.toLowerCase()}(uv, d, R); }\n`;
         prefix += `vec4 READ_${x.safeName}(vec2 uv) { return texture(tex_${x.id}, wrap_${x.id}(uv, vec2(0.0), res_${x.id})); }\n`;
         prefix += `vec4 READ_OFF_${x.safeName}(vec2 uv, vec2 offset) { return texture(tex_${x.id}, wrap_${x.id}(uv, offset, res_${x.id})); }\n`;
     });
 
     prefix += '#define OUT fragColor\n';
+    prefix += '#define iUV vUV\n';
     prefix += '#define U vUV\n';
+    prefix += '#define iPixel (vUV * iResolution.xy)\n';
     prefix += '#define P (vUV * iResolution.xy)\n';
+    prefix += '#define iFragCoord (vUV * iResolution.xy)\n';
     prefix += '#define fragCoord (vUV * iResolution.xy)\n';
     prefix += 'uniform sampler2D tex_self;\n';
+    prefix += 'uniform sampler2D tex_prev_sampler;\n';
+    prefix += 'uniform vec2 res_prev;\n';
 
     l.uniforms.forEach(u => {
         if (u.sourceDefined) return;
@@ -1978,9 +2632,12 @@ function compile(l) {
         else if (u.type === 'vec4') prefix += `uniform vec4 ${name};\n`;
     });
 
-    prefix += `vec4 N(float dx, float dy) { return texture(tex_self, wrap_${l.id}(vUV, vec2(dx, dy), iResolution.xy)); }\n`;
-    prefix += `vec4 N(int dx, int dy) { return texture(tex_self, wrap_${l.id}(vUV, vec2(float(dx), float(dy)), iResolution.xy)); }\n`;
+    prefix += `vec4 SAMPLE(float dx, float dy) { return texture(tex_self, wrap_${l.id}(vUV, vec2(dx, dy), iResolution.xy)); }\n`;
+    prefix += `vec4 SAMPLE(int dx, int dy) { return texture(tex_self, wrap_${l.id}(vUV, vec2(float(dx), float(dy)), iResolution.xy)); }\n`;
     prefix += `vec4 VAL() { return texture(tex_self, vUV); }\n`;
+    prefix += `vec4 tex_self_read_off(vec2 uv, vec2 offset) { return texture(tex_self, wrap_${l.id}(uv, offset, iResolution.xy)); }\n`;
+    prefix += `vec4 tex_prev(vec2 uv) { return texture(tex_prev_sampler, wrap_${prevLayer.id}(uv, vec2(0.0), res_prev)); }\n`;
+    prefix += `vec4 tex_prev_off(vec2 uv, vec2 offset) { return texture(tex_prev_sampler, wrap_${prevLayer.id}(uv, offset, res_prev)); }\n`;
     l.prefixLineCount = prefix.split('\n').length;
 
     let fs = code.replace(/\r\n/g, '\n');
@@ -1989,6 +2646,18 @@ function compile(l) {
             const layer = engine.layers.find(x => x.safeName === name);
             return layer ? `READ_OFF_${name}(${uv.trim()}, ${off.trim()})` : match;
         }
+    );
+    fs = fs.replace(/\bREAD\s*\(\s*tex_self\s*,\s*([^)]+?)\s*\)/g,
+        (match, uv) => `VAL()`
+    );
+    fs = fs.replace(/\bREAD_OFF\s*\(\s*tex_self\s*,\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/g,
+        (match, uv, off) => `tex_self_read_off(${uv.trim()}, ${off.trim()})`
+    );
+    fs = fs.replace(/\bREAD\s*\(\s*tex_prev\s*,\s*([^)]+?)\s*\)/g,
+        (match, uv) => `tex_prev(${uv.trim()})`
+    );
+    fs = fs.replace(/\bREAD_OFF\s*\(\s*tex_prev\s*,\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/g,
+        (match, uv, off) => `tex_prev_off(${uv.trim()}, ${off.trim()})`
     );
     fs = fs.replace(/\bREAD\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([^)]+?)\s*\)/g,
         (match, name, uv) => {
@@ -2260,6 +2929,7 @@ function setActive(id) {
         e_name.value = l.name; e_color.value = l.color || '#ffffff'; e_w.value = l.baseW; e_h.value = l.baseH; e_top.value = l.top;
         e_useGlobalRes.checked = l.useGlobalRes;
         e_resMult.value = l.resMult;
+        e_passes.value = l.passes != null ? l.passes : -1;
         e_w.disabled = l.useGlobalRes;
         e_h.disabled = l.useGlobalRes;
         e_globalW.value = engine.globalResolution.w;
@@ -2287,9 +2957,10 @@ function updateTabs() {
         const rgb = hexToRgb(l.color || '#888888');
         d.style.setProperty('--layer-color-rgb', `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`);
         const previewMark = previewId === l.id ? '▶ ' : '';
+        const passHint = l.passes >= 0 ? ` [${l.passesRun}/${l.passes}]` : '';
         const compileHint = l.compileTime != null ? ` (${l.compileTime.toFixed(1)}ms)` : '';
         const title = D.createElement('span');
-        title.textContent = `${previewMark}${l.name}${compileHint}${l.err ? ' ⚠️' : ''}`;
+        title.textContent = `${previewMark}${l.name}${passHint}${compileHint}${l.err ? ' ⚠️' : ''}`;
         const controls = D.createElement('div');
         controls.className = 'tab-controls';
 
@@ -2334,6 +3005,10 @@ function updateTabs() {
         bypassBtn.onclick = e => {
             e.stopPropagation();
             l.enabled = !l.enabled;
+            if (!l.enabled) {
+                clearLayerBuffers(l);
+                l.passesRun = 0;
+            }
             if (engine.previewLocked && engine.lockedPreviewId === l.id && !l.enabled) {
                 engine.previewLocked = false;
                 engine.lockedPreviewId = null;
@@ -2401,6 +3076,7 @@ function step() {
     const targetLayers = soloLayers.length ? engine.layers.filter(x => x.solo && x.enabled) : engine.layers.filter(x => x.enabled);
     targetLayers.forEach(l => {
         if (!l.prog) return;
+        if (l.passes >= 0 && l.passesRun >= l.passes) return;
         gl.useProgram(l.prog);
         const { w: lw, h: lh } = getLayerResolution(l);
         gl.bindFramebuffer(gl.FRAMEBUFFER, l.r0 ? l.f1 : l.f0); gl.viewport(0, 0, lw, lh);
@@ -2417,6 +3093,16 @@ function step() {
         });
         const sid = engine.layers.length; gl.activeTexture(gl.TEXTURE0 + sid); gl.bindTexture(gl.TEXTURE_2D, l.r0 ? l.t0 : l.t1);
         gl.uniform1i(gl.getUniformLocation(l.prog, 'tex_self'), sid);
+        const prevLayer = (() => {
+            const idx = engine.layers.findIndex(x => x.id === l.id);
+            return idx > 0 ? engine.layers[idx - 1] : l;
+        })();
+        const prevTex = prevLayer.r0 ? prevLayer.t0 : prevLayer.t1;
+        const prevUnit = sid + 1;
+        gl.activeTexture(gl.TEXTURE0 + prevUnit);
+        gl.bindTexture(gl.TEXTURE_2D, prevTex);
+        gl.uniform1i(gl.getUniformLocation(l.prog, 'tex_prev_sampler'), prevUnit);
+        gl.uniform2f(gl.getUniformLocation(l.prog, 'res_prev'), prevLayer.w, prevLayer.h);
         l.uniforms.forEach(u => {
             const loc = (l.uniformLocs && l.uniformLocs[u.name]) || gl.getUniformLocation(l.prog, u.name);
             if (!loc) return;
@@ -2430,6 +3116,7 @@ function step() {
         gl.bindBuffer(gl.ARRAY_BUFFER, engine.quad);
         const pLoc = gl.getAttribLocation(l.prog, 'pos'); gl.enableVertexAttribArray(pLoc);
         gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        if (l.passes >= 0) l.passesRun += 1;
     });
     engine.layers.forEach(l => l.r0 = !l.r0); engine.frame++;
 }
