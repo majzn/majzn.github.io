@@ -6,12 +6,12 @@
 <title>GridIDE</title>
 <style>
 :root { --bg: #1e1e1e; --panel: #252526; --surface: #1f1f24; --surface-alt: #16161b; --input-bg: #121217; --input-border: #333; --border: #3c3c3c; --accent: #007acc; --text: #d4d4d4; --text-muted: #8f8f8f; --slider-track: rgba(0,122,204,0.2); --slider-thumb: #007acc; --editor-font-size: 13px; --editor-line-height: 18px; --ui-font-size: 13px; --tab-padding-v: 8px; --tab-padding-h: 12px; --toolbar-button-size: 32px; --button-radius: 5px; --toolbar-gap: 6px; --toolbar-icon-size: 18px; --toolbar-icon-color: #d4d4d4; }
-body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-size: var(--ui-font-size); }
+body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; min-height: 100vh; overflow: hidden; font-size: var(--ui-font-size); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: var(--surface); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; border: 2px solid var(--surface); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-#toolbar { height: 38px; background: var(--panel); display: flex; align-items: center; padding: 0 8px; gap: var(--toolbar-gap); border-bottom: 1px solid var(--border); }
+#toolbar { position: sticky; top: 0; z-index: 1000; height: auto; min-height: 38px; background: var(--panel); display: flex; flex-wrap: wrap; align-items: center; padding: 6px 8px; gap: var(--toolbar-gap); border-bottom: 1px solid var(--border); justify-content: space-between; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 button { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; cursor: pointer; font-size: calc(var(--ui-font-size) - 1px); border-radius: var(--button-radius); min-height: var(--toolbar-button-size); }
 .icon { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: var(--toolbar-icon-size) !important; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-flex; align-items: center; justify-content: center; width: var(--toolbar-icon-size); height: var(--toolbar-icon-size); color: var(--toolbar-icon-color); direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; vertical-align: middle; }
 #toolbar button { flex: 0 0 auto; white-space: nowrap; width: var(--toolbar-button-size); height: var(--toolbar-button-size); padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--button-radius); }
@@ -51,6 +51,33 @@ select { background: var(--input-bg); border: 1px solid var(--border); color: va
 #splitter { width: 5px; cursor: col-resize; background: var(--border); position: relative; z-index: 11; transition: background 0.2s; }
 #splitter:hover, #splitter:active { background: var(--accent); }
 #viewport-container { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: #000; }
+@media (max-width: 900px) {
+    #main { flex-direction: column; }
+    #sidebar { width: 100%; min-width: 0; max-height: 45vh; overflow: auto; order: 2; }
+    #viewport-container { order: 1; min-height: 280px; }
+    #splitter { display: none; }
+    #toolbar { justify-content: flex-start; }
+    #toolbar > * { flex: 0 0 auto; }
+    #toolbar button, #toolbar select, #toolbar input, #toolbar .prop-group { min-width: 0; }
+    #toolbar select, #toolbar input[type="text"], #toolbar input[type="number"] { width: auto; max-width: 160px; }
+    #toolbar .prop-group { flex: 1 1 auto; min-width: 0; }
+    #layer-props { flex-wrap: wrap; gap: 6px; }
+    #layer-props .prop-row { flex-wrap: wrap; gap: 6px; }
+    #layer-props .prop-group { min-width: 0; flex: 1 1 120px; }
+    #uniform-panel { max-height: 30vh; overflow-y: auto; }
+    #touch-hint { display: block; }
+    .sidebar-open-btn { display: inline-flex; }
+    #uniform-panel .uniform-row { grid-template-columns: 1fr; }
+    #uniform-panel .uniform-inputs { justify-content: flex-start; flex-wrap: wrap; }
+    #uniform-panel .uniform-inputs input[type=text], #uniform-panel .uniform-inputs input[type=number] { width: 100%; max-width: 140px; }
+    .modal-content { width: min(100%, calc(100vw - 24px)); max-height: 90vh; }
+    .modal-settings-grid { gap: 10px; }
+    .modal-setting-row { flex-direction: column; align-items: stretch; }
+    .modal-setting-row .setting-label { flex: none; width: auto; white-space: normal; }
+    .modal-setting-row .field { justify-content: flex-start; }
+    .input-with-unit { width: 100%; }
+    .input-with-unit .unit { padding-right: 6px; }
+}
 #tab-row { display: flex; align-items: stretch; }
 #tabs { display: flex; flex: 1; min-width: 0; background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
 .sidebar-open-btn, .sidebar-toggle-btn { background: var(--panel); border: 1px solid var(--border); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--button-radius); min-width: 32px; width: 32px; height: 100%; }
@@ -108,7 +135,10 @@ input[type=range]::-moz-range-thumb:hover { transform: scale(1.2); }
 .token-error-line { background: rgba(255, 80, 80, 0.18); display: block; }
 #editor .error-line { background: rgba(255, 80, 80, 0.18); border-left: 3px solid #ff5555; padding-left: 4px; margin-left: -7px; cursor: pointer; transition: background 0.1s; }
 #editor .error-line:hover { background: rgba(255, 80, 80, 0.25); }
-canvas { display: block; width: 100%; height: 100%; outline: none; cursor: crosshair; }
+canvas { display: block; width: 100%; height: 100%; outline: none; cursor: crosshair; touch-action: none; }
+canvas.dragging { cursor: grabbing; }
+#touch-hint { display: none; position: absolute; bottom: 12px; left: 12px; right: auto; z-index: 12; max-width: calc(100% - 24px); padding: 8px 10px; background: rgba(24,24,24,0.88); border: 1px solid var(--border); border-radius: 999px; color: var(--text); font-size: 12px; line-height: 1.3; box-shadow: 0 2px 14px rgba(0,0,0,0.35); }
+#touch-hint strong { color: var(--accent); }
 #playback-status { margin-left: auto; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; white-space: nowrap; text-align: right; min-width: 250px; padding-right: 8px; }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
@@ -203,6 +233,7 @@ canvas { display: block; width: 100%; height: 100%; outline: none; cursor: cross
             <button type="button" id="btn-show-sidebar" class="sidebar-open-btn" title="Show sidebar" aria-label="Show sidebar"></button>
             <div id="tabs"></div>
         </div>
+        <div id="touch-hint">Touch: drag to move / rotate, pinch to zoom</div>
         <canvas id="viewport" tabindex="0"></canvas>
     </div>
 </div>
@@ -1459,20 +1490,95 @@ function attachControlHandlers() {
             }
         }
     });
-    cvs.onmousedown = e => { engine.mouse.d = e.buttons; };
-    cvs.onmouseup = e => { engine.mouse.d = e.buttons; };
-    cvs.onmousemove = e => {
-        const r = cvs.getBoundingClientRect(); engine.mouse.x = e.clientX - r.left; engine.mouse.y = e.clientY - r.top; engine.mouse.d = e.buttons;
-        if (engine.is3D && (e.buttons === 1 || e.buttons === 4)) {
-            engine.cam3d.rx += e.movementY * 0.01;
-            engine.cam3d.ry += e.movementX * 0.01;
-            engine.cam3d.rx = Math.max(-Math.PI/2, Math.min(Math.PI/2, engine.cam3d.rx));
-            render();
-        } else if (!engine.is3D && (e.buttons === 4 || (e.buttons === 1 && e.shiftKey))) {
-            engine.cam2d.x -= e.movementX / engine.cam2d.z; 
-            engine.cam2d.y += e.movementY / engine.cam2d.z; 
-            render();
+    const activePointers = new Map();
+    const gestureState = { initialDistance: 0, midpoint: null, centerWorld: null, initialCam2d: null, initialCam3dD: 0 };
+    const getDistance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const getMidpoint = (a, b) => ({ clientX: (a.clientX + b.clientX) * 0.5, clientY: (a.clientY + b.clientY) * 0.5 });
+    const getWorldPoint = (clientX, clientY, cam2d, zoom) => {
+        const r = cvs.getBoundingClientRect();
+        const sx = clientX - r.left;
+        const sy = (cvs.height - (clientY - r.top));
+        return {
+            x: (sx - cvs.width * 0.5) / zoom + cam2d.x,
+            y: (sy - cvs.height * 0.5) / zoom + cam2d.y,
+        };
+    };
+    const updatePointerPosition = e => {
+        const r = cvs.getBoundingClientRect();
+        engine.mouse.x = e.clientX - r.left;
+        engine.mouse.y = e.clientY - r.top;
+        engine.mouse.d = e.buttons;
+    };
+
+    cvs.onpointerdown = e => {
+        cvs.setPointerCapture(e.pointerId);
+        activePointers.set(e.pointerId, e);
+        updatePointerPosition(e);
+        if (activePointers.size === 2) {
+            const [p1, p2] = Array.from(activePointers.values());
+            gestureState.initialDistance = getDistance(p1, p2);
+            gestureState.midpoint = getMidpoint(p1, p2);
+            gestureState.initialCam2d = { x: engine.cam2d.x, y: engine.cam2d.y, z: engine.cam2d.z };
+            gestureState.initialCam3dD = engine.cam3d.d;
+            gestureState.centerWorld = getWorldPoint(gestureState.midpoint.clientX, gestureState.midpoint.clientY, gestureState.initialCam2d, gestureState.initialCam2d.z);
         }
+    };
+
+    cvs.onpointermove = e => {
+        const previous = activePointers.get(e.pointerId);
+        if (!previous) return;
+        const dx = e.clientX - previous.clientX;
+        const dy = e.clientY - previous.clientY;
+        activePointers.set(e.pointerId, e);
+        updatePointerPosition(e);
+
+        if (activePointers.size === 2) {
+            const [p1, p2] = Array.from(activePointers.values());
+            const distance = getDistance(p1, p2);
+            const scale = Math.max(0.05, Math.min(10, distance / gestureState.initialDistance));
+            if (engine.is3D) {
+                engine.cam3d.d = Math.max(1.1, Math.min(15.0, gestureState.initialCam3dD / scale));
+            } else {
+                const newZoom = Math.max(0.1, Math.min(50, gestureState.initialCam2d.z * scale));
+                const after = getWorldPoint(gestureState.midpoint.clientX, gestureState.midpoint.clientY, { x: gestureState.initialCam2d.x, y: gestureState.initialCam2d.y }, newZoom);
+                engine.cam2d.z = newZoom;
+                engine.cam2d.x += gestureState.centerWorld.x - after.x;
+                engine.cam2d.y += gestureState.centerWorld.y - after.y;
+            }
+            render();
+        } else if (activePointers.size === 1) {
+            let updated = false;
+            if (e.pointerType === 'mouse') {
+                if (engine.is3D && (e.buttons === 1 || e.buttons === 4)) {
+                    engine.cam3d.rx = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, engine.cam3d.rx + dy * 0.01));
+                    engine.cam3d.ry += dx * 0.01;
+                    updated = true;
+                } else if (!engine.is3D && (e.buttons === 4 || (e.buttons === 1 && e.shiftKey))) {
+                    engine.cam2d.x -= dx / engine.cam2d.z;
+                    engine.cam2d.y += dy / engine.cam2d.z;
+                    updated = true;
+                }
+            } else {
+                if (engine.is3D) {
+                    engine.cam3d.rx = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, engine.cam3d.rx + dy * 0.01));
+                    engine.cam3d.ry += dx * 0.01;
+                } else {
+                    engine.cam2d.x -= dx / engine.cam2d.z;
+                    engine.cam2d.y += dy / engine.cam2d.z;
+                }
+                updated = true;
+            }
+            if (updated) render();
+        }
+    };
+
+    cvs.onpointerup = e => {
+        activePointers.delete(e.pointerId);
+        engine.mouse.d = 0;
+    };
+    cvs.onpointercancel = e => {
+        activePointers.delete(e.pointerId);
+        engine.mouse.d = 0;
     };
     cvs.onwheel = e => {
         e.preventDefault(); 
@@ -1627,7 +1733,13 @@ void main() {
 }
 
 if (document.readyState === 'loading') {
-    window.addEventListener('DOMContentLoaded', () => { initDOM(); attachControlHandlers(); });
+    window.addEventListener('DOMContentLoaded', () => {
+        initDOM();
+        attachControlHandlers();
+        document.body.classList.remove('full-preview-mode');
+        const toolbar = el('toolbar');
+        if (toolbar) toolbar.style.display = 'flex';
+    });
 } else {
     initDOM();
     attachControlHandlers();
