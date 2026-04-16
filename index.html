@@ -1028,6 +1028,7 @@ function initDOM() {
     e_previewOnly = el('btn-preview-only');
     e_previewClose = el('preview-close-btn');
     cvs = el('viewport');
+    cvs.addEventListener('touchstart', e => { e.preventDefault(); }, { passive: false });
     
     // WebGL Context setup
     gl = cvs.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
@@ -1511,6 +1512,7 @@ function attachControlHandlers() {
     };
 
     cvs.onpointerdown = e => {
+        if (e.pointerType !== 'mouse') e.preventDefault();
         cvs.setPointerCapture(e.pointerId);
         activePointers.set(e.pointerId, e);
         updatePointerPosition(e);
@@ -1525,6 +1527,7 @@ function attachControlHandlers() {
     };
 
     cvs.onpointermove = e => {
+        if (e.pointerType !== 'mouse') e.preventDefault();
         const previous = activePointers.get(e.pointerId);
         if (!previous) return;
         const dx = e.clientX - previous.clientX;
@@ -1535,15 +1538,17 @@ function attachControlHandlers() {
         if (activePointers.size === 2) {
             const [p1, p2] = Array.from(activePointers.values());
             const distance = getDistance(p1, p2);
+            const midpoint = getMidpoint(p1, p2);
+            const currentWorld = getWorldPoint(midpoint.clientX, midpoint.clientY, engine.cam2d, engine.cam2d.z);
             const scale = Math.max(0.05, Math.min(10, distance / gestureState.initialDistance));
             if (engine.is3D) {
                 engine.cam3d.d = Math.max(1.1, Math.min(15.0, gestureState.initialCam3dD / scale));
             } else {
                 const newZoom = Math.max(0.1, Math.min(50, gestureState.initialCam2d.z * scale));
-                const after = getWorldPoint(gestureState.midpoint.clientX, gestureState.midpoint.clientY, { x: gestureState.initialCam2d.x, y: gestureState.initialCam2d.y }, newZoom);
+                const after = getWorldPoint(midpoint.clientX, midpoint.clientY, engine.cam2d, newZoom);
                 engine.cam2d.z = newZoom;
-                engine.cam2d.x += gestureState.centerWorld.x - after.x;
-                engine.cam2d.y += gestureState.centerWorld.y - after.y;
+                engine.cam2d.x += currentWorld.x - after.x;
+                engine.cam2d.y += currentWorld.y - after.y;
             }
             render();
         } else if (activePointers.size === 1) {
