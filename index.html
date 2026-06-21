@@ -235,6 +235,46 @@
                     <option value="0">Exact CPU</option><option value="1">GPU Stats + CPU Exact</option><option selected value="2">GPU Fast Rigid Bodies</option>
                    </select>
                   </div>
+                  <div class="control-row"><label>Plate Rigidbody</label>
+                   <select class="cfg-input" data-key="enablePlateDynamics" id="val-enablePlateDynamics">
+                    <option value="1" selected>On</option><option value="0">Off / Freeze Plates</option>
+                   </select>
+                  </div>
+                  <div class="control-row"><label>MPM Crust Solver</label>
+                   <select class="cfg-input" data-key="enableMpmCrust" id="val-enableMpmCrust">
+                    <option value="1" selected>On</option><option value="0">Off / Freeze Crust Particles</option>
+                   </select>
+                  </div>
+                  <div class="control-row"><label>Surface / Erosion</label>
+                   <select class="cfg-input" data-key="enableSurfaceModel" id="val-enableSurfaceModel">
+                    <option value="1" selected>On</option><option value="0">Off / Freeze Terrain</option>
+                   </select>
+                  </div>
+                  <div class="control-row"><label>Climate / Seasons</label>
+                   <select class="cfg-input" data-key="enableClimateSystem" id="val-enableClimateSystem">
+                    <option value="1" selected>On</option><option value="0">Off / Freeze Climate</option>
+                   </select>
+                  </div>
+                  <div class="control-row"><label>Cloud Fluid</label>
+                   <select class="cfg-input" data-key="enableCloudFluid" id="val-enableCloudFluid">
+                    <option value="1" selected>On</option><option value="0">Off / Static Clouds</option>
+                   </select>
+                  </div>
+                  <div class="control-row"><label>Biosphere / Soil</label>
+                   <select class="cfg-input" data-key="enableBiosphere" id="val-enableBiosphere">
+                    <option value="1" selected>On</option><option value="0">Off / Freeze Vegetation</option>
+                   </select>
+                  </div>
+                  <div class="control-row"><label>Cloud Rendering</label>
+                   <select class="cfg-input" data-key="showClouds" id="val-showClouds">
+                    <option value="1" selected>On</option><option value="0">Hidden</option>
+                   </select>
+                  </div>
+                  <div class="control-row"><label>History Capture</label>
+                   <select class="cfg-input" data-key="enableHistoryCapture" id="val-enableHistoryCapture">
+                    <option value="1" selected>On</option><option value="0">Off</option>
+                   </select>
+                  </div>
                   <div class="control-row"><label>Plate Dynamics Every</label><input class="cfg-input" data-key="plateEvery" max="32" min="1" step="1" type="range" value="1"/><span class="control-value" id="val-plateEvery">1</span></div>
                   <div class="control-row"><label>MPM Crust Every</label><input class="cfg-input" data-key="mpmEvery" max="16" min="1" step="1" type="range" value="1"/><span class="control-value" id="val-mpmEvery">1</span></div>
                   <div class="control-row"><label>Plate Time Scale</label><input class="cfg-input" data-key="plateTimeScale" max="10.0" min="0.0" step="0.05" type="range" value="1.0"/><span class="control-value" id="val-plateTimeScale">1.00</span></div>
@@ -450,7 +490,7 @@
     const DEFAULT_CONFIG = Object.freeze({
         topology: 0, width: 256, height: 256, plates: 18,
         particleSlotDensity: 4.0, particleDensity: 1.0, gridPhysicsPasses: 1, boundaryQuality: 2,
-        plateCollisionStride: 1, gpuPlateSolver: 2, plateEvery: 1, mpmEvery: 1, plateTimeScale: 1.0,
+        plateCollisionStride: 1, gpuPlateSolver: 2, enablePlateDynamics: 1, enableMpmCrust: 1, enableSurfaceModel: 1, enableClimateSystem: 1, enableCloudFluid: 1, enableBiosphere: 1, showClouds: 1, enableHistoryCapture: 1, plateEvery: 1, mpmEvery: 1, plateTimeScale: 1.0,
         mpmTimeScale: 1.0, erosionTimeScale: 1.0, climateTimeScale: 1.0, startupStabilizationFrames: 96,
         terrainResolutionScale: 1.0, cloudResolutionScale: 1.0, stressScale: 0.85, stressClamp: 24.0,
         apicBlend: 0.86, strainCoupling: 0.82, gridViscosity: 0.12, particleDamping: 0.08,
@@ -2097,7 +2137,7 @@
         }
 
         effectiveSeaLevel() { return clamp(CONFIG.seaLevel ?? 0.9, 0.02, 6.0); }
-        effectivePlateMotionScale() { return Math.max(0.0, CONFIG.plateTimeScale ?? 1.0) * this.startupRamp(); }
+        effectivePlateMotionScale() { return ((CONFIG.enablePlateDynamics ?? 1) >= 0.5 ? 1.0 : 0.0) * Math.max(0.0, CONFIG.plateTimeScale ?? 1.0) * this.startupRamp(); }
         startupRamp() {
             const frames = Math.max(0, CONFIG.startupStabilizationFrames | 0);
             if (frames <= 0 || this.iterCount >= frames) return 1.0;
@@ -2152,12 +2192,6 @@
             this.nextFloatX = new Float32Array(area); this.nextFloatY = new Float32Array(area); this.advectedImap = new Uint8Array(area);
             
             this.plateDataBuffer = new Float32Array(64 * 3 * 4);
-            this.plateRawBuffer = new Float32Array(64 * 2 * 4);
-            this.plateStats0Buffer = new Float32Array(64 * 4);
-            this.plateStats1Buffer = new Float32Array(64 * 4);
-            this.plateInertiaBuffer = new Float32Array(64 * 4);
-            this.plateMaxR2Buffer = new Float32Array(64 * 4);
-            this.plateImpulseBuffer = new Float32Array(64 * 4);
             this.readbackBuffer = new Float32Array(area * 4);
             this.compactReadbackBuffer = new Float32Array(area * 2);
             this.gridMassSurfaceBuffer = this.readbackBuffer; this.gridMassSurfaceStride = 4; this.gridMassOffset = 2; this.gridSurfaceOffset = 3;
@@ -2305,16 +2339,14 @@
 
             this.tTerritory = this.tex(this.width, this.height, gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE, this.imap);
             this.tPlateData = this.tex(64, 3, gl.RGBA32F, gl.RGBA, gl.FLOAT, this.plateDataBuffer);
-            this.tPlateRaw = this.tex(64, 2, gl.RGBA32F, gl.RGBA, gl.FLOAT, this.plateRawBuffer);
             this.setupGridReadbackTarget();
-            this.setupGpuPlateSolverTargets();
 
             this.iterCount = 0; this.readIndex = 0; this.gridRead = 0; this.terrainRead = 0; this.climateBRead = 0; this.climateCRead = 0; this.climateDRead = 0;
             
             this.uploadTextures();
-            this.substep(0, Math.min(CONFIG.dt || 0.08, 0.05));
-            for (let i = 0; i < 4; i++) this.updateTerrain(true);
-            for (let i = 0; i < 8; i++) this.updateClimate(true);
+            if ((CONFIG.enableMpmCrust ?? 1) >= 0.5) this.substep(0, Math.min(CONFIG.dt || 0.08, 0.05));
+            if ((CONFIG.enableSurfaceModel ?? 1) >= 0.5) for (let i = 0; i < 4; i++) this.updateTerrain(true);
+            if ((CONFIG.enableClimateSystem ?? 1) >= 0.5) for (let i = 0; i < 8; i++) this.updateClimate(true);
         }
 
         clearAccum() {
@@ -2333,22 +2365,11 @@
                 this.plateDataBuffer[(128 + i) * 4 + 0] = p.surfaceFloat || 0;
                 this.plateDataBuffer[(128 + i) * 4 + 1] = (p._surfaceCells || 0) > 0 ? (p._surfaceMass || 0) / p._surfaceCells : 0;
                 this.plateDataBuffer[(128 + i) * 4 + 2] = (p._surfaceMass || 0) > 0 ? (p._surfaceExcess || 0) / p._surfaceMass : 0;
-                this.plateDataBuffer[(128 + i) * 4 + 3] = p.materialType || 0;
-
-                this.plateRawBuffer[i * 4 + 0] = p.cx; this.plateRawBuffer[i * 4 + 1] = p.cy;
-                this.plateRawBuffer[i * 4 + 2] = p.vx; this.plateRawBuffer[i * 4 + 3] = p.vy;
-                this.plateRawBuffer[(64 + i) * 4 + 0] = p.omega;
-                this.plateRawBuffer[(64 + i) * 4 + 1] = p.surfaceFloat || 0;
-                this.plateRawBuffer[(64 + i) * 4 + 2] = p.materialType || 0;
-                this.plateRawBuffer[(64 + i) * 4 + 3] = p.mass || 0;
+                this.plateDataBuffer[(128 + i) * 4 + 3] = p.materialType || 0; 
             }
             const gl = this.gl;
             gl.bindTexture(gl.TEXTURE_2D, this.tPlateData);
             gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 3, gl.RGBA, gl.FLOAT, this.plateDataBuffer);
-            if (this.tPlateRaw) {
-                gl.bindTexture(gl.TEXTURE_2D, this.tPlateRaw);
-                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 2, gl.RGBA, gl.FLOAT, this.plateRawBuffer);
-            }
             this.invalidateTextureBindings();
         }
 
@@ -2364,288 +2385,7 @@
             this.uploadTerritoryMap();
         }
 
-        setupGpuPlateSolverTargets() {
-            const gl = this.gl;
-            this.gpuPlatePhysicsAvailable = false;
-            this.plateStats0Tex = this.plateStats1Tex = this.plateInertiaTex = this.plateMaxR2Tex = this.plateImpulseTex = null;
-            this.plateStatsFbo = this.plateInertiaFbo = this.plateMaxR2Fbo = this.plateImpulseFbo = null;
-            try {
-                this.plateStats0Tex = this.tex(64, 1, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
-                this.plateStats1Tex = this.tex(64, 1, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
-                this.plateInertiaTex = this.tex(64, 1, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
-                this.plateMaxR2Tex = this.tex(64, 1, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
-                this.plateImpulseTex = this.tex(64, 1, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
-                this.plateStatsFbo = this.fbo([this.plateStats0Tex, this.plateStats1Tex]);
-                this.plateInertiaFbo = this.fbo([this.plateInertiaTex]);
-                this.plateMaxR2Fbo = this.fbo([this.plateMaxR2Tex]);
-                this.plateImpulseFbo = this.fbo([this.plateImpulseTex]);
-                this.gpuPlatePhysicsAvailable = true;
-            } catch (err) {
-                console.warn("GPU plate solver unavailable; falling back to CPU plate physics.", err);
-                for (const f of [this.plateStatsFbo, this.plateInertiaFbo, this.plateMaxR2Fbo, this.plateImpulseFbo]) if (f) gl.deleteFramebuffer(f);
-                for (const t of [this.plateStats0Tex, this.plateStats1Tex, this.plateInertiaTex, this.plateMaxR2Tex, this.plateImpulseTex]) if (t) gl.deleteTexture(t);
-                this.plateStats0Tex = this.plateStats1Tex = this.plateInertiaTex = this.plateMaxR2Tex = this.plateImpulseTex = null;
-                this.plateStatsFbo = this.plateInertiaFbo = this.plateMaxR2Fbo = this.plateImpulseFbo = null;
-                this.gpuPlatePhysicsAvailable = false;
-            }
-        }
-
-        runGpuPlateStats() {
-            if (!this.gpuPlatePhysicsAvailable) return false;
-            const gl = this.gl; const w = this.width; const h = this.height;
-            const ps = this.programs.plateStats;
-            this.bindFBO(this.plateStatsFbo, 64, 1);
-            gl.disable(gl.BLEND);
-            gl.clearBufferfv(gl.COLOR, 0, ZERO4); gl.clearBufferfv(gl.COLOR, 1, ZERO4);
-            this.useProgram(ps);
-            this.setTex(ps, "uGridVel", 0, this.gridVel[this.gridRead]);
-            this.setTex(ps, "uTerritoryMap", 1, this.tTerritory);
-            this.uniform2f(ps.u.uGridSize, w, h);
-            this.uniform1f(ps.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0);
-            this.uniform1i(ps.u.uTopology, CONFIG.topology);
-            gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE);
-            gl.drawArrays(gl.POINTS, 0, w * h);
-            gl.disable(gl.BLEND);
-            gl.readBuffer(gl.COLOR_ATTACHMENT0);
-            gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, this.plateStats0Buffer);
-            gl.readBuffer(gl.COLOR_ATTACHMENT1);
-            gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, this.plateStats1Buffer);
-            return gl.getError() === gl.NO_ERROR;
-        }
-
-        runGpuPlateDynamics() {
-            if (!this.gpuPlatePhysicsAvailable) return false;
-            const gl = this.gl; const w = this.width; const h = this.height;
-
-            const pi = this.programs.plateInertia;
-            this.bindFBO(this.plateInertiaFbo, 64, 1);
-            gl.disable(gl.BLEND); gl.clearBufferfv(gl.COLOR, 0, ZERO4);
-            this.useProgram(pi);
-            this.setTex(pi, "uGridVel", 0, this.gridVel[this.gridRead]);
-            this.setTex(pi, "uTerritoryMap", 1, this.tTerritory);
-            this.setTex(pi, "uPlateRaw", 2, this.tPlateRaw);
-            this.uniform2f(pi.u.uGridSize, w, h); this.uniform1i(pi.u.uTopology, CONFIG.topology);
-            gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE);
-            gl.drawArrays(gl.POINTS, 0, w * h);
-            gl.disable(gl.BLEND);
-            gl.readBuffer(gl.COLOR_ATTACHMENT0);
-            gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, this.plateInertiaBuffer);
-
-            const pm = this.programs.plateMaxR2;
-            this.bindFBO(this.plateMaxR2Fbo, 64, 1);
-            gl.disable(gl.BLEND); gl.clearBufferfv(gl.COLOR, 0, ZERO4);
-            this.useProgram(pm);
-            this.setTex(pm, "uGridVel", 0, this.gridVel[this.gridRead]);
-            this.setTex(pm, "uTerritoryMap", 1, this.tTerritory);
-            this.setTex(pm, "uPlateRaw", 2, this.tPlateRaw);
-            this.uniform2f(pm.u.uGridSize, w, h); this.uniform1i(pm.u.uTopology, CONFIG.topology);
-            gl.enable(gl.BLEND); gl.blendEquation(gl.MAX); gl.blendFunc(gl.ONE, gl.ONE);
-            gl.drawArrays(gl.POINTS, 0, w * h);
-            gl.blendEquation(gl.FUNC_ADD); gl.disable(gl.BLEND);
-            gl.readBuffer(gl.COLOR_ATTACHMENT0);
-            gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, this.plateMaxR2Buffer);
-
-            const pim = this.programs.plateImpulse;
-            this.bindFBO(this.plateImpulseFbo, 64, 1);
-            gl.disable(gl.BLEND); gl.clearBufferfv(gl.COLOR, 0, ZERO4);
-            this.useProgram(pim);
-            this.setTex(pim, "uGridVel", 0, this.gridVel[this.gridRead]);
-            this.setTex(pim, "uTerritoryMap", 1, this.tTerritory);
-            this.setTex(pim, "uPlateRaw", 2, this.tPlateRaw);
-            this.uniform2f(pim.u.uGridSize, w, h);
-            this.uniform1i(pim.u.uTopology, CONFIG.topology);
-            this.uniform1i(pim.u.uCollisionStride, Math.max(1, CONFIG.plateCollisionStride | 0));
-            this.uniform1f(pim.u.uBoundaryRestitution, CONFIG.boundaryRestitution ?? 0.1);
-            this.uniform1f(pim.u.uBoundaryFriction, CONFIG.boundaryFriction ?? 0.9);
-            this.uniform1f(pim.u.uDensityFriction, CONFIG.densityFriction ?? 1.0);
-            gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE);
-            this.uniform1i(pim.u.uEmitTarget, 0); gl.drawArrays(gl.POINTS, 0, w * h * 2);
-            this.uniform1i(pim.u.uEmitTarget, 1); gl.drawArrays(gl.POINTS, 0, w * h * 2);
-            gl.disable(gl.BLEND);
-            gl.readBuffer(gl.COLOR_ATTACHMENT0);
-            gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, this.plateImpulseBuffer);
-            return gl.getError() === gl.NO_ERROR;
-        }
-
-        applyGpuPlateStatsToCpu() {
-            const w = this.width; const h = this.height;
-            const stats0 = this.plateStats0Buffer; const stats1 = this.plateStats1Buffer;
-            for (let p of this.plates) {
-                const i = p.id * 4;
-                p.mass = stats0[i + 0];
-                p._scx = stats0[i + 1]; p._ssx = stats0[i + 2]; p._scy = stats0[i + 3]; p._ssy = stats1[i + 0];
-                p._surfaceMass = stats1[i + 1]; p._surfaceExcess = stats1[i + 2]; p._surfaceCells = stats1[i + 3];
-                p._I = 0;
-            }
-            for (let p of this.plates) {
-                if (p.mass > 0) {
-                    let ax = Math.atan2(p._ssx, p._scx); if (ax < 0) ax += 2 * Math.PI;
-                    let ay = Math.atan2(p._ssy, p._scy); if (ay < 0) ay += 2 * Math.PI;
-                    let targetCx = (ax / (2 * Math.PI)) * w; let targetCy = (ay / (2 * Math.PI)) * h;
-                    if (p.inertia === 1 || this.iterCount < 5) { p.cx = targetCx; p.cy = targetCy; }
-                    else {
-                        const wrapX = CONFIG.topology < 2; const wrapY = CONFIG.topology === 0;
-                        p.cx = wrapFloat(p.cx + wrappedDist(targetCx, p.cx, w, wrapX) * CONFIG.comInterpolation, w, wrapX);
-                        p.cy = wrapFloat(p.cy + wrappedDist(targetCy, p.cy, h, wrapY) * CONFIG.comInterpolation, h, wrapY);
-                    }
-                    const meanCrustHeight = p._surfaceExcess / Math.max(p._surfaceMass, 0.0001);
-                    const targetSurfaceFloat = Math.min(2.0, meanCrustHeight);
-                    p.surfaceFloat = p.surfaceFloat * 0.94 + targetSurfaceFloat * 0.06;
-                } else { p.surfaceFloat *= 0.94; }
-            }
-        }
-
-        maybeSplitPlates(plateDtScale) {
-            const w = this.width; const h = this.height; const area = w * h;
-            const wrapX = CONFIG.topology < 2; const wrapY = CONFIG.topology === 0;
-            let changed = false;
-            if (this.iterCount > 10) {
-                let baseSplitChance = CONFIG.plateSplitRate * 0.0005 * plateDtScale;
-                let minSplitMass = area * (CONFIG.plateSplitMinMass * 0.01);
-                let criticalMass = area * 0.33;
-                for (let i = 0; i < 64; i++) {
-                    let p = this.plates[i]; let isCritical = p.mass > criticalMass;
-                    let splitChance = Math.min(0.25, isCritical ? 0.05 * plateDtScale : baseSplitChance);
-                    if ((p.mass > minSplitMass || isCritical) && Math.random() < splitChance && splitChance > 0) {
-                        let emptyId = this.plates.findIndex(pl => pl.mass === 0);
-                        if (emptyId !== -1) {
-                            let newP = this.plates[emptyId]; let angle = Math.random() * Math.PI * 2.0;
-                            let nx = Math.cos(angle); let ny = Math.sin(angle);
-                            let kickSpeed = CONFIG.maxPlateSpeed * 0.6;
-                            p.vx -= nx * kickSpeed * 0.5; p.vy -= ny * kickSpeed * 0.5;
-                            newP.vx = p.vx + nx * kickSpeed; newP.vy = p.vy + ny * kickSpeed;
-                            newP.omega = p.omega + (Math.random() - 0.5) * 0.05; p.omega += (Math.random() - 0.5) * 0.05;
-                            newP.colorR = Math.abs(Math.sin(emptyId * 12.9898 + this.iterCount) * 43758.5453) % 1.0;
-                            newP.colorG = Math.abs(Math.sin(emptyId * 78.233 + this.iterCount) * 43758.5453) % 1.0;
-                            newP.colorB = Math.abs(Math.sin(emptyId * 37.719 + this.iterCount) * 43758.5453) % 1.0;
-                            let maxC = Math.max(newP.colorR, newP.colorG, newP.colorB);
-                            if (maxC < 0.3) { newP.colorR += 0.3; newP.colorG += 0.3; newP.colorB += 0.3; }
-                            for (let k = 0; k < area; k++) {
-                                if (this.imap[k] === p.id) {
-                                    let px = k % w; let py = Math.floor(k / w);
-                                    let dx = wrappedDist(px, p.cx, w, wrapX); let dy = wrappedDist(py, p.cy, h, wrapY);
-                                    let noise = (Math.sin(px * 0.15) * Math.cos(py * 0.15)) * 6.0;
-                                    if (dx * nx + dy * ny + noise > 0) { this.imap[k] = emptyId; changed = true; }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return changed;
-        }
-
         updatePlatePhysics(dtScale = 1) {
-            const mode = CONFIG.gpuPlateSolver | 0;
-            if (mode >= 2 && this.gpuPlatePhysicsAvailable) {
-                if (this.updatePlatePhysicsGpuFast(dtScale)) return;
-                this.gpuPlatePhysicsAvailable = false;
-                console.warn("GPU plate solver failed during runtime; falling back to exact CPU solver.");
-            }
-            this.updatePlatePhysicsCpuExact(dtScale);
-        }
-
-        updatePlatePhysicsGpuFast(dtScale = 1) {
-            const gl = this.gl; const plateTimeScale = Math.max(0.0, CONFIG.plateTimeScale ?? 1.0) * this.startupRamp();
-            const plateDtScale = Math.max(0.0, Math.min(2.5, (dtScale || 1) * plateTimeScale));
-            if (plateDtScale <= 0.000001) { this.uploadPlateData(); return true; }
-            const w = this.width; const h = this.height; const area = w * h;
-            const wrapX = CONFIG.topology < 2; const wrapY = CONFIG.topology === 0;
-
-            if (this.maybeSplitPlates(plateDtScale)) this.uploadTerritoryMap();
-
-            if (!this.runGpuPlateStats()) return false;
-            this.applyGpuPlateStatsToCpu();
-            this.uploadPlateData();
-            if (!this.runGpuPlateDynamics()) return false;
-
-            const maxAllowedR2 = (w * CONFIG.maxPlateRadius) * (w * CONFIG.maxPlateRadius);
-            for (let p of this.plates) {
-                const i = p.id * 4;
-                p._I = this.plateInertiaBuffer[i + 0];
-                p.inertia = Math.max(1.0, p._I);
-                p.impX += this.plateImpulseBuffer[i + 0];
-                p.impY += this.plateImpulseBuffer[i + 1];
-                p.impTorque += this.plateImpulseBuffer[i + 2];
-            }
-
-            const t = this.iterCount * CONFIG.flowTimeScale * Math.max(0.0, CONFIG.plateTimeScale ?? 1.0);
-            const flowScale = Math.max(0.001, CONFIG.flowScale || 0.02) / 0.02;
-            const flowDrag = Math.exp(-CONFIG.viscosity * CONFIG.mantleCoupling * plateDtScale);
-            const rotDrag = Math.exp(-(CONFIG.viscosity * CONFIG.angularDamping + 0.01) * CONFIG.mantleCoupling * plateDtScale);
-
-            for (let p of this.plates) {
-                if (p.mass === 0) continue;
-                let phase = p.id * 2.39996;
-                let mx = (p.cx / w) * Math.PI * 4.0 * flowScale; let my = (p.cy / h) * Math.PI * 4.0 * flowScale;
-                let thrust = CONFIG.flowForce * p.mass * CONFIG.mantleCoupling * plateDtScale;
-                p.impX += (Math.sin(my + t) + 0.45 * Math.sin(1.7 * mx - 0.6 * t + phase)) * thrust;
-                p.impY += (-Math.sin(mx - 0.8 * t) + 0.45 * Math.cos(1.3 * my + 0.5 * t - phase)) * thrust;
-                p.impTorque += (Math.sin(0.7 * mx + 0.9 * my + 0.35 * t + phase)) * thrust * Math.sqrt(p.mass) * CONFIG.flowTorque;
-                p.vx += p.impX / p.mass; p.vy += p.impY / p.mass; p.omega += p.impTorque / p.inertia;
-                p.impX = 0; p.impY = 0; p.impTorque = 0;
-                p.vx *= flowDrag; p.vy *= flowDrag; p.omega *= rotDrag;
-                if (this.plateMaxR2Buffer[p.id * 4] > maxAllowedR2) p.omega *= 0.01;
-                let spd = Math.hypot(p.vx, p.vy);
-                if (spd > CONFIG.maxPlateSpeed) { p.vx *= CONFIG.maxPlateSpeed / spd; p.vy *= CONFIG.maxPlateSpeed / spd; }
-                p.omega = clamp(p.omega, -0.1, 0.1);
-            }
-
-            this.advectedImap.fill(255);
-            for (let i = 0; i < area; i++) {
-                let pid = this.imap[i]; if (pid === 255) continue;
-                let p = this.plates[pid];
-                let fx = this.floatX[i]; let fy = this.floatY[i];
-                let rAx = wrappedDist(fx, p.cx, w, wrapX); let rAy = wrappedDist(fy, p.cy, h, wrapY);
-                let nfx = wrapFloat(fx + (p.vx - p.omega * rAy) * plateDtScale, w, wrapX);
-                let nfy = wrapFloat(fy + (p.vy + p.omega * rAx) * plateDtScale, h, wrapY);
-                this.nextFloatX[i] = nfx; this.nextFloatY[i] = nfy;
-                let nx = Math.floor(nfx); let ny = Math.floor(nfy);
-                this.advectedImap[ny * w + nx] = pid;
-            }
-
-            this.nextImap.set(this.advectedImap);
-            const counts = this.smoothCounts; const stamps = this.smoothStamps;
-            for (let pass = 0; pass < CONFIG.territorySmoothingPasses; pass++) {
-                this.smoothImap.set(this.nextImap);
-                for (let y = 0; y < h; y++) {
-                    let yOffset = y * w;
-                    for (let x = 0; x < w; x++) {
-                        let idx = yOffset + x; let curr = this.smoothImap[idx];
-                        let stamp = (this.smoothStamp = (this.smoothStamp + 1) >>> 0);
-                        if (stamp === 0) { stamps.fill(0); stamp = this.smoothStamp = 1; }
-                        let maxC = 0; let bestId = curr;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                if (dx === 0 && dy === 0) continue;
-                                let nx = wrapInt(x + dx, w, wrapX); let ny = wrapInt(y + dy, h, wrapY);
-                                if (nx !== -1 && ny !== -1) {
-                                    let id = this.smoothImap[ny * w + nx];
-                                    if (id !== 255) {
-                                        if (stamps[id] !== stamp) { stamps[id] = stamp; counts[id] = 0; }
-                                        counts[id]++;
-                                        if (counts[id] > maxC) { maxC = counts[id]; bestId = id; }
-                                    }
-                                }
-                            }
-                        }
-                        if (bestId !== 255) {
-                            if (curr === 255) { this.nextImap[idx] = bestId; }
-                            else if (maxC >= CONFIG.plateSmoothingMajority && bestId !== curr) { this.nextImap[idx] = bestId; }
-                        }
-                    }
-                }
-            }
-            for (let i = 0; i < area; i++) {
-                let pid = this.nextImap[i];
-                if (pid !== this.advectedImap[i] || pid === 255) { this.floatX[i] = (i % w) + 0.5; this.floatY[i] = Math.floor(i / w) + 0.5; }
-                else { this.floatX[i] = this.nextFloatX[i]; this.floatY[i] = this.nextFloatY[i]; }
-            }
-            this.imap.set(this.nextImap); this.uploadPlateData(); this.uploadTerritoryMap();
-            return true;
-        }
-
-        updatePlatePhysicsCpuExact(dtScale = 1) {
             const gl = this.gl; const plateTimeScale = Math.max(0.0, CONFIG.plateTimeScale ?? 1.0) * this.startupRamp();
             const plateDtScale = Math.max(0.0, Math.min(2.5, (dtScale || 1) * plateTimeScale));
             if (plateDtScale <= 0.000001) { this.uploadPlateData(); return; }
@@ -2923,6 +2663,7 @@
         }
 
         updateTerrain(force = false) {
+            if ((CONFIG.enableSurfaceModel ?? 1) < 0.5) return;
             const passes = Math.max(0, CONFIG.terrainPasses | 0); const every = Math.max(1, CONFIG.terrainEvery | 0);
             const erosionTimeScale = Math.max(0.0, CONFIG.erosionTimeScale ?? 1.0) * (force ? 1.0 : this.startupRamp());
             if (!force && ((this.iterCount % every) !== 0 || passes === 0)) return;
@@ -2953,6 +2694,7 @@
         }
 
         updateClimate(force = false) {
+            if ((CONFIG.enableClimateSystem ?? 1) < 0.5) return;
             const every = Math.max(1, CONFIG.climateEvery | 0);
             const climateTimeScale = Math.max(0.0, CONFIG.climateTimeScale ?? 1.0) * (force ? 1.0 : this.startupRamp());
             if (!force && (this.iterCount % every) !== 0) return;
@@ -2974,12 +2716,17 @@
             };
             runB();
             
+            const cloudFluidEnabled = (CONFIG.enableCloudFluid ?? 1) >= 0.5;
+            const biosphereEnabled = (CONFIG.enableBiosphere ?? 1) >= 0.5;
+            if (!cloudFluidEnabled && !biosphereEnabled) return;
             const requestedPasses = Math.max(1, CONFIG.cloudFluidPasses | 0);
             const passes = Math.max(requestedPasses, Math.min(32, Math.ceil(climateStepScale / 2.0)));
             const climatePassScale = Math.min(2.0, Math.max(0.0, climateStepScale / passes));
             
             for (let i = 0; i < passes; i++) {
-                const cc = this.programs.climateC; let dst = 1 - this.climateCRead; this.useProgram(cc);
+                let dst;
+                if (cloudFluidEnabled) {
+                const cc = this.programs.climateC; dst = 1 - this.climateCRead; this.useProgram(cc);
                 this.setTex(cc, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(cc, "uClimateB", 1, this.climateB[this.climateBRead]);
                 this.setTex(cc, "uClimateC", 2, this.climateC[this.climateCRead]); this.setTex(cc, "uClimateD", 3, this.climateD[this.climateDRead]);
                 this.uniform2f(cc.u.uTerrainSize, this.terrainWidth, this.terrainHeight); this.uniform2f(cc.u.uClimateSize, sizeW, sizeH); 
@@ -2992,7 +2739,9 @@
                 this.uniform1f(cc.u.uTerrainDeflection, CONFIG.terrainDeflection ?? 0.50); this.uniform1f(cc.u.uTerrainRainShadow, CONFIG.terrainRainShadow ?? 0.60);
                 this.uniform1f(cc.u.uTerrainThermalLift, CONFIG.terrainThermalLift ?? 0.50); this.uniform1i(cc.u.uTopology, CONFIG.topology);
                 this.bindFBO(this.climateCFbo[dst], sizeW, sizeH); gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3); this.climateCRead = dst;
+                }
 
+                if (biosphereEnabled) {
                 const cd = this.programs.climateD; dst = 1 - this.climateDRead; this.useProgram(cd);
                 this.setTex(cd, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(cd, "uClimateB", 1, this.climateB[this.climateBRead]);
                 this.setTex(cd, "uClimateC", 2, this.climateC[this.climateCRead]); this.setTex(cd, "uClimateD", 3, this.climateD[this.climateDRead]);
@@ -3006,6 +2755,7 @@
                 this.uniform1f(cd.u.uSoilFormation, CONFIG.soilFormation ?? 1.0);
                 this.uniform1f(cd.u.uCloudCondensation, CONFIG.cloudCondensation ?? 1.0); this.uniform1i(cd.u.uTopology, CONFIG.topology);
                 this.bindFBO(this.climateDFbo[dst], sizeW, sizeH); gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3); this.climateDRead = dst;
+                }
             }
         }
 
@@ -3013,13 +2763,13 @@
             const plateEvery = Math.max(1, CONFIG.plateEvery | 0); const mpmEvery = Math.max(1, CONFIG.mpmEvery | 0); const ramp = this.startupRamp();
             const mpmTimeScale = Math.max(0.0, CONFIG.mpmTimeScale ?? 1.0) * ramp;
             
-            if ((this.iterCount % plateEvery) === 0) {
+            if ((CONFIG.enablePlateDynamics ?? 1) >= 0.5 && (this.iterCount % plateEvery) === 0) {
                 const plateTimeScale = Math.max(0.0, CONFIG.plateTimeScale ?? 1.0) * ramp; const rawPlateDt = plateEvery * plateTimeScale;
                 const platePieces = Math.max(1, Math.min(12, Math.ceil(rawPlateDt / 2.5)));
                 for (let i = 0; i < platePieces; i++) this.updatePlatePhysics(plateEvery / platePieces);
             }
             
-            if ((this.iterCount % mpmEvery) === 0 && mpmTimeScale > 0.000001) {
+            if ((CONFIG.enableMpmCrust ?? 1) >= 0.5 && (this.iterCount % mpmEvery) === 0 && mpmTimeScale > 0.000001) {
                 const maxSubstepDt = 0.055; const totalMpmDt = CONFIG.dt * mpmEvery * mpmTimeScale;
                 const requestedSubsteps = Math.max(1, CONFIG.substeps | 0);
                 const substeps = Math.max(requestedSubsteps, Math.min(96, Math.ceil(totalMpmDt / maxSubstepDt)));
@@ -3033,6 +2783,7 @@
         }
 
         substep(s, dtOverride = null) {
+            if ((CONFIG.enableMpmCrust ?? 1) < 0.5) return;
             const gl = this.gl;
             const defaultDt = (CONFIG.dt * Math.max(0.0, CONFIG.mpmTimeScale ?? 1.0) * this.startupRamp()) / Math.max(1, CONFIG.substeps | 0);
             const dt = Math.min(0.06, dtOverride ?? defaultDt);
@@ -3164,10 +2915,12 @@
             this.setTex(r, "uGridMat", 8, this.gridMat[this.gridRead]);
             this.uniform2f(r.u.uGridSize, this.width, this.height); this.uniform2f(r.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
             this.uniform2f(r.u.uClimateSize, this.climateWidth, this.climateHeight); this.uniform1f(r.u.uSeaLevel, this.effectiveSeaLevel());
-            this.uniform1f(r.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); this.uniform1f(r.u.uCloudOpacity, CONFIG.cloudOpacity ?? 0.32);
+            const renderCloudOpacity = ((CONFIG.enableClimateSystem ?? 1) >= 0.5 && (CONFIG.showClouds ?? 1) >= 0.5) ? (CONFIG.cloudOpacity ?? 0.32) : 0.0;
+            this.uniform1f(r.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); this.uniform1f(r.u.uCloudOpacity, renderCloudOpacity);
             this.uniform1f(r.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0); this.uniform1f(r.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0);
             const setRenderFloat = (name, value) => { const loc = r.u[name]; if (loc !== undefined && loc !== null) this.uniform1f(loc, value); };
-            setRenderFloat("uPlantGrowth", CONFIG.plantGrowth ?? 1.0); setRenderFloat("uBiosphereComplexity", CONFIG.biosphereComplexity ?? 1.0);
+            const renderBiosphereScale = ((CONFIG.enableClimateSystem ?? 1) >= 0.5 && (CONFIG.enableBiosphere ?? 1) >= 0.5) ? 1.0 : 0.0;
+            setRenderFloat("uPlantGrowth", renderBiosphereScale * (CONFIG.plantGrowth ?? 1.0)); setRenderFloat("uBiosphereComplexity", CONFIG.biosphereComplexity ?? 1.0);
             setRenderFloat("uColdStress", CONFIG.coldStress ?? 1.0); setRenderFloat("uDroughtStress", CONFIG.droughtStress ?? 1.0);
             setRenderFloat("uAltitudeStress", CONFIG.altitudeStress ?? 1.0);
             this.uniform1i(r.u.uMode, mode); this.uniform1i(r.u.uTopology, CONFIG.topology); gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -3177,8 +2930,8 @@
             const gl = this.gl;
             for (const arr of [this.posVel, this.F, this.C, this.meta, this.gridVel, this.gridAux, this.gridMat, this.terrain, this.climateB, this.climateC, this.climateD]) { if (arr) for (const t of arr) gl.deleteTexture(t); }
             if (this.previewTerrainTex) gl.deleteTexture(this.previewTerrainTex);
-            for (const t of [this.grid0, this.grid1, this.tTerritory, this.tPlateData, this.tPlateRaw, this.gridReadbackTex, this.plateStats0Tex, this.plateStats1Tex, this.plateInertiaTex, this.plateMaxR2Tex, this.plateImpulseTex]) if (t) gl.deleteTexture(t);
-            for (const f of [this.gridReadbackFbo, this.plateStatsFbo, this.plateInertiaFbo, this.plateMaxR2Fbo, this.plateImpulseFbo]) if (f) gl.deleteFramebuffer(f);
+            for (const t of [this.grid0, this.grid1, this.tTerritory, this.tPlateData, this.gridReadbackTex]) if (t) gl.deleteTexture(t);
+            if (this.gridReadbackFbo) gl.deleteFramebuffer(this.gridReadbackFbo);
             gl.deleteFramebuffer(this.accumFbo);
             for (const arr of [this.gridFbo, this.terrainFbo, this.climateBFbo, this.climateCFbo, this.climateDFbo, this.particleFbo]) if (arr) for (const f of arr) gl.deleteFramebuffer(f);
             for (const key in this.programs) gl.deleteProgram(this.programs[key].p);
@@ -3201,7 +2954,7 @@
 
     const CONTROL_SUBGROUPS = {
         "Domain Setup": [["World", ["Topology", "Dimensions (POT)", "Plate Count"]], ["Resolution", ["Terrain Resolution", "Cloud Resolution"]]],
-        "Performance / Quality": [["Capacity", ["Particle Slots / Cell", "Initial Particles / Cell"]], ["Physics Cadence", ["Grid Physics Passes", "Boundary Samples", "CPU Collision Stride", "Plate Solver", "Plate Dynamics Every", "MPM Crust Every"]], ["Time Scales", ["Plate Time Scale", "MPM / Crust Time Scale", "Erosion Time Scale", "Climate Time Scale", "Startup Stabilization"]], ["MPM Numerics", ["MPM Stress Scale", "MPM Stress Clamp", "APIC Blend", "Grid Viscosity", "Particle Damping"]]],
+        "Performance / Quality": [["System Toggles", ["Plate Rigidbody", "MPM Crust Solver", "Surface / Erosion", "Climate / Seasons", "Cloud Fluid", "Biosphere / Soil", "Cloud Rendering", "History Capture"]], ["Capacity", ["Particle Slots / Cell", "Initial Particles / Cell"]], ["Physics Cadence", ["Grid Physics Passes", "Boundary Samples", "CPU Collision Stride", "Plate Solver", "Plate Dynamics Every", "MPM Crust Every"]], ["Time Scales", ["Plate Time Scale", "MPM / Crust Time Scale", "Erosion Time Scale", "Climate Time Scale", "Startup Stabilization"]], ["MPM Numerics", ["MPM Stress Scale", "MPM Stress Clamp", "APIC Blend", "Grid Viscosity", "Particle Damping"]]],
         "Mantle Dynamics (Plates)": [["Coupling", ["Mantle Coupling", "Density Friction Mult."]], ["Mantle Flow", ["Mantle Flow Scale", "Mantle Flow Time Scale", "Mantle Flow Strength", "Flow Torque Scale"]], ["Damping & Limits", ["Viscosity (Global Drag)", "Angular Damping", "Boundary Bounce (Restit.)", "Boundary Friction", "Max Rotational Radius", "CoM Smoothing", "Max Plate Speed"]], ["Lifecycle", ["Plate Merge Rate", "Merge Collision Bias", "Plate Split Rate", "Min Split Mass (%)"]], ["Territory", ["Territory Smoothing Passes", "Territory Majority Rule"]]],
         "Boundary Crust": [["Boundary Signal", ["Ridge Push (Flow)", "Boundary Damping", "Signal Spread"]], ["Divergent Boundaries", ["Rift Threshold", "Divergent Crust Spawn", "Rift Thinning / Recycling"]], ["Subduction Boundaries", ["Subduct Threshold", "Subduction Loss"]], ["Crust Limits", ["Collision / Arc Gain", "Max Crust Mass"]]],
         "Crust Material (MPM)": [["Solver", ["Substeps / Frame", "Time Step", "Particle Mass"]], ["Elasticity", ["Shear Stiffness", "Bulk Stiffness", "Compression Hardening"]], ["Plasticity", ["Plastic Yield", "Plastic Creep"]], ["Plate Coupling", ["Plate Drag", "Density Drag"]], ["Material & Age", ["Old Crust %", "Old Crust Stiffness", "Material Variation", "Initial Age Spread", "Age Rate", "Age Density", "Type Density"]]],
@@ -3360,7 +3113,7 @@
     }
 
     function captureTerrainHistory(force = false) {
-        if (!sim || !historyRecording) return;
+        if (!sim || !historyRecording || (CONFIG.enableHistoryCapture ?? 1) < 0.5) return;
         const every = Math.max(1, CONFIG.historyEvery | 0);
         if (!force && (sim.iterCount % every) !== 0) return;
         try {
@@ -3418,9 +3171,15 @@
         if (running) tick(); else cancelAnimationFrame(raf);
     }
 
+    function afterRuntimeConfigChange(key) {
+        if (!sim) return;
+        if (key === "enablePlateDynamics" || key === "plateTimeScale" || key === "startupStabilizationFrames") sim.uploadPlateData();
+        if (key === "enableHistoryCapture" && (CONFIG.enableHistoryCapture ?? 1) < 0.5) { historyRecording = false; updateHistoryUI(); }
+    }
+
     configInputs.forEach(el => {
         const rebuild = REBUILD_KEYS.includes(el.dataset.key);
-        el.addEventListener(rebuild ? "change" : "input", () => { updateConfig(); if (rebuild) regenerateWorld(); else renderUI(true); });
+        el.addEventListener(rebuild ? "change" : "input", () => { updateConfig(); if (rebuild) regenerateWorld(); else { afterRuntimeConfigChange(el.dataset.key); renderUI(true); } });
     });
 
     dom.restart.addEventListener("click", regenerateWorld);
