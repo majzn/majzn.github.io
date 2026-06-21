@@ -641,6 +641,13 @@
             if (!this.gl.getExtension("EXT_float_blend")) throw new Error("EXT_float_blend required.");
             this.floatLinear = this.gl.getExtension("OES_texture_float_linear");
             
+            this.activeProgram = null;
+            this.boundTextureUnit = -1;
+            this.boundTextures = new Array(16).fill(null);
+            this.uniformCache = new WeakMap();
+            this.boundFramebuffer = null;
+            this.viewportW = -1; this.viewportH = -1;
+            
             this.width = 0; this.height = 0; this.iterCount = 0;
             this.readIndex = 0; this.gridRead = 0;
             
@@ -672,10 +679,15 @@
                 ivec2 tc = ivec2(id % uParticleTexSize.x, id / uParticleTexSize.x);
                 vMeta = texelFetch(uMeta, tc, 0);
                 if(vMeta.x <= 0.0001) { gl_Position = vec4(4.0, 4.0, 0.0, 1.0); gl_PointSize = 1.0; return; }
-                vPosVel = texelFetch(uPosVel, tc, 0); vec4 fa = texelFetch(uF, tc, 0); vec4 ca = texelFetch(uC, tc, 0);
-                vF = mat2(fa.x, fa.y, fa.z, fa.w); vC = mat2(ca.x, ca.y, ca.z, ca.w);
+                vPosVel = texelFetch(uPosVel, tc, 0);
                 vec2 xp = vPosVel.xy - vec2(0.5); vBase = floor(xp - vec2(0.5)); vWrapOffset = uWrapOffset;
-                vec2 pixel = vBase + vec2(1.5) + uWrapOffset; vec2 ndc = pixel / uGridSize * 2.0 - 1.0;
+                vec2 pixel = vBase + vec2(1.5) + uWrapOffset;
+                if(pixel.x < -3.0 || pixel.x > uGridSize.x + 3.0 || pixel.y < -3.0 || pixel.y > uGridSize.y + 3.0) {
+                    gl_Position = vec4(4.0, 4.0, 0.0, 1.0); gl_PointSize = 1.0; return;
+                }
+                vec4 fa = texelFetch(uF, tc, 0); vec4 ca = texelFetch(uC, tc, 0);
+                vF = mat2(fa.x, fa.y, fa.z, fa.w); vC = mat2(ca.x, ca.y, ca.z, ca.w);
+                vec2 ndc = pixel / uGridSize * 2.0 - 1.0;
                 gl_Position = vec4(ndc, 0.0, 1.0); gl_PointSize = 5.0;
             }`;
 
@@ -1733,6 +1745,16 @@
                 fragColor = vec4(0.0, 0.0, 0.0, 1.0);
             }`;
 
+            const fsGridReadback = GLSL_UTILS + `
+            in vec2 vUv;
+            uniform sampler2D uGridVel; uniform vec2 uGridSize;
+            layout(location=0) out vec2 outMassSurface;
+            void main() {
+                ivec2 xy = ivec2(vUv * uGridSize);
+                vec4 gv = texelFetch(uGridVel, xy, 0);
+                outMassSurface = gv.zw;
+            }`;
+
             return {
                 p2g: this.link(vsP2G, fsP2G),
                 gridUpdate: this.link(vsFull, fsGridUpdate),
@@ -1741,6 +1763,7 @@
                 climateB: this.link(vsFull, fsClimateB),
                 climateC: this.link(vsFull, fsClimateC),
                 climateD: this.link(vsFull, fsClimateD),
+                gridReadback: this.link(vsFull, fsGridReadback),
                 g2p: this.link(vsFull, fsG2P),
                 render: this.link(vsFull, fsRender)
             };
@@ -1754,10 +1777,56 @@
             gl.shaderSource(fs, fsSrc); gl.compileShader(fs);
             if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fs));
             gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
-            if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+            if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+                const log = gl.getProgramInfoLog(p);
+                gl.deleteShader(vs); gl.deleteShader(fs); gl.deleteProgram(p);
+                throw new Error(log);
+            }
+            gl.detachShader(p, vs); gl.detachShader(p, fs); gl.deleteShader(vs); gl.deleteShader(fs);
             const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
             for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); if (info) u[info.name.replace(/\[0\]$/, "")] = gl.getUniformLocation(p, info.name); }
             return { p, u };
+        }
+
+        invalidateTextureBindings() {
+            this.boundTextureUnit = -1;
+            this.boundTextures.fill(null);
+        }
+
+        useProgram(program) {
+            const rawProgram = program && program.p ? program.p : program;
+            if (this.activeProgram !== rawProgram) {
+                this.gl.useProgram(rawProgram);
+                this.activeProgram = rawProgram;
+            }
+        }
+
+        uniform1f(loc, a) {
+            if (loc === undefined || loc === null) return;
+            const c = this.uniformCache.get(loc);
+            if (c && c.t === 1 && c.a === a) return;
+            this.gl.uniform1f(loc, a); this.uniformCache.set(loc, { t: 1, a });
+        }
+
+        uniform1i(loc, a) {
+            if (loc === undefined || loc === null) return;
+            const c = this.uniformCache.get(loc);
+            if (c && c.t === 2 && c.a === a) return;
+            this.gl.uniform1i(loc, a); this.uniformCache.set(loc, { t: 2, a });
+        }
+
+        uniform2f(loc, a, b) {
+            if (loc === undefined || loc === null) return;
+            const c = this.uniformCache.get(loc);
+            if (c && c.t === 3 && c.a === a && c.b === b) return;
+            this.gl.uniform2f(loc, a, b); this.uniformCache.set(loc, { t: 3, a, b });
+        }
+
+        uniform2i(loc, a, b) {
+            if (loc === undefined || loc === null) return;
+            const c = this.uniformCache.get(loc);
+            if (c && c.t === 4 && c.a === a && c.b === b) return;
+            this.gl.uniform2i(loc, a, b); this.uniformCache.set(loc, { t: 4, a, b });
         }
 
         tex(w, h, internal, format, type, data = null, filter = null) {
@@ -1766,22 +1835,90 @@
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter || gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter || gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-            gl.texImage2D(gl.TEXTURE_2D, 0, internal, w, h, 0, format, type, data); return t;
+            gl.texImage2D(gl.TEXTURE_2D, 0, internal, w, h, 0, format, type, data);
+            this.invalidateTextureBindings();
+            return t;
         }
 
         fbo(textures) {
-            const gl = this.gl; const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); const bufs = [];
+            const gl = this.gl; const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); this.boundFramebuffer = f; const bufs = [];
             textures.forEach((t, i) => { gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0); bufs.push(gl.COLOR_ATTACHMENT0 + i); });
             gl.drawBuffers(bufs);
             if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("Framebuffer setup failed.");
             return f;
         }
 
-        bindFBO(fbo, w, h) { this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fbo); this.gl.viewport(0, 0, w, h); }
+        bindFBO(fbo, w, h) {
+            const gl = this.gl;
+            if (this.boundFramebuffer !== fbo) { gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); this.boundFramebuffer = fbo; }
+            if (this.viewportW !== w || this.viewportH !== h) { gl.viewport(0, 0, w, h); this.viewportW = w; this.viewportH = h; }
+        }
 
         setTex(program, name, unit, tex) {
-            const gl = this.gl; if (program.u[name] === undefined || program.u[name] === null) return;
-            gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(program.u[name], unit);
+            const loc = program.u[name];
+            if (loc === undefined || loc === null) return;
+            const gl = this.gl;
+            if (this.boundTextureUnit !== unit) { gl.activeTexture(gl.TEXTURE0 + unit); this.boundTextureUnit = unit; }
+            if (this.boundTextures[unit] !== tex) { gl.bindTexture(gl.TEXTURE_2D, tex); this.boundTextures[unit] = tex; }
+            this.uniform1i(loc, unit);
+        }
+
+        setupGridReadbackTarget() {
+            const gl = this.gl;
+            this.gridReadbackTex = null; this.gridReadbackFbo = null;
+            this.compactGridReadback = false; this.compactGridReadbackValidated = false;
+            try {
+                const tex = this.tex(this.width, this.height, gl.RG32F, gl.RG, gl.FLOAT, null);
+                const fbo = gl.createFramebuffer();
+                gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); this.boundFramebuffer = fbo;
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+                gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+                if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+                    gl.deleteFramebuffer(fbo); gl.deleteTexture(tex); this.boundFramebuffer = null;
+                    return;
+                }
+                this.gridReadbackTex = tex; this.gridReadbackFbo = fbo; this.compactGridReadback = true;
+            } catch (_) {
+                if (this.gridReadbackFbo) gl.deleteFramebuffer(this.gridReadbackFbo);
+                if (this.gridReadbackTex) gl.deleteTexture(this.gridReadbackTex);
+                this.gridReadbackTex = null; this.gridReadbackFbo = null; this.compactGridReadback = false;
+            }
+        }
+
+        readGridMassSurface() {
+            const gl = this.gl; const w = this.width; const h = this.height;
+            if (this.compactGridReadback && this.gridReadbackFbo) {
+                const rb = this.programs.gridReadback;
+                this.useProgram(rb);
+                this.setTex(rb, "uGridVel", 0, this.gridVel[this.gridRead]);
+                this.uniform2f(rb.u.uGridSize, w, h);
+                this.bindFBO(this.gridReadbackFbo, w, h);
+                gl.disable(gl.BLEND);
+                gl.drawArrays(gl.TRIANGLES, 0, 3);
+                gl.readBuffer(gl.COLOR_ATTACHMENT0);
+                if (!this.compactGridReadbackValidated) while (gl.getError() !== gl.NO_ERROR) {}
+                try {
+                    gl.readPixels(0, 0, w, h, gl.RG, gl.FLOAT, this.compactReadbackBuffer);
+                } catch (_) {
+                    this.compactGridReadback = false;
+                }
+                if (this.compactGridReadback && !this.compactGridReadbackValidated) {
+                    const err = gl.getError();
+                    if (err !== gl.NO_ERROR) this.compactGridReadback = false;
+                    else this.compactGridReadbackValidated = true;
+                }
+                if (this.compactGridReadback) {
+                    this.gridMassSurfaceBuffer = this.compactReadbackBuffer;
+                    this.gridMassSurfaceStride = 2; this.gridMassOffset = 0; this.gridSurfaceOffset = 1;
+                    return;
+                }
+            }
+
+            this.bindFBO(this.gridFbo[this.gridRead], w, h);
+            gl.readBuffer(gl.COLOR_ATTACHMENT0);
+            gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, this.readbackBuffer);
+            this.gridMassSurfaceBuffer = this.readbackBuffer;
+            this.gridMassSurfaceStride = 4; this.gridMassOffset = 2; this.gridSurfaceOffset = 3;
         }
 
         effectiveSeaLevel() { return clamp(CONFIG.seaLevel ?? 0.9, 0.02, 6.0); }
@@ -1816,6 +1953,11 @@
                 }
             }
 
+            this.cosX = new Float64Array(this.width); this.sinX = new Float64Array(this.width);
+            this.cosY = new Float64Array(this.height); this.sinY = new Float64Array(this.height);
+            for (let x = 0; x < this.width; x++) { const a = x * 2 * Math.PI / this.width; this.cosX[x] = Math.cos(a); this.sinX[x] = Math.sin(a); }
+            for (let y = 0; y < this.height; y++) { const a = y * 2 * Math.PI / this.height; this.cosY[y] = Math.cos(a); this.sinY[y] = Math.sin(a); }
+
             this.plates = Array.from({ length: 64 }, (_, i) => new Plate(i));
             
 
@@ -1834,7 +1976,13 @@
             this.floatX = new Float32Array(area); this.floatY = new Float32Array(area);
             this.nextFloatX = new Float32Array(area); this.nextFloatY = new Float32Array(area); this.advectedImap = new Uint8Array(area);
             
-            this.plateDataBuffer = new Float32Array(64 * 3 * 4); this.readbackBuffer = new Float32Array(area * 4);
+            this.plateDataBuffer = new Float32Array(64 * 3 * 4);
+            this.readbackBuffer = new Float32Array(area * 4);
+            this.compactReadbackBuffer = new Float32Array(area * 2);
+            this.gridMassSurfaceBuffer = this.readbackBuffer; this.gridMassSurfaceStride = 4; this.gridMassOffset = 2; this.gridSurfaceOffset = 3;
+            this.maxR2 = new Float32Array(64);
+            this.pendingMergeA = new Uint8Array(4096); this.pendingMergeB = new Uint8Array(4096);
+            this.smoothCounts = new Int32Array(64); this.smoothStamps = new Uint32Array(64); this.smoothStamp = 1;
 
             const ntex = this.ptexW * this.ptexH;
             const posVel = new Float32Array(ntex * 4); const F = new Float32Array(ntex * 4);
@@ -1976,6 +2124,7 @@
 
             this.tTerritory = this.tex(this.width, this.height, gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE, this.imap);
             this.tPlateData = this.tex(64, 3, gl.RGBA32F, gl.RGBA, gl.FLOAT, this.plateDataBuffer);
+            this.setupGridReadbackTarget();
 
             this.iterCount = 0; this.readIndex = 0; this.gridRead = 0; this.terrainRead = 0; this.climateBRead = 0; this.climateCRead = 0; this.climateDRead = 0;
             
@@ -1990,7 +2139,7 @@
             gl.disable(gl.BLEND); gl.clearBufferfv(gl.COLOR, 0, ZERO4); gl.clearBufferfv(gl.COLOR, 1, ZERO4);
         }
 
-        uploadTextures() {
+        uploadPlateData() {
             const motionScale = this.effectivePlateMotionScale();
             for (let i = 0; i < 64; i++) {
                 let p = this.plates[i];
@@ -2004,14 +2153,27 @@
                 this.plateDataBuffer[(128 + i) * 4 + 3] = p.materialType || 0; 
             }
             const gl = this.gl;
-            gl.bindTexture(gl.TEXTURE_2D, this.tPlateData); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 3, gl.RGBA, gl.FLOAT, this.plateDataBuffer);
-            gl.bindTexture(gl.TEXTURE_2D, this.tTerritory); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.width, this.height, gl.RED_INTEGER, gl.UNSIGNED_BYTE, this.imap);
+            gl.bindTexture(gl.TEXTURE_2D, this.tPlateData);
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 3, gl.RGBA, gl.FLOAT, this.plateDataBuffer);
+            this.invalidateTextureBindings();
+        }
+
+        uploadTerritoryMap() {
+            const gl = this.gl;
+            gl.bindTexture(gl.TEXTURE_2D, this.tTerritory);
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.width, this.height, gl.RED_INTEGER, gl.UNSIGNED_BYTE, this.imap);
+            this.invalidateTextureBindings();
+        }
+
+        uploadTextures() {
+            this.uploadPlateData();
+            this.uploadTerritoryMap();
         }
 
         updatePlatePhysics(dtScale = 1) {
             const gl = this.gl; const plateTimeScale = Math.max(0.0, CONFIG.plateTimeScale ?? 1.0) * this.startupRamp();
             const plateDtScale = Math.max(0.0, Math.min(2.5, (dtScale || 1) * plateTimeScale));
-            if (plateDtScale <= 0.000001) { this.uploadTextures(); return; }
+            if (plateDtScale <= 0.000001) { this.uploadPlateData(); return; }
             const w = this.width; const h = this.height; const area = w * h;
             const wrapX = CONFIG.topology < 2; const wrapY = CONFIG.topology === 0;
             
@@ -2052,8 +2214,12 @@
                 }
             }
 
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this.gridFbo[this.gridRead]);
-            gl.readBuffer(gl.COLOR_ATTACHMENT0); gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, this.readbackBuffer);
+            this.readGridMassSurface();
+            const gridRead = this.gridMassSurfaceBuffer;
+            const gridStride = this.gridMassSurfaceStride;
+            const gridMassOffset = this.gridMassOffset;
+            const gridSurfaceOffset = this.gridSurfaceOffset;
+            const cosX = this.cosX; const sinX = this.sinX; const cosY = this.cosY; const sinY = this.sinY;
 
             for (let p of this.plates) {
                 p.mass = 0; p._scx = 0; p._ssx = 0; p._scy = 0; p._ssy = 0; p._I = 0; p._surfaceMass = 0; p._surfaceExcess = 0; p._surfaceCells = 0;
@@ -2062,13 +2228,14 @@
             for (let y = 0; y < h; y++) {
                 let yOffset = y * w;
                 for (let x = 0; x < w; x++) {
-                    let pid = this.imap[yOffset + x]; if (pid === 255) continue;
-                    let mass = this.readbackBuffer[(yOffset + x) * 4 + 2];
+                    const idx = yOffset + x;
+                    let pid = this.imap[idx]; if (pid === 255) continue;
+                    let mass = gridRead[idx * gridStride + gridMassOffset];
                     if (mass > 0) {
                         let p = this.plates[pid]; p.mass += mass;
-                        p._scx += mass * Math.cos(x * 2 * Math.PI / w); p._ssx += mass * Math.sin(x * 2 * Math.PI / w);
-                        p._scy += mass * Math.cos(y * 2 * Math.PI / h); p._ssy += mass * Math.sin(y * 2 * Math.PI / h);
-                        const crustSurface = Math.max(0, this.readbackBuffer[(yOffset + x) * 4 + 3] * (CONFIG.terrainVerticalScale ?? 1.0));
+                        p._scx += mass * cosX[x]; p._ssx += mass * sinX[x];
+                        p._scy += mass * cosY[y]; p._ssy += mass * sinY[y];
+                        const crustSurface = Math.max(0, gridRead[idx * gridStride + gridSurfaceOffset] * (CONFIG.terrainVerticalScale ?? 1.0));
                         p._surfaceMass += mass; p._surfaceExcess += mass * Math.min(crustSurface, 4.0); p._surfaceCells += 1;
                     }
                 }
@@ -2092,20 +2259,31 @@
                 } else { p.surfaceFloat *= 0.94; }
             }
             
-            let maxR2 = new Float32Array(64); let pendingMerges = [];
+            const maxR2 = this.maxR2; maxR2.fill(0);
+            let pendingMergeCount = 0;
+            const addPendingMerge = (idA, idB) => {
+                if (pendingMergeCount >= this.pendingMergeA.length) {
+                    const nextA = new Uint8Array(this.pendingMergeA.length * 2);
+                    const nextB = new Uint8Array(this.pendingMergeB.length * 2);
+                    nextA.set(this.pendingMergeA); nextB.set(this.pendingMergeB);
+                    this.pendingMergeA = nextA; this.pendingMergeB = nextB;
+                }
+                this.pendingMergeA[pendingMergeCount] = idA; this.pendingMergeB[pendingMergeCount] = idB; pendingMergeCount++;
+            };
+            const collisionStride = Math.max(1, CONFIG.plateCollisionStride | 0);
 
             for (let y = 0; y < h; y++) {
                 let yOffset = y * w;
                 for (let x = 0; x < w; x++) {
-                    let pidA = this.imap[yOffset + x]; if (pidA === 255) continue;
-                    let massA = this.readbackBuffer[(yOffset + x) * 4 + 2];
+                    const idxA = yOffset + x;
+                    let pidA = this.imap[idxA]; if (pidA === 255) continue;
+                    let massA = gridRead[idxA * gridStride + gridMassOffset];
                     if (massA > 0) {
                         let pA = this.plates[pidA];
                         let rAx = wrappedDist(x, pA.cx, w, wrapX); let rAy = wrappedDist(y, pA.cy, h, wrapY);
                         let distSq = rAx * rAx + rAy * rAy;
                         pA._I += massA * distSq; maxR2[pidA] = Math.max(maxR2[pidA], distSq);
                         
-                        const collisionStride = Math.max(1, CONFIG.plateCollisionStride | 0);
                         if (((x % collisionStride) !== 0) || ((y % collisionStride) !== 0)) continue;
 
                         let nx = wrapInt(x + 1, w, wrapX); let ny = wrapInt(y + 1, h, wrapY);
@@ -2130,7 +2308,8 @@
                             }
 
                             let pidB = this.imap[nbY * w + nbX]; if (pidB === 255 || pidA === pidB) continue;
-                            let massB = this.readbackBuffer[(nbY * w + nbX) * 4 + 2]; if (massB < 0.1) continue;
+                            const idxB = nbY * w + nbX;
+                            let massB = gridRead[idxB * gridStride + gridMassOffset]; if (massB < 0.1) continue;
                             let pB = this.plates[pidB];
                             
                             let rBx = wrappedDist(nbX, pB.cx, w, wrapX); let rBy = wrappedDist(nbY, pB.cy, h, wrapY);
@@ -2147,7 +2326,7 @@
                                 let densitySim = 1.0 / (1.0 + Math.abs(massA - massB));
                                 let collisionViolence = Math.max(0.0, -relV_normal);
                                 let mergeProb = Math.min(0.02, (CONFIG.plateMergeRate * 0.000005) * plateDtScale * densitySim * (1.0 + collisionViolence * CONFIG.mergeCollisionBias));
-                                if (Math.random() < mergeProb) pendingMerges.push([pidA, pidB]);
+                                if (Math.random() < mergeProb) addPendingMerge(pidA, pidB);
                             }
                             
                             if (relV_normal < 0.0) { 
@@ -2168,7 +2347,8 @@
                 }
             }
 
-            for (let [idA, idB] of pendingMerges) {
+            for (let mi = 0; mi < pendingMergeCount; mi++) {
+                const idA = this.pendingMergeA[mi]; const idB = this.pendingMergeB[mi];
                 let pA = this.plates[idA]; let pB = this.plates[idB];
                 if (pA && pB && pA.mass > 0 && pB.mass > 0 && idA !== idB) {
                     let totalMass = pA.mass + pB.mass;
@@ -2223,7 +2403,7 @@
             }
 
             this.nextImap.set(this.advectedImap);
-            const counts = new Int32Array(64);
+            const counts = this.smoothCounts; const stamps = this.smoothStamps;
             
             for (let pass = 0; pass < CONFIG.territorySmoothingPasses; pass++) {
                 this.smoothImap.set(this.nextImap);
@@ -2231,7 +2411,9 @@
                     let yOffset = y * w;
                     for (let x = 0; x < w; x++) {
                         let idx = yOffset + x; let curr = this.smoothImap[idx];
-                        counts.fill(0); let maxC = 0; let bestId = curr;
+                        let stamp = (this.smoothStamp = (this.smoothStamp + 1) >>> 0);
+                        if (stamp === 0) { stamps.fill(0); stamp = this.smoothStamp = 1; }
+                        let maxC = 0; let bestId = curr;
                         
                         for (let dy = -1; dy <= 1; dy++) {
                             for (let dx = -1; dx <= 1; dx++) {
@@ -2239,7 +2421,11 @@
                                 let nx = wrapInt(x + dx, w, wrapX); let ny = wrapInt(y + dy, h, wrapY);
                                 if (nx !== -1 && ny !== -1) {
                                     let id = this.smoothImap[ny * w + nx];
-                                    if (id !== 255) { counts[id]++; if (counts[id] > maxC) { maxC = counts[id]; bestId = id; } }
+                                    if (id !== 255) {
+                                        if (stamps[id] !== stamp) { stamps[id] = stamp; counts[id] = 0; }
+                                        counts[id]++;
+                                        if (counts[id] > maxC) { maxC = counts[id]; bestId = id; }
+                                    }
                                 }
                             }
                         }
@@ -2258,7 +2444,7 @@
                 else { this.floatX[i] = this.nextFloatX[i]; this.floatY[i] = this.nextFloatY[i]; }
             }
             
-            this.imap.set(this.nextImap); this.uploadTextures();
+            this.imap.set(this.nextImap); this.uploadPlateData(); this.uploadTerritoryMap();
         }
 
         updateTerrain(force = false) {
@@ -2272,18 +2458,18 @@
             const dt = Math.min(0.08, totalTerrainDt / passCount);
             
             for (let i = 0; i < passCount; i++) {
-                const dst = 1 - this.terrainRead; gl.useProgram(tu.p);
+                const dst = 1 - this.terrainRead; this.useProgram(tu);
                 this.setTex(tu, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(tu, "uGridVel", 1, this.gridVel[this.gridRead]);
                 this.setTex(tu, "uGridAux", 2, this.gridAux[this.gridRead]); this.setTex(tu, "uGridMat", 3, this.gridMat[this.gridRead]);
                 
-                gl.uniform2f(tu.u.uGridSize, this.width, this.height); gl.uniform2f(tu.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
-                gl.uniform1f(tu.u.uDt, dt); gl.uniform1f(tu.u.uTerrainCoupling, CONFIG.terrainCoupling ?? 0.0);
-                gl.uniform1f(tu.u.uThermalErosion, CONFIG.thermalErosion ?? 0.02); gl.uniform1f(tu.u.uErosionRate, CONFIG.erosionRate ?? 0.05);
-                gl.uniform1f(tu.u.uBasinFillRate, CONFIG.basinFillRate ?? 0.00015); gl.uniform1f(tu.u.uRiftThreshold, CONFIG.riftThreshold ?? 0.08);
-                gl.uniform1f(tu.u.uSubductThreshold, CONFIG.subductThreshold ?? 0.10); gl.uniform1f(tu.u.uSubductRate, CONFIG.subductRate ?? 2.5);
-                gl.uniform1f(tu.u.uRiftTerrainReset, CONFIG.riftTerrainReset ?? 2.5); gl.uniform1f(tu.u.uGlobalUplift, CONFIG.globalUplift ?? 0.0015);
-                gl.uniform1f(tu.u.uBuoyancyLift, CONFIG.buoyancyLift ?? 0.55); gl.uniform1f(tu.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0);
-                gl.uniform1f(tu.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0); gl.uniform1i(tu.u.uTopology, CONFIG.topology);
+                this.uniform2f(tu.u.uGridSize, this.width, this.height); this.uniform2f(tu.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
+                this.uniform1f(tu.u.uDt, dt); this.uniform1f(tu.u.uTerrainCoupling, CONFIG.terrainCoupling ?? 0.0);
+                this.uniform1f(tu.u.uThermalErosion, CONFIG.thermalErosion ?? 0.02); this.uniform1f(tu.u.uErosionRate, CONFIG.erosionRate ?? 0.05);
+                this.uniform1f(tu.u.uBasinFillRate, CONFIG.basinFillRate ?? 0.00015); this.uniform1f(tu.u.uRiftThreshold, CONFIG.riftThreshold ?? 0.08);
+                this.uniform1f(tu.u.uSubductThreshold, CONFIG.subductThreshold ?? 0.10); this.uniform1f(tu.u.uSubductRate, CONFIG.subductRate ?? 2.5);
+                this.uniform1f(tu.u.uRiftTerrainReset, CONFIG.riftTerrainReset ?? 2.5); this.uniform1f(tu.u.uGlobalUplift, CONFIG.globalUplift ?? 0.0015);
+                this.uniform1f(tu.u.uBuoyancyLift, CONFIG.buoyancyLift ?? 0.55); this.uniform1f(tu.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0);
+                this.uniform1f(tu.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0); this.uniform1i(tu.u.uTopology, CONFIG.topology);
                 
                 this.bindFBO(this.terrainFbo[dst], this.terrainWidth, this.terrainHeight);
                 gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -2300,14 +2486,14 @@
             const time = this.iterCount * CONFIG.dt * climateTimeScale; const climateStepScale = Math.max(0.0, every * climateTimeScale);
             
             const runB = () => {
-                const cb = this.programs.climateB; const dst = 1 - this.climateBRead; gl.useProgram(cb.p);
+                const cb = this.programs.climateB; const dst = 1 - this.climateBRead; this.useProgram(cb);
                 this.setTex(cb, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(cb, "uClimateB", 1, this.climateB[this.climateBRead]);
-                gl.uniform2f(cb.u.uTerrainSize, this.terrainWidth, this.terrainHeight); gl.uniform2f(cb.u.uClimateSize, sizeW, sizeH);
+                this.uniform2f(cb.u.uTerrainSize, this.terrainWidth, this.terrainHeight); this.uniform2f(cb.u.uClimateSize, sizeW, sizeH);
                 
                 const seasonSpeed = Math.max(0.0, CONFIG.seasonSpeed ?? 1.0); const seasonPhase = ((this.iterCount * climateTimeScale * seasonSpeed) / 720.0) % 1.0;
-                gl.uniform1f(cb.u.uSeaLevel, this.effectiveSeaLevel()); gl.uniform1f(cb.u.uSeasonPhase, seasonPhase);
-                gl.uniform1f(cb.u.uAxialTilt, CONFIG.axialTilt ?? 23.5); gl.uniform1f(cb.u.uSunPower, CONFIG.sunPower ?? 1.0);
-                gl.uniform1f(cb.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); gl.uniform1i(cb.u.uTopology, CONFIG.topology);
+                this.uniform1f(cb.u.uSeaLevel, this.effectiveSeaLevel()); this.uniform1f(cb.u.uSeasonPhase, seasonPhase);
+                this.uniform1f(cb.u.uAxialTilt, CONFIG.axialTilt ?? 23.5); this.uniform1f(cb.u.uSunPower, CONFIG.sunPower ?? 1.0);
+                this.uniform1f(cb.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); this.uniform1i(cb.u.uTopology, CONFIG.topology);
                 
                 this.bindFBO(this.climateBFbo[dst], sizeW, sizeH); gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3); this.climateBRead = dst;
             };
@@ -2318,32 +2504,32 @@
             const climatePassScale = Math.min(2.0, Math.max(0.0, climateStepScale / passes));
             
             for (let i = 0; i < passes; i++) {
-                const cc = this.programs.climateC; let dst = 1 - this.climateCRead; gl.useProgram(cc.p);
+                const cc = this.programs.climateC; let dst = 1 - this.climateCRead; this.useProgram(cc);
                 this.setTex(cc, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(cc, "uClimateB", 1, this.climateB[this.climateBRead]);
                 this.setTex(cc, "uClimateC", 2, this.climateC[this.climateCRead]); this.setTex(cc, "uClimateD", 3, this.climateD[this.climateDRead]);
-                gl.uniform2f(cc.u.uTerrainSize, this.terrainWidth, this.terrainHeight); gl.uniform2f(cc.u.uClimateSize, sizeW, sizeH); 
-                gl.uniform1f(cc.u.uTime, time + i * 0.05 * Math.max(1.0, climatePassScale));
-                gl.uniform1f(cc.u.uSeaLevel, this.effectiveSeaLevel()); gl.uniform1f(cc.u.uStepScale, climatePassScale);
-                gl.uniform1f(cc.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); gl.uniform1f(cc.u.uWindSpeed, CONFIG.windSpeed ?? 1.0);
-                gl.uniform1f(cc.u.uCloudAdvection, CONFIG.cloudAdvection ?? 1.20); gl.uniform1f(cc.u.uCloudDiffusion, CONFIG.cloudDiffusion ?? 0.08);
-                gl.uniform1f(cc.u.uCloudVorticity, CONFIG.cloudVorticity ?? 0.45); gl.uniform1f(cc.u.uCloudCondensation, CONFIG.cloudCondensation ?? 1.0);
-                gl.uniform1f(cc.u.uEvaporationBias, CONFIG.evaporationBias ?? 0.50); gl.uniform1f(cc.u.uTerrainLift, CONFIG.terrainLift ?? 1.0);
-                gl.uniform1f(cc.u.uTerrainDeflection, CONFIG.terrainDeflection ?? 0.50); gl.uniform1f(cc.u.uTerrainRainShadow, CONFIG.terrainRainShadow ?? 0.60);
-                gl.uniform1f(cc.u.uTerrainThermalLift, CONFIG.terrainThermalLift ?? 0.50); gl.uniform1i(cc.u.uTopology, CONFIG.topology);
+                this.uniform2f(cc.u.uTerrainSize, this.terrainWidth, this.terrainHeight); this.uniform2f(cc.u.uClimateSize, sizeW, sizeH); 
+                this.uniform1f(cc.u.uTime, time + i * 0.05 * Math.max(1.0, climatePassScale));
+                this.uniform1f(cc.u.uSeaLevel, this.effectiveSeaLevel()); this.uniform1f(cc.u.uStepScale, climatePassScale);
+                this.uniform1f(cc.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); this.uniform1f(cc.u.uWindSpeed, CONFIG.windSpeed ?? 1.0);
+                this.uniform1f(cc.u.uCloudAdvection, CONFIG.cloudAdvection ?? 1.20); this.uniform1f(cc.u.uCloudDiffusion, CONFIG.cloudDiffusion ?? 0.08);
+                this.uniform1f(cc.u.uCloudVorticity, CONFIG.cloudVorticity ?? 0.45); this.uniform1f(cc.u.uCloudCondensation, CONFIG.cloudCondensation ?? 1.0);
+                this.uniform1f(cc.u.uEvaporationBias, CONFIG.evaporationBias ?? 0.50); this.uniform1f(cc.u.uTerrainLift, CONFIG.terrainLift ?? 1.0);
+                this.uniform1f(cc.u.uTerrainDeflection, CONFIG.terrainDeflection ?? 0.50); this.uniform1f(cc.u.uTerrainRainShadow, CONFIG.terrainRainShadow ?? 0.60);
+                this.uniform1f(cc.u.uTerrainThermalLift, CONFIG.terrainThermalLift ?? 0.50); this.uniform1i(cc.u.uTopology, CONFIG.topology);
                 this.bindFBO(this.climateCFbo[dst], sizeW, sizeH); gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3); this.climateCRead = dst;
 
-                const cd = this.programs.climateD; dst = 1 - this.climateDRead; gl.useProgram(cd.p);
+                const cd = this.programs.climateD; dst = 1 - this.climateDRead; this.useProgram(cd);
                 this.setTex(cd, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(cd, "uClimateB", 1, this.climateB[this.climateBRead]);
                 this.setTex(cd, "uClimateC", 2, this.climateC[this.climateCRead]); this.setTex(cd, "uClimateD", 3, this.climateD[this.climateDRead]);
-                gl.uniform2f(cd.u.uTerrainSize, this.terrainWidth, this.terrainHeight); gl.uniform2f(cd.u.uClimateSize, sizeW, sizeH);
-                gl.uniform1f(cd.u.uTime, time + i * 0.05 * Math.max(1.0, climatePassScale));
-                gl.uniform1f(cd.u.uSeaLevel, this.effectiveSeaLevel()); gl.uniform1f(cd.u.uStepScale, climatePassScale);
-                gl.uniform1f(cd.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); gl.uniform1f(cd.u.uPlantGrowth, CONFIG.plantGrowth ?? 1.0);
-                gl.uniform1f(cd.u.uBiosphereComplexity, CONFIG.biosphereComplexity ?? 1.0); gl.uniform1f(cd.u.uColdStress, CONFIG.coldStress ?? 1.0);
-                gl.uniform1f(cd.u.uDroughtStress, CONFIG.droughtStress ?? 1.0); gl.uniform1f(cd.u.uAltitudeStress, CONFIG.altitudeStress ?? 1.0);
-                gl.uniform1f(cd.u.uPlantSpread, CONFIG.plantSpread ?? 1.0); gl.uniform1f(cd.u.uSuccessionRate, CONFIG.successionRate ?? 1.0);
-                gl.uniform1f(cd.u.uSoilFormation, CONFIG.soilFormation ?? 1.0);
-                gl.uniform1f(cd.u.uCloudCondensation, CONFIG.cloudCondensation ?? 1.0); gl.uniform1i(cd.u.uTopology, CONFIG.topology);
+                this.uniform2f(cd.u.uTerrainSize, this.terrainWidth, this.terrainHeight); this.uniform2f(cd.u.uClimateSize, sizeW, sizeH);
+                this.uniform1f(cd.u.uTime, time + i * 0.05 * Math.max(1.0, climatePassScale));
+                this.uniform1f(cd.u.uSeaLevel, this.effectiveSeaLevel()); this.uniform1f(cd.u.uStepScale, climatePassScale);
+                this.uniform1f(cd.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); this.uniform1f(cd.u.uPlantGrowth, CONFIG.plantGrowth ?? 1.0);
+                this.uniform1f(cd.u.uBiosphereComplexity, CONFIG.biosphereComplexity ?? 1.0); this.uniform1f(cd.u.uColdStress, CONFIG.coldStress ?? 1.0);
+                this.uniform1f(cd.u.uDroughtStress, CONFIG.droughtStress ?? 1.0); this.uniform1f(cd.u.uAltitudeStress, CONFIG.altitudeStress ?? 1.0);
+                this.uniform1f(cd.u.uPlantSpread, CONFIG.plantSpread ?? 1.0); this.uniform1f(cd.u.uSuccessionRate, CONFIG.successionRate ?? 1.0);
+                this.uniform1f(cd.u.uSoilFormation, CONFIG.soilFormation ?? 1.0);
+                this.uniform1f(cd.u.uCloudCondensation, CONFIG.cloudCondensation ?? 1.0); this.uniform1i(cd.u.uTopology, CONFIG.topology);
                 this.bindFBO(this.climateDFbo[dst], sizeW, sizeH); gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3); this.climateDRead = dst;
             }
         }
@@ -2379,70 +2565,70 @@
             this.clearAccum();
             
             const p2g = this.programs.p2g;
-            gl.useProgram(p2g.p);
+            this.useProgram(p2g);
             this.setTex(p2g, "uPosVel", 0, this.posVel[this.readIndex]); this.setTex(p2g, "uF", 1, this.F[this.readIndex]);
             this.setTex(p2g, "uC", 2, this.C[this.readIndex]); this.setTex(p2g, "uMeta", 3, this.meta[this.readIndex]);
-            gl.uniform2i(p2g.u.uParticleTexSize, this.ptexW, this.ptexH); gl.uniform1i(p2g.u.uParticleCount, this.particleCount);
-            gl.uniform2f(p2g.u.uGridSize, this.width, this.height); gl.uniform1f(p2g.u.uDt, dt);
-            gl.uniform1f(p2g.u.uMu, CONFIG.mu); gl.uniform1f(p2g.u.uLambda, CONFIG.lambda);
-            gl.uniform1f(p2g.u.uStressScale, CONFIG.stressScale ?? SIM_CONSTANTS.stressScale); gl.uniform1f(p2g.u.uStressClamp, CONFIG.stressClamp ?? SIM_CONSTANTS.stressClamp);
-            gl.uniform1f(p2g.u.uHardening, CONFIG.hardening); gl.uniform1f(p2g.u.uCratonStrength, CONFIG.cratonStrength ?? 1.85);
-            gl.uniform1f(p2g.u.uMaterialVariation, CONFIG.materialVariation ?? 0.65); gl.uniform1f(p2g.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0);
-            gl.uniform1f(p2g.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0); gl.uniform1i(p2g.u.uTopology, CONFIG.topology);
+            this.uniform2i(p2g.u.uParticleTexSize, this.ptexW, this.ptexH); this.uniform1i(p2g.u.uParticleCount, this.particleCount);
+            this.uniform2f(p2g.u.uGridSize, this.width, this.height); this.uniform1f(p2g.u.uDt, dt);
+            this.uniform1f(p2g.u.uMu, CONFIG.mu); this.uniform1f(p2g.u.uLambda, CONFIG.lambda);
+            this.uniform1f(p2g.u.uStressScale, CONFIG.stressScale ?? SIM_CONSTANTS.stressScale); this.uniform1f(p2g.u.uStressClamp, CONFIG.stressClamp ?? SIM_CONSTANTS.stressClamp);
+            this.uniform1f(p2g.u.uHardening, CONFIG.hardening); this.uniform1f(p2g.u.uCratonStrength, CONFIG.cratonStrength ?? 1.85);
+            this.uniform1f(p2g.u.uMaterialVariation, CONFIG.materialVariation ?? 0.65); this.uniform1f(p2g.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0);
+            this.uniform1f(p2g.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0); this.uniform1i(p2g.u.uTopology, CONFIG.topology);
             
             this.bindFBO(this.accumFbo, this.width, this.height);
             gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-            for (const off of this.wrapOffsets) { gl.uniform2f(p2g.u.uWrapOffset, off[0], off[1]); gl.drawArrays(gl.POINTS, 0, this.ptexW * this.ptexH); }
+            for (const off of this.wrapOffsets) { this.uniform2f(p2g.u.uWrapOffset, off[0], off[1]); gl.drawArrays(gl.POINTS, 0, this.particleCount); }
             gl.disable(gl.BLEND);
             
             const gu = this.programs.gridUpdate;
-            gl.useProgram(gu.p);
+            this.useProgram(gu);
             this.setTex(gu, "uGrid", 0, this.grid0); this.setTex(gu, "uDrive", 1, this.grid1);
             this.setTex(gu, "uTerritoryMap", 2, this.tTerritory); this.setTex(gu, "uPlateData", 3, this.tPlateData);
-            gl.uniform2f(gu.u.uGridSize, this.width, this.height); gl.uniform1f(gu.u.uDt, dt); gl.uniform1f(gu.u.uFrameDt, CONFIG.dt);
-            gl.uniform1f(gu.u.uDamping, SIM_CONSTANTS.gridDamping); gl.uniform1f(gu.u.uDriveCoupling, CONFIG.driveCoupling);
-            gl.uniform1f(gu.u.uDensityDetachment, CONFIG.densityDetachment); gl.uniform1f(gu.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0);
-            gl.uniform1f(gu.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0); gl.uniform1f(gu.u.uBuoyancyLift, CONFIG.buoyancyLift ?? 0.55);
-            gl.uniform1f(gu.u.uSpeedClamp, SIM_CONSTANTS.gridSpeedClamp); gl.uniform1f(gu.u.uMassCutoff, SIM_CONSTANTS.massCutoff); gl.uniform1i(gu.u.uTopology, CONFIG.topology);
+            this.uniform2f(gu.u.uGridSize, this.width, this.height); this.uniform1f(gu.u.uDt, dt); this.uniform1f(gu.u.uFrameDt, CONFIG.dt);
+            this.uniform1f(gu.u.uDamping, SIM_CONSTANTS.gridDamping); this.uniform1f(gu.u.uDriveCoupling, CONFIG.driveCoupling);
+            this.uniform1f(gu.u.uDensityDetachment, CONFIG.densityDetachment); this.uniform1f(gu.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0);
+            this.uniform1f(gu.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0); this.uniform1f(gu.u.uBuoyancyLift, CONFIG.buoyancyLift ?? 0.55);
+            this.uniform1f(gu.u.uSpeedClamp, SIM_CONSTANTS.gridSpeedClamp); this.uniform1f(gu.u.uMassCutoff, SIM_CONSTANTS.massCutoff); this.uniform1i(gu.u.uTopology, CONFIG.topology);
             
             this.gridRead = 0; this.bindFBO(this.gridFbo[this.gridRead], this.width, this.height); gl.drawArrays(gl.TRIANGLES, 0, 3);
             
             const gp = this.programs.gridPhysics;
             const physicsPasses = Math.max(1, CONFIG.gridPhysicsPasses | 0);
             for (let pass = 0; pass < physicsPasses; pass++) {
-                const dst = 1 - this.gridRead; gl.useProgram(gp.p);
+                const dst = 1 - this.gridRead; this.useProgram(gp);
                 this.setTex(gp, "uGridVel", 0, this.gridVel[this.gridRead]); this.setTex(gp, "uGridAux", 1, this.gridAux[this.gridRead]);
                 this.setTex(gp, "uGridMat", 2, this.gridMat[this.gridRead]); this.setTex(gp, "uTerritoryMap", 3, this.tTerritory);
                 this.setTex(gp, "uPlateData", 4, this.tPlateData);
-                gl.uniform2f(gp.u.uGridSize, this.width, this.height);
-                gl.uniform1f(gp.u.uAmount, Math.min(0.5, (CONFIG.gridViscosity ?? SIM_CONSTANTS.gridViscosity) / Math.sqrt(physicsPasses)));
-                gl.uniform1f(gp.u.uDt, dt / physicsPasses); gl.uniform1f(gp.u.uFrameDt, CONFIG.dt);
-                gl.uniform1f(gp.u.uWastingAngle, CONFIG.wastingAngle); gl.uniform1f(gp.u.uWastingRate, CONFIG.wastingRate);
-                gl.uniform1f(gp.u.uCohesion, CONFIG.cohesion); gl.uniform1f(gp.u.uBoundarySmoothing, CONFIG.boundarySmoothing);
-                gl.uniform1i(gp.u.uBoundaryQuality, CONFIG.boundaryQuality | 0); gl.uniform1i(gp.u.uTopology, CONFIG.topology);
-                gl.uniform1f(gp.u.uRidgePush, CONFIG.ridgePush ?? 0.8);
+                this.uniform2f(gp.u.uGridSize, this.width, this.height);
+                this.uniform1f(gp.u.uAmount, Math.min(0.5, (CONFIG.gridViscosity ?? SIM_CONSTANTS.gridViscosity) / Math.sqrt(physicsPasses)));
+                this.uniform1f(gp.u.uDt, dt / physicsPasses); this.uniform1f(gp.u.uFrameDt, CONFIG.dt);
+                this.uniform1f(gp.u.uWastingAngle, CONFIG.wastingAngle); this.uniform1f(gp.u.uWastingRate, CONFIG.wastingRate);
+                this.uniform1f(gp.u.uCohesion, CONFIG.cohesion); this.uniform1f(gp.u.uBoundarySmoothing, CONFIG.boundarySmoothing);
+                this.uniform1i(gp.u.uBoundaryQuality, CONFIG.boundaryQuality | 0); this.uniform1i(gp.u.uTopology, CONFIG.topology);
+                this.uniform1f(gp.u.uRidgePush, CONFIG.ridgePush ?? 0.8);
                 this.bindFBO(this.gridFbo[dst], this.width, this.height); gl.drawArrays(gl.TRIANGLES, 0, 3); this.gridRead = dst;
             }
             
             const g2p = this.programs.g2p;
-            const pDst = 1 - this.readIndex; gl.useProgram(g2p.p);
+            const pDst = 1 - this.readIndex; this.useProgram(g2p);
             this.setTex(g2p, "uPosVel", 0, this.posVel[this.readIndex]); this.setTex(g2p, "uF", 1, this.F[this.readIndex]); this.setTex(g2p, "uMeta", 2, this.meta[this.readIndex]);
             this.setTex(g2p, "uGridVel", 3, this.gridVel[this.gridRead]); this.setTex(g2p, "uGridAux", 4, this.gridAux[this.gridRead]);
             this.setTex(g2p, "uGridMat", 5, this.gridMat[this.gridRead]); this.setTex(g2p, "uTerritoryMap", 6, this.tTerritory); this.setTex(g2p, "uPlateData", 7, this.tPlateData);
-            gl.uniform2i(g2p.u.uParticleTexSize, this.ptexW, this.ptexH); gl.uniform1i(g2p.u.uParticleCount, this.particleCount);
-            gl.uniform2f(g2p.u.uGridSize, this.width, this.height); gl.uniform1f(g2p.u.uDt, dt);
-            gl.uniform1f(g2p.u.uMinJ, Math.min(SIM_CONSTANTS.minJ, SIM_CONSTANTS.maxJ - 0.01)); gl.uniform1f(g2p.u.uMaxJ, Math.max(SIM_CONSTANTS.maxJ, SIM_CONSTANTS.minJ + 0.01));
-            gl.uniform1f(g2p.u.uPlasticYield, CONFIG.plasticYield); gl.uniform1f(g2p.u.uPlasticCreep, CONFIG.plasticCreep);
-            gl.uniform1f(g2p.u.uApicBlend, CONFIG.apicBlend ?? SIM_CONSTANTS.apicBlend); gl.uniform1f(g2p.u.uStrainCoupling, CONFIG.strainCoupling ?? SIM_CONSTANTS.strainCoupling);
-            gl.uniform1f(g2p.u.uParticleDamping, CONFIG.particleDamping ?? SIM_CONSTANTS.particleDamping); gl.uniform1f(g2p.u.uVelocityClamp, SIM_CONSTANTS.velocityClamp);
-            gl.uniform1f(g2p.u.uTime, globalTime); gl.uniform1f(g2p.u.uParticleMass, CONFIG.particleMass);
-            gl.uniform1f(g2p.u.uSubductThreshold, CONFIG.subductThreshold); gl.uniform1f(g2p.u.uSubductRate, CONFIG.subductRate);
-            gl.uniform1f(g2p.u.uRiftThreshold, CONFIG.riftThreshold); gl.uniform1f(g2p.u.uRiftRate, CONFIG.riftRate);
-            gl.uniform1f(g2p.u.uRiftRecycleRate, CONFIG.riftRecycleRate ?? 1.25); gl.uniform1f(g2p.u.uConvergentCrustGainRate, CONFIG.convergentCrustGainRate ?? 1.05);
-            gl.uniform1f(g2p.u.uMaxCrustMass, CONFIG.maxCrustMass); gl.uniform1f(g2p.u.uCrustGrowthRate, CONFIG.crustGrowthRate ?? 0.28);
-            gl.uniform1f(g2p.u.uAgeRate, CONFIG.ageRate ?? 1.0); gl.uniform1f(g2p.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0);
-            gl.uniform1f(g2p.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0); gl.uniform1f(g2p.u.uMaterialVariation, CONFIG.materialVariation ?? 0.65);
-            gl.uniform1i(g2p.u.uTopology, CONFIG.topology);
+            this.uniform2i(g2p.u.uParticleTexSize, this.ptexW, this.ptexH); this.uniform1i(g2p.u.uParticleCount, this.particleCount);
+            this.uniform2f(g2p.u.uGridSize, this.width, this.height); this.uniform1f(g2p.u.uDt, dt);
+            this.uniform1f(g2p.u.uMinJ, Math.min(SIM_CONSTANTS.minJ, SIM_CONSTANTS.maxJ - 0.01)); this.uniform1f(g2p.u.uMaxJ, Math.max(SIM_CONSTANTS.maxJ, SIM_CONSTANTS.minJ + 0.01));
+            this.uniform1f(g2p.u.uPlasticYield, CONFIG.plasticYield); this.uniform1f(g2p.u.uPlasticCreep, CONFIG.plasticCreep);
+            this.uniform1f(g2p.u.uApicBlend, CONFIG.apicBlend ?? SIM_CONSTANTS.apicBlend); this.uniform1f(g2p.u.uStrainCoupling, CONFIG.strainCoupling ?? SIM_CONSTANTS.strainCoupling);
+            this.uniform1f(g2p.u.uParticleDamping, CONFIG.particleDamping ?? SIM_CONSTANTS.particleDamping); this.uniform1f(g2p.u.uVelocityClamp, SIM_CONSTANTS.velocityClamp);
+            this.uniform1f(g2p.u.uTime, globalTime); this.uniform1f(g2p.u.uParticleMass, CONFIG.particleMass);
+            this.uniform1f(g2p.u.uSubductThreshold, CONFIG.subductThreshold); this.uniform1f(g2p.u.uSubductRate, CONFIG.subductRate);
+            this.uniform1f(g2p.u.uRiftThreshold, CONFIG.riftThreshold); this.uniform1f(g2p.u.uRiftRate, CONFIG.riftRate);
+            this.uniform1f(g2p.u.uRiftRecycleRate, CONFIG.riftRecycleRate ?? 1.25); this.uniform1f(g2p.u.uConvergentCrustGainRate, CONFIG.convergentCrustGainRate ?? 1.05);
+            this.uniform1f(g2p.u.uMaxCrustMass, CONFIG.maxCrustMass); this.uniform1f(g2p.u.uCrustGrowthRate, CONFIG.crustGrowthRate ?? 0.28);
+            this.uniform1f(g2p.u.uAgeRate, CONFIG.ageRate ?? 1.0); this.uniform1f(g2p.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0);
+            this.uniform1f(g2p.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0); this.uniform1f(g2p.u.uMaterialVariation, CONFIG.materialVariation ?? 0.65);
+            this.uniform1i(g2p.u.uTopology, CONFIG.topology);
             
             this.bindFBO(this.particleFbo[pDst], this.ptexW, this.ptexH); gl.drawArrays(gl.TRIANGLES, 0, 3); this.readIndex = pDst;
         }
@@ -2472,6 +2658,7 @@
             this.ensurePreviewTerrain(snapshot.width, snapshot.height);
             gl.bindTexture(gl.TEXTURE_2D, this.previewTerrainTex);
             gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, snapshot.width, snapshot.height, gl.RGBA, gl.FLOAT, snapshot.data);
+            this.invalidateTextureBindings();
             this.previewTerrain = this.previewTerrainTex;
             return true;
         }
@@ -2485,6 +2672,7 @@
                 gl.bindTexture(gl.TEXTURE_2D, tex);
                 gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, snapshot.width, snapshot.height, gl.RGBA, gl.FLOAT, snapshot.data);
             }
+            this.invalidateTextureBindings();
             this.terrainRead = 0;
             this.clearTerrainPreview();
             return true;
@@ -2492,29 +2680,30 @@
 
         render(mode) {
             const gl = this.gl; const r = this.programs.render;
-            this.bindFBO(null, this.canvas.width, this.canvas.height); gl.useProgram(r.p);
+            this.bindFBO(null, this.canvas.width, this.canvas.height); this.useProgram(r);
             const terrainTex = this.previewTerrain || this.terrain[this.terrainRead];
             this.setTex(r, "uTerrain", 0, terrainTex); this.setTex(r, "uTerritoryMap", 1, this.tTerritory);
             this.setTex(r, "uPlateData", 2, this.tPlateData); this.setTex(r, "uClimateB", 3, this.climateB[this.climateBRead]);
             this.setTex(r, "uClimateC", 4, this.climateC[this.climateCRead]); this.setTex(r, "uClimateD", 5, this.climateD[this.climateDRead]);
             this.setTex(r, "uGridVel", 6, this.gridVel[this.gridRead]); this.setTex(r, "uGridAux", 7, this.gridAux[this.gridRead]);
             this.setTex(r, "uGridMat", 8, this.gridMat[this.gridRead]);
-            gl.uniform2f(r.u.uGridSize, this.width, this.height); gl.uniform2f(r.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
-            gl.uniform2f(r.u.uClimateSize, this.climateWidth, this.climateHeight); gl.uniform1f(r.u.uSeaLevel, this.effectiveSeaLevel());
-            gl.uniform1f(r.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); gl.uniform1f(r.u.uCloudOpacity, CONFIG.cloudOpacity ?? 0.32);
-            gl.uniform1f(r.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0); gl.uniform1f(r.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0);
-            const setRenderFloat = (name, value) => { const loc = r.u[name]; if (loc !== undefined && loc !== null) gl.uniform1f(loc, value); };
+            this.uniform2f(r.u.uGridSize, this.width, this.height); this.uniform2f(r.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
+            this.uniform2f(r.u.uClimateSize, this.climateWidth, this.climateHeight); this.uniform1f(r.u.uSeaLevel, this.effectiveSeaLevel());
+            this.uniform1f(r.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale ?? 1.0); this.uniform1f(r.u.uCloudOpacity, CONFIG.cloudOpacity ?? 0.32);
+            this.uniform1f(r.u.uAgeDensityGain, CONFIG.ageDensityGain ?? 1.0); this.uniform1f(r.u.uMaterialDensityContrast, CONFIG.materialDensityContrast ?? 1.0);
+            const setRenderFloat = (name, value) => { const loc = r.u[name]; if (loc !== undefined && loc !== null) this.uniform1f(loc, value); };
             setRenderFloat("uPlantGrowth", CONFIG.plantGrowth ?? 1.0); setRenderFloat("uBiosphereComplexity", CONFIG.biosphereComplexity ?? 1.0);
             setRenderFloat("uColdStress", CONFIG.coldStress ?? 1.0); setRenderFloat("uDroughtStress", CONFIG.droughtStress ?? 1.0);
             setRenderFloat("uAltitudeStress", CONFIG.altitudeStress ?? 1.0);
-            gl.uniform1i(r.u.uMode, mode); gl.uniform1i(r.u.uTopology, CONFIG.topology); gl.drawArrays(gl.TRIANGLES, 0, 3);
+            this.uniform1i(r.u.uMode, mode); this.uniform1i(r.u.uTopology, CONFIG.topology); gl.drawArrays(gl.TRIANGLES, 0, 3);
         }
 
         destroy() {
             const gl = this.gl;
             for (const arr of [this.posVel, this.F, this.C, this.meta, this.gridVel, this.gridAux, this.gridMat, this.terrain, this.climateB, this.climateC, this.climateD]) { if (arr) for (const t of arr) gl.deleteTexture(t); }
             if (this.previewTerrainTex) gl.deleteTexture(this.previewTerrainTex);
-            for (const t of [this.grid0, this.grid1, this.tTerritory, this.tPlateData]) if (t) gl.deleteTexture(t);
+            for (const t of [this.grid0, this.grid1, this.tTerritory, this.tPlateData, this.gridReadbackTex]) if (t) gl.deleteTexture(t);
+            if (this.gridReadbackFbo) gl.deleteFramebuffer(this.gridReadbackFbo);
             gl.deleteFramebuffer(this.accumFbo);
             for (const arr of [this.gridFbo, this.terrainFbo, this.climateBFbo, this.climateCFbo, this.climateDFbo, this.particleFbo]) if (arr) for (const f of arr) gl.deleteFramebuffer(f);
             for (const key in this.programs) gl.deleteProgram(this.programs[key].p);
