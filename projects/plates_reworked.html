@@ -1,0 +1,3028 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shader MPM Plate Tectonics - Coupled Rigid Plates</title>
+<style>
+    :root {
+        --bg: #0f1012;
+        --surface-0: #16181a;
+        --surface-1: #1e2024;
+        --surface-2: #282b30;
+        --line: #33373e;
+        --text: #e2e8f0;
+        --text-dim: #94a3b8;
+        --accent: #38bdf8;
+        --accent-hover: #0ea5e9;
+        --run: #22c55e;
+        --run-hover: #16a34a;
+        --bad: #ef4444;
+        --font: system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    html, body {
+        height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.5 var(--font);
+        overflow: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--line); }
+
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    header {
+        height: 50px; display: flex; align-items: center; justify-content: space-between;
+        padding: 0 20px; background: var(--surface-0); border-bottom: 1px solid var(--line); z-index: 10;
+    }
+
+    .title { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+    .title::before {
+        content: ""; display: block; width: 10px; height: 10px; border-radius: 50%;
+        background: var(--accent); box-shadow: 0 0 10px var(--accent);
+    }
+
+    .main-area { flex: 1; display: flex; overflow: hidden; }
+
+    aside {
+        width: 430px; background: var(--surface-1); border-right: 1px solid var(--line);
+        display: flex; flex-direction: column; z-index: 10;
+    }
+
+    .controls-header { padding: 15px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; flex-shrink: 0; }
+    .btn-group { display: flex; gap: 8px; }
+
+    button {
+        flex: 1; font: inherit; font-weight: 500; color: var(--text); background: var(--surface-2);
+        border: 1px solid var(--line); padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: .15s;
+    }
+    button:hover { background: var(--line); }
+    button:active { transform: scale(0.98); }
+    button.primary { background: var(--accent); border-color: var(--accent-hover); color: #fff; }
+    button.primary:hover { background: var(--accent-hover); }
+    button.play { background: var(--run); border-color: var(--run-hover); color: #fff; }
+    button.play:hover { background: var(--run-hover); }
+
+    .settings-scroll { flex: 1; overflow-y: auto; padding: 8px; }
+    .setting-group { margin: 0 0 8px; padding: 0; border: 1px solid rgba(255, 255, 255, .07); border-radius: 8px; background: rgba(15, 16, 18, .28); overflow: hidden; }
+    .setting-group:last-child { margin-bottom: 0; }
+    .setting-group[open] { background: rgba(15, 16, 18, .44); }
+    .setting-title { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; user-select: none; font-size: 11px; text-transform: uppercase; color: var(--text-dim); font-weight: 700; margin: 0; padding: 10px 12px; letter-spacing: .5px; }
+    .setting-title::-webkit-details-marker { display: none; }
+    .setting-title::after { content: "▸"; color: var(--accent); transition: transform .15s ease; }
+    .setting-group[open] > .setting-title::after { transform: rotate(90deg); }
+    .setting-body { padding: 8px 10px 10px; border-top: 1px solid rgba(255, 255, 255, .06); }
+
+    .control-row { display: flex; align-items: center; margin-bottom: 6px; gap: 8px; }
+    .control-row:last-child { margin-bottom: 0; }
+    .control-row label { flex: 0 0 152px; font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    .control-row input[type="range"] { flex: 1; -webkit-appearance: none; height: 4px; background: var(--surface-2); border-radius: 2px; outline: none; min-width: 0; }
+    .control-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+    .control-row .control-value { flex: 0 0 54px; text-align: right; font-size: 11px; font-family: monospace; color: var(--accent); }
+
+    input[type="number"] {
+        flex: 1; height: 24px; background: var(--surface-0); border: 1px solid var(--line); color: var(--text);
+        border-radius: 4px; padding: 0 6px; font: inherit; font-size: 11px; outline: none; max-width: 70px;
+    }
+    input[type="number"]:focus { border-color: var(--accent); }
+
+    select { font: inherit; color: var(--text); background: var(--surface-0); border: 1px solid var(--line); border-radius: 4px; outline: none; flex: 1; }
+
+    main { flex: 1; display: flex; flex-direction: column; background: #000; position: relative; overflow: hidden; }
+
+    .viewport-overlay {
+        position: absolute; top: 15px; left: 15px; right: 15px; display: flex;
+        justify-content: space-between; align-items: flex-start; pointer-events: none; z-index: 5;
+    }
+
+    .stats-panel {
+        background: rgba(22, 24, 26, .85); backdrop-filter: blur(8px); border: 1px solid var(--line);
+        border-radius: 6px; padding: 10px 15px; display: flex; gap: 20px; pointer-events: auto;
+    }
+    .stat { display: flex; flex-direction: column; }
+    .stat-val { font-size: 14px; font-weight: 600; font-family: monospace; color: #fff; }
+    .stat-label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); }
+
+    .view-controls { pointer-events: auto; display: flex; gap: 8px; }
+    .view-controls button, .view-controls select {
+        padding: 6px 12px; font-size: 11px; font-weight: 600; color: var(--text); background: rgba(22, 24, 26, .85);
+        backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 4px; outline: none; cursor: pointer;
+    }
+
+    .canvas-container { flex: 1; position: relative; overflow: hidden; background: #0b0c0e; cursor: grab; touch-action: none; }
+    .canvas-container:active { cursor: grabbing; }
+
+    canvas {
+        position: absolute; top: 0; left: 0; transform-origin: 0 0;
+        border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 10px 40px rgba(0, 0, 0, .8); will-change: transform;
+    }
+
+    .error-box {
+        position: absolute; inset: 20px; display: none; align-items: center; justify-content: center; text-align: left;
+        background: rgba(15, 16, 18, .94); border: 1px solid var(--bad); border-radius: 8px; padding: 24px; color: var(--text); z-index: 20;
+    }
+    .error-box strong { color: #fff; }
+    .hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+
+    @media (max-width: 800px) {
+        .main-area { flex-direction: column; }
+        aside { width: 100%; border-right: none; border-bottom: 1px solid var(--line); max-height: 45vh; }
+        .viewport-overlay { flex-direction: column; gap: 10px; }
+    }
+</style>
+</head>
+<body>
+<div id="app">
+    <header>
+        <div class="title">Shader MPM Plate Tectonics</div>
+        <div style="font-size:12px;color:var(--text-dim)">Two-Way Coupled Rigid Plates + Emergent Fluid Crust</div>
+    </header>
+    <div class="main-area">
+        <aside>
+            <div class="controls-header">
+                <button id="btn-restart" class="primary">Regenerate World</button>
+                <div class="btn-group">
+                    <button id="btn-step">Step</button>
+                    <button id="btn-play" class="play">Play</button>
+                </div>
+                <div class="hint">GPU MPM crust, rigid plates, erosion and climate with bounded resource use.</div>
+            </div>
+            <div class="settings-scroll">
+                <details class="setting-group" open>
+                    <summary class="setting-title">Domain</summary>
+                    <div class="setting-body">
+                        <div class="control-row"><label>Topology</label><select class="cfg-input" data-key="topology"><option value="0">Torus</option><option value="1">Cylinder</option><option value="2">Box</option></select></div>
+                        <div class="control-row"><label>Dimensions</label><input class="cfg-input" data-key="width" min="64" max="1024" step="16" type="number" value="256"><span style="font-size:11px;color:var(--text-dim)">×</span><input class="cfg-input" data-key="height" min="64" max="1024" step="16" type="number" value="256"></div>
+                        <div class="control-row"><label>Plate Count</label><input class="cfg-input" data-key="plates" min="2" max="64" step="1" type="range" value="18"><span class="control-value" id="val-plates">18</span></div>
+                        <div class="control-row"><label>Terrain Resolution</label><select class="cfg-input" data-key="terrainResolutionScale"><option value="0.5">Half</option><option selected value="1">Full</option><option value="2">2×</option></select></div>
+                        <div class="control-row"><label>Climate Resolution</label><select class="cfg-input" data-key="climateResolutionScale"><option selected value="0.5">Half</option><option value="1">Full</option></select></div>
+                    </div>
+                </details>
+                <details class="setting-group" open>
+                    <summary class="setting-title">Performance</summary>
+                    <div class="setting-body">
+                        <div class="control-row"><label>Particle Slots / Cell</label><input class="cfg-input" data-key="particleSlotDensity" min="1" max="2" step="0.25" type="range" value="1.5"><span class="control-value" id="val-particleSlotDensity">1.50</span></div>
+                        <div class="control-row"><label>Initial Particles / Cell</label><input class="cfg-input" data-key="particleDensity" min="0.5" max="1.5" step="0.25" type="range" value="1"><span class="control-value" id="val-particleDensity">1.00</span></div>
+                        <div class="control-row"><label>Plate Update Interval</label><input class="cfg-input" data-key="plateEvery" min="1" max="16" step="1" type="range" value="4"><span class="control-value" id="val-plateEvery">4</span></div>
+                        <div class="control-row"><label>Surface Interval</label><input class="cfg-input" data-key="terrainEvery" min="1" max="16" step="1" type="range" value="2"><span class="control-value" id="val-terrainEvery">2</span></div>
+                        <div class="control-row"><label>Climate Interval</label><input class="cfg-input" data-key="climateEvery" min="1" max="16" step="1" type="range" value="2"><span class="control-value" id="val-climateEvery">2</span></div>
+                        <div class="control-row"><label>Render Interval</label><input class="cfg-input" data-key="renderEvery" min="1" max="8" step="1" type="range" value="1"><span class="control-value" id="val-renderEvery">1</span></div>
+                        <div class="control-row"><label>Substeps / Frame</label><input class="cfg-input" data-key="substeps" min="1" max="8" step="1" type="range" value="4"><span class="control-value" id="val-substeps">4</span></div>
+                        <div class="control-row"><label>Time Step</label><input class="cfg-input" data-key="dt" min="0.02" max="0.20" step="0.01" type="range" value="0.08"><span class="control-value" id="val-dt">0.08</span></div>
+                        <div class="control-row"><label>Plate Time Scale</label><input class="cfg-input" data-key="plateTimeScale" min="0" max="4" step="0.05" type="range" value="1"><span class="control-value" id="val-plateTimeScale">1.00</span></div>
+                        <div class="control-row"><label>Crust Time Scale</label><input class="cfg-input" data-key="mpmTimeScale" min="0" max="4" step="0.05" type="range" value="1"><span class="control-value" id="val-mpmTimeScale">1.00</span></div>
+                        <div class="control-row"><label>Erosion Time Scale</label><input class="cfg-input" data-key="erosionTimeScale" min="0" max="4" step="0.05" type="range" value="1"><span class="control-value" id="val-erosionTimeScale">1.00</span></div>
+                        <div class="control-row"><label>Climate Time Scale</label><input class="cfg-input" data-key="climateTimeScale" min="0" max="4" step="0.05" type="range" value="1"><span class="control-value" id="val-climateTimeScale">1.00</span></div>
+                    </div>
+                </details>
+                <details class="setting-group">
+                    <summary class="setting-title">Plate Dynamics</summary>
+                    <div class="setting-body">
+                        <div class="control-row"><label>Mantle Coupling</label><input class="cfg-input" data-key="mantleCoupling" min="0" max="1" step="0.05" type="range" value="1"><span class="control-value" id="val-mantleCoupling">1.00</span></div>
+                        <div class="control-row"><label>Mantle Flow Strength</label><input class="cfg-input" data-key="flowForce" min="0" max="0.3" step="0.005" type="range" value="0.1"><span class="control-value" id="val-flowForce">0.100</span></div>
+                        <div class="control-row"><label>Flow Torque</label><input class="cfg-input" data-key="flowTorque" min="0" max="2" step="0.05" type="range" value="0.4"><span class="control-value" id="val-flowTorque">0.40</span></div>
+                        <div class="control-row"><label>Global Drag</label><input class="cfg-input" data-key="viscosity" min="0" max="0.1" step="0.005" type="range" value="0.02"><span class="control-value" id="val-viscosity">0.020</span></div>
+                        <div class="control-row"><label>Max Plate Speed</label><input class="cfg-input" data-key="maxPlateSpeed" min="0.5" max="8" step="0.1" type="range" value="2"><span class="control-value" id="val-maxPlateSpeed">2.0</span></div>
+                        <div class="control-row"><label>Plate Merge Rate</label><input class="cfg-input" data-key="plateMergeRate" min="0" max="10" step="0.1" type="range" value="1"><span class="control-value" id="val-plateMergeRate">1.0</span></div>
+                        <div class="control-row"><label>Plate Split Rate</label><input class="cfg-input" data-key="plateSplitRate" min="0" max="10" step="0.1" type="range" value="0.5"><span class="control-value" id="val-plateSplitRate">0.5</span></div>
+                    </div>
+                </details>
+                <details class="setting-group">
+                    <summary class="setting-title">Crust & Boundaries</summary>
+                    <div class="setting-body">
+                        <div class="control-row"><label>Ridge Push</label><input class="cfg-input" data-key="ridgePush" min="0" max="4" step="0.1" type="range" value="0.8"><span class="control-value" id="val-ridgePush">0.8</span></div>
+                        <div class="control-row"><label>Boundary Damping</label><input class="cfg-input" data-key="cohesion" min="0" max="20" step="0.5" type="range" value="3.5"><span class="control-value" id="val-cohesion">3.5</span></div>
+                        <div class="control-row"><label>Signal Spread</label><input class="cfg-input" data-key="boundarySmoothing" min="0" max="0.95" step="0.05" type="range" value="0.45"><span class="control-value" id="val-boundarySmoothing">0.45</span></div>
+                        <div class="control-row"><label>Rift Threshold</label><input class="cfg-input" data-key="riftThreshold" min="0" max="1" step="0.01" type="range" value="0.08"><span class="control-value" id="val-riftThreshold">0.08</span></div>
+                        <div class="control-row"><label>Rift Spawn</label><input class="cfg-input" data-key="riftRate" min="0" max="50" step="1" type="range" value="12"><span class="control-value" id="val-riftRate">12</span></div>
+                        <div class="control-row"><label>Rift Recycling</label><input class="cfg-input" data-key="riftRecycleRate" min="0" max="4" step="0.05" type="range" value="1.25"><span class="control-value" id="val-riftRecycleRate">1.25</span></div>
+                        <div class="control-row"><label>Subduct Threshold</label><input class="cfg-input" data-key="subductThreshold" min="0" max="1" step="0.01" type="range" value="0.10"><span class="control-value" id="val-subductThreshold">0.10</span></div>
+                        <div class="control-row"><label>Subduction Loss</label><input class="cfg-input" data-key="subductRate" min="0" max="20" step="0.1" type="range" value="2.5"><span class="control-value" id="val-subductRate">2.5</span></div>
+                        <div class="control-row"><label>Max Crust Mass</label><input class="cfg-input" data-key="maxCrustMass" min="0.8" max="10" step="0.05" type="range" value="4.2"><span class="control-value" id="val-maxCrustMass">4.20</span></div>
+                        <div class="control-row"><label>Shear Stiffness</label><input class="cfg-input" data-key="mu" min="0" max="12" step="0.05" type="range" value="2.4"><span class="control-value" id="val-mu">2.40</span></div>
+                        <div class="control-row"><label>Bulk Stiffness</label><input class="cfg-input" data-key="lambda" min="0" max="18" step="0.05" type="range" value="4.2"><span class="control-value" id="val-lambda">4.20</span></div>
+                        <div class="control-row"><label>Plastic Yield</label><input class="cfg-input" data-key="plasticYield" min="0.02" max="1.5" step="0.01" type="range" value="0.36"><span class="control-value" id="val-plasticYield">0.36</span></div>
+                        <div class="control-row"><label>Plate Drag</label><input class="cfg-input" data-key="driveCoupling" min="0" max="50" step="0.5" type="range" value="6"><span class="control-value" id="val-driveCoupling">6.0</span></div>
+                        <div class="control-row"><label>Material Variation</label><input class="cfg-input" data-key="materialVariation" min="0" max="2" step="0.05" type="range" value="0.65"><span class="control-value" id="val-materialVariation">0.65</span></div>
+                    </div>
+                </details>
+                <details class="setting-group">
+                    <summary class="setting-title">Surface</summary>
+                    <div class="setting-body">
+                        <div class="control-row"><label>Surface Coupling</label><input class="cfg-input" data-key="terrainCoupling" min="0" max="8" step="0.05" type="range" value="0.35"><span class="control-value" id="val-terrainCoupling">0.35</span></div>
+                        <div class="control-row"><label>Crust Growth</label><input class="cfg-input" data-key="crustGrowthRate" min="0" max="2" step="0.01" type="range" value="0.28"><span class="control-value" id="val-crustGrowthRate">0.28</span></div>
+                        <div class="control-row"><label>Crust Lift</label><input class="cfg-input" data-key="buoyancyLift" min="0" max="2" step="0.01" type="range" value="0.55"><span class="control-value" id="val-buoyancyLift">0.55</span></div>
+                        <div class="control-row"><label>Rift Lower</label><input class="cfg-input" data-key="riftTerrainReset" min="0" max="12" step="0.05" type="range" value="2.5"><span class="control-value" id="val-riftTerrainReset">2.50</span></div>
+                        <div class="control-row"><label>Smoothing</label><input class="cfg-input" data-key="thermalErosion" min="0" max="0.5" step="0.005" type="range" value="0.02"><span class="control-value" id="val-thermalErosion">0.020</span></div>
+                        <div class="control-row"><label>Incision</label><input class="cfg-input" data-key="erosionRate" min="0" max="2" step="0.005" type="range" value="0.05"><span class="control-value" id="val-erosionRate">0.050</span></div>
+                        <div class="control-row"><label>Sea Level</label><input class="cfg-input" data-key="seaLevel" min="0.1" max="3" step="0.01" type="range" value="0.9"><span class="control-value" id="val-seaLevel">0.90</span></div>
+                        <div class="control-row"><label>Height Scale</label><input class="cfg-input" data-key="terrainVerticalScale" min="0.25" max="8" step="0.05" type="range" value="1"><span class="control-value" id="val-terrainVerticalScale">1.00</span></div>
+                    </div>
+                </details>
+                <details class="setting-group">
+                    <summary class="setting-title">Climate</summary>
+                    <div class="setting-body">
+                        <div class="control-row"><label>Season Speed</label><input class="cfg-input" data-key="seasonSpeed" min="0" max="60" step="0.1" type="range" value="1"><span class="control-value" id="val-seasonSpeed">1.0</span></div>
+                        <div class="control-row"><label>Axial Tilt</label><input class="cfg-input" data-key="axialTilt" min="0" max="45" step="0.5" type="range" value="23.5"><span class="control-value" id="val-axialTilt">23.5</span></div>
+                        <div class="control-row"><label>Sun Power</label><input class="cfg-input" data-key="sunPower" min="0.4" max="1.8" step="0.01" type="range" value="1"><span class="control-value" id="val-sunPower">1.00</span></div>
+                        <div class="control-row"><label>Plant Growth</label><input class="cfg-input" data-key="plantGrowth" min="0" max="5" step="0.05" type="range" value="1"><span class="control-value" id="val-plantGrowth">1.00</span></div>
+                        <div class="control-row"><label>Cloud Passes</label><input class="cfg-input" data-key="cloudFluidPasses" min="1" max="8" step="1" type="range" value="1"><span class="control-value" id="val-cloudFluidPasses">1</span></div>
+                        <div class="control-row"><label>Cloud Opacity</label><input class="cfg-input" data-key="cloudOpacity" min="0" max="1.5" step="0.01" type="range" value="0.32"><span class="control-value" id="val-cloudOpacity">0.32</span></div>
+                        <div class="control-row"><label>Wind Speed</label><input class="cfg-input" data-key="windSpeed" min="0" max="4" step="0.05" type="range" value="1"><span class="control-value" id="val-windSpeed">1.00</span></div>
+                        <div class="control-row"><label>Cloud Advection</label><input class="cfg-input" data-key="cloudAdvection" min="0" max="4" step="0.05" type="range" value="1.2"><span class="control-value" id="val-cloudAdvection">1.20</span></div>
+                        <div class="control-row"><label>Cloud Diffusion</label><input class="cfg-input" data-key="cloudDiffusion" min="0" max="0.5" step="0.005" type="range" value="0.08"><span class="control-value" id="val-cloudDiffusion">0.080</span></div>
+                        <div class="control-row"><label>Condensation</label><input class="cfg-input" data-key="cloudCondensation" min="0" max="3" step="0.05" type="range" value="1"><span class="control-value" id="val-cloudCondensation">1.00</span></div>
+                    </div>
+                </details>
+            </div>
+        </aside>
+
+        <main>
+            <div class="viewport-overlay">
+                <div class="stats-panel">
+                    <div class="stat"><span class="stat-val" id="stat-iter">0</span><span class="stat-label">Iteration</span></div>
+                    <div class="stat"><span class="stat-val" id="stat-plates">0</span><span class="stat-label">Plates</span></div>
+                    <div class="stat"><span class="stat-val" id="stat-particles">0k</span><span class="stat-label">Slots</span></div>
+                    <div class="stat"><span class="stat-val" id="stat-energy">0.0</span><span class="stat-label">Plate KE</span></div>
+                </div>
+                <div class="view-controls">
+                    <select id="view-mode">
+                        <option value="0">Satellite</option>
+                        <option value="1">Heightmap</option>
+                        <option value="2">Plates</option>
+                        <option value="3">Temperature</option>
+                        <option value="4">Pressure / Wind</option>
+                        <option value="5">Crust Age</option>
+                        <option value="6">Crust Density</option>
+                        <option value="7">Material Type</option>
+                        <option value="8">Crust Mass</option>
+                        <option value="9">Boundary State</option>
+                        <option value="10">Crust Lift</option>
+                        <option value="11">Vegetation</option>
+                        <option value="12">Soil Moisture</option>
+                        <option value="13">Surface Flow</option>
+                        <option value="14">Erosion / Deposition</option>
+                    </select>
+                    <button id="btn-reset-view">Recenter View</button>
+                </div>
+            </div>
+            <div class="canvas-container" id="canvas-container">
+                <canvas id="map"></canvas>
+                <div class="error-box" id="error-box">
+                    <div id="error-text"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+(() => {
+    "use strict";
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const wrapFloat = (v, max, wrapped) => wrapped ? ((v % max) + max) % max : clamp(v, 0, max - 0.001);
+    const wrapInt = (v, max, wrapped) => wrapped ? ((v % max) + max) % max : (v >= 0 && v < max ? v : -1);
+    const wrappedDist = (a, b, max, wrapped) => {
+        let d = a - b;
+        if (!wrapped) return d;
+        if (d > max * 0.5) d -= max;
+        else if (d < -max * 0.5) d += max;
+        return d;
+    };
+    const snapDimension = v => Math.round(clamp(Number(v) || 256, 64, 1024) / 16) * 16;
+    const hash01 = (x, y = 0, seed = 0) => {
+        const v = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
+        return v - Math.floor(v);
+    };
+
+    const DEFAULT_CONFIG = Object.freeze({
+        topology: 0, width: 256, height: 256, plates: 18,
+        particleSlotDensity: 1.5, particleDensity: 1.0,
+        terrainResolutionScale: 1.0, climateResolutionScale: 0.5,
+        plateEvery: 4, terrainEvery: 2, climateEvery: 2, renderEvery: 1,
+        plateTimeScale: 1.0, mpmTimeScale: 1.0, erosionTimeScale: 1.0, climateTimeScale: 1.0,
+        mantleCoupling: 1.0, flowForce: 0.1, flowTorque: 0.4, viscosity: 0.02, maxPlateSpeed: 2.0,
+        plateMergeRate: 1.0, plateSplitRate: 0.5,
+        cohesion: 3.5, ridgePush: 0.8, boundarySmoothing: 0.45,
+        subductThreshold: 0.10, subductRate: 2.5, riftThreshold: 0.08, riftRate: 12.0, riftRecycleRate: 1.25,
+        maxCrustMass: 4.2, substeps: 4, dt: 0.08, mu: 2.4, lambda: 4.2, plasticYield: 0.36,
+        driveCoupling: 6.0, materialVariation: 0.65,
+        terrainCoupling: 0.35, riftTerrainReset: 2.50, thermalErosion: 0.02, erosionRate: 0.05,
+        buoyancyLift: 0.55, crustGrowthRate: 0.28, terrainVerticalScale: 1.0,
+        cloudFluidPasses: 1, seasonSpeed: 1.0, axialTilt: 23.5, sunPower: 1.0, seaLevel: 0.90,
+        plantGrowth: 1.0, windSpeed: 1.0, cloudAdvection: 1.20, cloudDiffusion: 0.08,
+        cloudCondensation: 1.0, cloudOpacity: 0.32
+    });
+
+    const CONFIG = { ...DEFAULT_CONFIG };
+    const ZERO4 = new Float32Array(4);
+    const SIM = Object.freeze({
+        restVolume: 1.0, stressScale: 0.85, stressClamp: 24.0, apicBlend: 0.86,
+        strainCoupling: 0.82, particleDamping: 0.08, minJ: 0.60, maxJ: 1.55,
+        velocityClamp: 42.0, gridDamping: 0.07, gridViscosityRate: 1.60,
+        gridSpeedClamp: 42.0, massCutoff: 0.001, wastingAngle: 0.36, wastingRate: 0.35,
+        territoryRelaxPasses: 2, territoryDataWeight: 2.6, territoryContinuity: 0.24, territorySwitchBias: 0.10, riftSpawnEvery: 4,
+        startupStabilizationFrames: 64, densityFriction: 1.0, flowScale: 0.02, flowTimeScale: 0.004,
+        angularDamping: 1.5, boundaryRestitution: 0.05, boundaryFriction: 0.65, maxPlateRadius: 0.45,
+        comInterpolation: 0.16, splitAreaRatio: 1.70, splitElongation: 2.15, splitRateScale: 0.020, splitCooldown: 160.0,
+        mergeRateScale: 0.012, mergeProgressDecay: 0.055, mergeMinContact: 0.055, particleMass: 1.0,
+        hardening: 0.35, plasticCreep: 0.28, densityDetachment: 0.70, cratonStrength: 1.85,
+        ageVariation: 1.0, ageRate: 1.0, ageDensityGain: 1.0, materialDensityContrast: 1.0,
+        basinFillRate: 0.000035, globalUplift: 0.0015, terrainPasses: 2, cloudVorticity: 0.45,
+        evaporationBias: 0.50, terrainLift: 1.0, terrainDeflection: 0.50, terrainRainShadow: 0.60,
+        terrainThermalLift: 0.50, memoryBudgetBytes: 512 * 1024 * 1024
+    });
+
+    const GLSL_HEADER = `#version 300 es
+        precision highp float;
+        precision highp int;
+    `;
+    const GLSL_TOPOLOGY = `
+        uniform int uTopology;
+        bvec2 getWrap() { return bvec2(uTopology < 2, uTopology == 0); }
+        ivec2 wrapc(ivec2 p, ivec2 s) {
+            bvec2 w = getWrap();
+            return ivec2(w.x ? (p.x + s.x) % s.x : clamp(p.x, 0, s.x - 1), w.y ? (p.y + s.y) % s.y : clamp(p.y, 0, s.y - 1));
+        }
+        vec2 wrapDelta(vec2 a, vec2 b, vec2 size) {
+            bvec2 w = getWrap();
+            vec2 d = a - b;
+            if (w.x) d.x -= size.x * floor(d.x / size.x + 0.5);
+            if (w.y) d.y -= size.y * floor(d.y / size.y + 0.5);
+            return d;
+        }
+        vec2 wrapPos(vec2 p, vec2 size) {
+            bvec2 w = getWrap();
+            return vec2(w.x ? mod(p.x + size.x, size.x) : clamp(p.x, 0.0, size.x - 0.001), w.y ? mod(p.y + size.y, size.y) : clamp(p.y, 0.0, size.y - 0.001));
+        }
+        vec2 topoUv(vec2 uv, vec2 size) {
+            bvec2 w = getWrap();
+            vec2 h = 0.5 / max(size, vec2(1.0));
+            return vec2(w.x ? fract(uv.x) : clamp(uv.x, h.x, 1.0 - h.x), w.y ? fract(uv.y) : clamp(uv.y, h.y, 1.0 - h.y));
+        }
+    `;
+    const GLSL_MPM = `
+        float wq(float x, int o) { if(o == 0) return 0.5 * (1.5 - x) * (1.5 - x); if(o == 1) return 0.75 - (x - 1.0) * (x - 1.0); return 0.5 * (x - 0.5) * (x - 0.5); }
+        mat2 invTrans(mat2 F, float J) { float a = F[0][0], b = F[1][0], c = F[0][1], d = F[1][1]; return mat2(d, -b, -c, a) / J; }
+        mat2 outerp(vec2 a, vec2 b) { return mat2(a * b.x, a * b.y); }
+        float det2(mat2 m) { return m[0][0] * m[1][1] - m[1][0] * m[0][1]; }
+    `;
+    const GLSL_HASH = `
+        vec2 hash22(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973)); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
+    `;
+    const GLSL_MATERIAL = `
+        vec4 getMatProps(float type) {
+            float t = clamp(type, 0.0, 4.0);
+            vec4 v = mix(vec4(1.08, 1.20, 0.60, 0.00), vec4(1.02, 0.95, 1.00, 0.25), clamp(t, 0.0, 1.0));
+            v = mix(v, vec4(0.94, 0.75, 1.50, 0.50), clamp(t - 1.0, 0.0, 1.0));
+            v = mix(v, vec4(0.88, 1.80, 0.30, 0.75), clamp(t - 2.0, 0.0, 1.0));
+            return mix(v, vec4(0.98, 0.40, 2.50, 1.00), clamp(t - 3.0, 0.0, 1.0));
+        }
+        float crustDensityFromState(float type, float age, float mass, float restVolume, float densityContrast, float ageDensityGain) {
+            vec4 props = getMatProps(type);
+            float material = mix(1.0, props.x, densityContrast) + clamp((props.x - 0.96) * 10.0, 0.0, 1.0) * clamp(age / 180.0, 0.0, 1.0) * 0.22 * ageDensityGain;
+            float compaction = clamp(mass / max(restVolume, 0.08), 0.35, 3.0);
+            return clamp(mix(material, compaction, 0.30), 0.55, 1.75);
+        }
+    `;
+    const GLSL_ATLAS = `
+        vec4 sampleAtlas(sampler2D tex, vec2 domainUv, vec2 pass, vec2 fullSize) {
+            bvec2 w = getWrap();
+            vec2 local = vec2(w.x ? fract(domainUv.x) : clamp(domainUv.x, 0.0, 1.0), w.y ? fract(domainUv.y) : clamp(domainUv.y, 0.0, 1.0));
+            vec2 passSize = fullSize * 0.5;
+            vec2 px = local * passSize - 0.5;
+            ivec2 iUv = ivec2(floor(px));
+            vec2 f = fract(px);
+            ivec2 p00 = wrapc(iUv, ivec2(passSize));
+            ivec2 p10 = wrapc(iUv + ivec2(1, 0), ivec2(passSize));
+            ivec2 p01 = wrapc(iUv + ivec2(0, 1), ivec2(passSize));
+            ivec2 p11 = wrapc(iUv + ivec2(1, 1), ivec2(passSize));
+            ivec2 off = ivec2(pass * fullSize);
+            return mix(mix(texelFetch(tex, p00 + off, 0), texelFetch(tex, p10 + off, 0), f.x), mix(texelFetch(tex, p01 + off, 0), texelFetch(tex, p11 + off, 0), f.x), f.y);
+        }
+    `;
+    const GLSL_PI = `#define PI 3.14159265359
+`;
+    const GLSL_DIRECTIONS = `
+        #define N vec2(0,1)
+        #define E vec2(1,0)
+        #define S vec2(0,-1)
+        #define W vec2(-1,0)
+    `;
+    const GLSL_PLANTS = `
+        uniform float uPlantGrowth;
+        float plant_growth(float moisture, float temp) {
+            float growth = clamp(moisture / 3.0, 0.0, 1.0);
+            growth *= smoothstep(0.0, 25.0, temp) - smoothstep(25.0, 35.0, temp);
+            return growth * uPlantGrowth;
+        }
+    `;
+
+    class Plate {
+        constructor(id) {
+            this.id = id; this.mass = 0; this.cx = 0; this.cy = 0; this.vx = 0; this.vy = 0; this.omega = 0;
+            this.impX = 0; this.impY = 0; this.impTorque = 0; this.inertia = 1;
+            this.materialType = 0;
+            
+            const hash = (id + 1) * 100.0;
+            this.colorR = Math.abs(Math.sin(hash * 12.9898) * 43758.5453) % 1.0;
+            this.colorG = Math.abs(Math.sin(hash * 78.233) * 43758.5453) % 1.0;
+            this.colorB = Math.abs(Math.sin(hash * 37.719) * 43758.5453) % 1.0;
+            
+            const maxC = Math.max(this.colorR, this.colorG, this.colorB);
+            if (maxC < 0.3) { this.colorR += 0.3; this.colorG += 0.3; this.colorB += 0.3; }
+            
+            this._surfaceMass = 0; this._surfaceExcess = 0; this._surfaceCells = 0; this.surfaceFloat = 0;
+            this.splitProgress = 0; this.splitCooldown = 0;
+        }
+    }
+
+    class ShaderMpmEngine {
+        constructor(canvas) {
+            this.canvas = canvas;
+            this.gl = canvas.getContext("webgl2", { antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false, powerPreference: "high-performance" });
+            if (!this.gl) throw new Error("WebGL2 is required.");
+            if (!this.gl.getExtension("EXT_color_buffer_float")) throw new Error("EXT_color_buffer_float is required.");
+            if (!this.gl.getExtension("EXT_float_blend")) throw new Error("EXT_float_blend is required.");
+            this.floatLinear = this.gl.getExtension("OES_texture_float_linear");
+            if (this.gl.getParameter(this.gl.MAX_DRAW_BUFFERS) < 4) throw new Error("At least four draw buffers are required.");
+            this.maxTextureSize = this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE);
+            this.width = 0;
+            this.height = 0;
+            this.iterCount = 0;
+            this.readIndex = 0;
+            this.vao = this.gl.createVertexArray();
+            this.gl.bindVertexArray(this.vao);
+            this.programs = this.createPrograms();
+            this.initWorld();
+        }
+
+        createPrograms() {
+            const vsFull = GLSL_HEADER + `
+            out vec2 vUv;
+            void main() {
+                vec2 p = gl_VertexID == 0 ? vec2(-1.0, -1.0) : (gl_VertexID == 1 ? vec2(3.0, -1.0) : vec2(-1.0, 3.0));
+                vUv = p * 0.5 + 0.5;
+                gl_Position = vec4(p, 0.0, 1.0);
+            }`;
+            const vsP2G = GLSL_HEADER + `
+            uniform sampler2D uPosVel; uniform sampler2D uF; uniform sampler2D uC; uniform sampler2D uMeta;
+            uniform ivec2 uParticleTexSize; uniform int uParticleCount; uniform vec2 uGridSize; uniform int uTopology;
+            out vec4 vPosVel; flat out vec4 vMeta; flat out mat2 vF; flat out mat2 vC;
+            flat out vec2 vBase; flat out vec2 vWrapOffset;
+            void main() {
+                int id = gl_VertexID;
+                if(id >= uParticleCount) { gl_Position = vec4(4.0); gl_PointSize = 1.0; return; }
+                ivec2 tc = ivec2(id % uParticleTexSize.x, id / uParticleTexSize.x);
+                vMeta = texelFetch(uMeta, tc, 0);
+                if(vMeta.x <= 0.0001) { gl_Position = vec4(4.0); gl_PointSize = 1.0; return; }
+                int ix = 0; int iy = 0;
+                if(uTopology == 0) { ix = gl_InstanceID % 3 - 1; iy = gl_InstanceID / 3 - 1; }
+                else if(uTopology == 1) ix = gl_InstanceID - 1;
+                vec2 wrapOffset = vec2(float(ix) * uGridSize.x, float(iy) * uGridSize.y);
+                vPosVel = texelFetch(uPosVel, tc, 0);
+                if((ix > 0 && vPosVel.x > 3.0) || (ix < 0 && vPosVel.x < uGridSize.x - 3.0) || (iy > 0 && vPosVel.y > 3.0) || (iy < 0 && vPosVel.y < uGridSize.y - 3.0)) { gl_Position = vec4(4.0); gl_PointSize = 1.0; return; }
+                vec4 fa = texelFetch(uF, tc, 0); vec4 ca = texelFetch(uC, tc, 0);
+                vF = mat2(fa.x, fa.y, fa.z, fa.w); vC = mat2(ca.x, ca.y, ca.z, ca.w);
+                vec2 xp = vPosVel.xy - vec2(0.5); vBase = floor(xp - vec2(0.5)); vWrapOffset = wrapOffset;
+                vec2 pixel = vBase + vec2(1.5) + wrapOffset; vec2 ndc = pixel / uGridSize * 2.0 - 1.0;
+                gl_Position = vec4(ndc, 0.0, 1.0); gl_PointSize = 3.0;
+            }`;
+            const fsP2G = GLSL_HEADER + GLSL_MPM + GLSL_MATERIAL + `
+            in vec4 vPosVel; flat in vec4 vMeta; flat in mat2 vF; flat in mat2 vC; flat in vec2 vBase; flat in vec2 vWrapOffset;
+            uniform float uDt; uniform float uMu; uniform float uLambda; uniform float uStressScale; uniform float uStressClamp;
+            uniform float uHardening; uniform float uCratonStrength; uniform float uMaterialVariation; uniform float uAgeDensityGain;
+            uniform float uMaterialDensityContrast;
+            layout(location=0) out vec4 outGrid; layout(location=1) out vec4 outDrive;
+
+            void main() {
+                vec2 xp = vPosVel.xy - vec2(0.5); ivec2 cell = ivec2(floor(gl_FragCoord.xy));
+                vec2 node = vec2(cell) - vWrapOffset; vec2 rel = node - vBase;
+                int ox = int(rel.x + 0.5); int oy = int(rel.y + 0.5);
+                if(ox < 0 || ox > 2 || oy < 0 || oy > 2) discard;
+                vec2 fx = xp - vBase; float w = wq(fx.x, ox) * wq(fx.y, oy); if(w <= 0.0) discard;
+                
+                float mass = vMeta.x; float vol = vMeta.z; float crust_type = vMeta.y; float crust_age = vMeta.w;
+                float J = max(0.25, vF[0][0] * vF[1][1] - vF[1][0] * vF[0][1]); mat2 iFT = invTrans(vF, J);
+                
+                vec4 props = getMatProps(crust_type);
+                float continental = clamp((1.0 - props.x) * 12.5, 0.0, 1.0);
+                float craton = clamp((0.92 - props.x) * 20.0, 0.0, 1.0);
+                
+                float oceanAgeHardening = mix(1.0 + clamp(crust_age * 0.012, 0.0, 0.55), 1.0, continental);
+                float materialNoise = mix(1.0, mix(0.78, 1.28, fract(crust_type * 2.371 + crust_age * 0.013)), clamp(uMaterialVariation, 0.0, 2.0) * 0.5);
+                float cratonStiffness = mix(1.0, max(1.0, uCratonStrength), craton);
+                float materialStiffness = props.y * oceanAgeHardening * materialNoise * cratonStiffness;
+                
+                float hard = exp(clamp(uHardening * (1.0 - J), -2.5, 2.5)) * materialStiffness;
+                float mu = max(0.0, uMu * hard); float la = max(0.0, uLambda * hard);
+                mat2 P = (mu * (vF - iFT) + la * log(J) * iFT) * uStressScale;
+                float plen = length(vec4(P[0], P[1]));
+                if(plen > uStressClamp) P *= uStressClamp / max(plen, 0.00001);
+                mat2 stress = (-uDt * 4.0 * vol) * (P * transpose(vF));
+                mat2 affine = stress + mass * vC; vec2 dpos = node - xp;
+                vec2 momentum = mass * vPosVel.zw + affine * dpos;
+                
+                float crust_density = crustDensityFromState(crust_type, crust_age, mass, vol, max(0.0, uMaterialDensityContrast), max(0.0, uAgeDensityGain));
+                outGrid = vec4(momentum * w, mass * w, 0.0);
+                outDrive = vec4(crust_type * mass * w, crust_age * mass * w, crust_density * mass * w, vol * mass * w);
+            }`;
+            const fsGridUpdate = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_MATERIAL + `
+            in vec2 vUv;
+            uniform sampler2D uGrid; uniform sampler2D uDrive; uniform mediump usampler2D uTerritoryMap; uniform sampler2D uPlateData;
+            uniform vec2 uGridSize; uniform float uDt; uniform float uFrameDt; uniform float uDamping; uniform float uDriveCoupling;
+            uniform float uDensityDetachment; uniform float uAgeDensityGain; uniform float uMaterialDensityContrast;
+            uniform float uBuoyancyLift; uniform float uSpeedClamp; uniform float uMassCutoff;
+            layout(location=0) out vec4 outGridVel; layout(location=1) out vec2 outGridAux; layout(location=2) out vec4 outGridMat;
+
+            void main() {
+                ivec2 xy = ivec2(vUv * uGridSize);
+                vec4 g = texelFetch(uGrid, xy, 0); vec4 d = texelFetch(uDrive, xy, 0);
+                if(g.z <= max(0.000001, uMassCutoff)) { outGridVel = vec4(0.0); outGridAux = vec2(0.0); outGridMat = vec4(0.0); return; }
+                vec2 v = g.xy / g.z;
+                float grid_crust = d.x / max(g.z, 0.000001); float grid_age = d.y / max(g.z, 0.000001);
+                float grid_density = d.z / max(g.z, 0.000001); float grid_rest = d.w / max(g.z, 0.000001);
+                uint pid = texelFetch(uTerritoryMap, xy, 0).r;
+                vec2 driveVelocity = vec2(0.0);
+                if(pid < 255u) {
+                    vec4 p0 = texelFetch(uPlateData, ivec2(int(pid), 0), 0); vec4 p1 = texelFetch(uPlateData, ivec2(int(pid), 1), 0);
+                    vec2 r = wrapDelta(vec2(xy), p0.xy, uGridSize);
+                    driveVelocity = (p0.zw + vec2(-r.y, r.x) * p1.x) / max(uFrameDt, 0.0001);
+                }
+                
+                float coupling = uDriveCoupling / max(1.0, g.z * uDensityDetachment);
+                float k = 1.0 - exp(-coupling * uDt);
+                v = mix(v, driveVelocity, k); v *= exp(-uDamping * uDt);
+                
+                bvec2 w = getWrap();
+                if (!w.x && (xy.x <= 1 || xy.x >= int(uGridSize.x) - 2)) v.x = 0.0;
+                if (!w.y && (xy.y <= 1 || xy.y >= int(uGridSize.y) - 2)) v.y = 0.0;
+                
+                float currentClamp = min(uSpeedClamp, 0.45 / max(uDt, 0.0001));
+                float s = length(v); if(s > currentClamp) v *= currentClamp / s;
+                
+                float cellMass = max(0.0, g.z / 4.0);
+                vec4 props = getMatProps(grid_crust);
+                float continental = clamp((1.0 - props.x) * 12.5, 0.0, 1.0);
+                float craton = clamp((0.92 - props.x) * 20.0, 0.0, 1.0);
+                float age01 = clamp(grid_age / 180.0, 0.0, 1.0);
+                float densityContrast = max(0.0, uMaterialDensityContrast); float ageDensity = max(0.0, uAgeDensityGain);
+                float crustDensity = grid_density > 0.01 ? grid_density : crustDensityFromState(grid_crust, grid_age, cellMass, max(grid_rest, 0.08), densityContrast, ageDensity);
+                
+                float lightCrust = clamp(1.0 - crustDensity, 0.0, 0.55); 
+                float denseOcean = max(0.0, crustDensity - 1.0);
+                
+                float compactMass = pow(max(cellMass - mix(0.14, 0.06, lightCrust * 2.0), 0.0), 0.72);
+                float thicknessLift = compactMass * mix(0.32, 1.15, clamp(lightCrust * 2.0, 0.0, 1.0));
+                float rootSupport = clamp((1.0 - props.x) * 5.0, 0.0, 1.0) * (0.16 + 0.45 * smoothstep(0.8, 2.0, props.y)) * smoothstep(0.14, 1.65, cellMass);
+                
+                float ageSubsidence = clamp((props.x - 1.0) * 5.0, 0.0, 1.0) * age01 * 0.14 * ageDensity; 
+                float densitySubsidence = denseOcean * 0.22;
+                
+                float h = max(0.0, thicknessLift + max(0.0, uBuoyancyLift) * (rootSupport + lightCrust * 0.78) - ageSubsidence - densitySubsidence);
+                
+                outGridVel = vec4(v, g.z, h); outGridAux = vec2(0.0);
+                outGridMat = vec4(grid_crust, grid_age, crustDensity, max(grid_rest, 0.0));
+            }`;
+            const fsGridPhysics = GLSL_HEADER + GLSL_TOPOLOGY + `
+            in vec2 vUv;
+            uniform sampler2D uGridVel; uniform sampler2D uGridAux; uniform sampler2D uGridMat;
+            uniform mediump usampler2D uTerritoryMap; uniform sampler2D uPlateData;
+            uniform vec2 uGridSize; uniform float uAmount; uniform float uDt; uniform float uFrameDt;
+            uniform float uWastingAngle; uniform float uWastingRate; uniform float uCohesion;
+            uniform float uBoundarySmoothing;
+            uniform float uRidgePush; 
+            
+            layout(location=0) out vec4 outGridVel; layout(location=1) out vec2 outGridAux;
+
+            void main() {
+                ivec2 s = ivec2(uGridSize); ivec2 xy = ivec2(vUv * uGridSize);
+                vec4 c = texelFetch(uGridVel, xy, 0); vec2 aux = texelFetch(uGridAux, xy, 0).xy; vec4 mat = texelFetch(uGridMat, xy, 0);
+                if(c.z <= 0.000001) { outGridVel = c; outGridAux = aux * 0.65; return; }
+
+                vec2 v = c.xy; float max_conv = 0.0; float max_div = 0.0; float avg_conv = 0.0; float avg_div = 0.0;
+                float boundary_wsum = 0.0; vec2 gradH = vec2(0.0); float gradW = 0.0; uint pid_c = texelFetch(uTerritoryMap, xy, 0).r;
+
+                ivec2 offsets[8] = ivec2[]( ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1) );
+
+                for(int i = 0; i < 4; i++) {
+                    ivec2 off = offsets[i]; ivec2 n = wrapc(xy + off, s);
+                    vec4 vN = texelFetch(uGridVel, n, 0);
+                    vec4 matN = texelFetch(uGridMat, n, 0);
+                    vec2 od = vec2(off);
+                    float stepLen = max(length(od), 1.0); vec2 dir = od / stepLen; float wt = 1.0 / stepLen;
+
+                    gradH += dir * (vN.w - c.w) * wt; gradW += wt;
+
+                    uint pid_n = texelFetch(uTerritoryMap, n, 0).r;
+                    if(pid_n != pid_c && pid_c != 255u && pid_n != 255u && vN.z > 0.001) {
+                        vec4 p0_c = texelFetch(uPlateData, ivec2(int(pid_c), 0), 0); vec4 p1_c = texelFetch(uPlateData, ivec2(int(pid_c), 1), 0);
+                        vec4 p0_n = texelFetch(uPlateData, ivec2(int(pid_n), 0), 0); vec4 p1_n = texelFetch(uPlateData, ivec2(int(pid_n), 1), 0);
+                        vec2 r_c = wrapDelta(vec2(xy), p0_c.xy, uGridSize); vec2 v_c = (p0_c.zw + vec2(-r_c.y, r_c.x) * p1_c.x) / max(uFrameDt, 0.0001);
+                        vec2 r_n = wrapDelta(vec2(n), p0_n.xy, uGridSize); vec2 v_n = (p0_n.zw + vec2(-r_n.y, r_n.x) * p1_n.x) / max(uFrameDt, 0.0001);
+
+                        vec2 relPlateStep = (v_n - v_c) * uFrameDt;
+                        float normalStep = dot(relPlateStep, dir);
+                        float openingStep = max(normalStep, 0.0);
+                        float closingStep = max(-normalStep, 0.0);
+                        float boundarySupport = clamp(0.20 + sqrt(max(min(c.z, vN.z), 0.0)) * 0.30, 0.0, 1.0);
+                        float div = clamp(openingStep, 0.0, 3.0) * boundarySupport;
+                        float conv = clamp(closingStep, 0.0, 3.0) * boundarySupport;
+
+                        max_conv = max(max_conv, conv); max_div = max(max_div, div);
+                        avg_conv += conv * wt; avg_div += div * wt; boundary_wsum += wt;
+
+
+                        float densityC = mat.z > 0.01 ? mat.z : 1.0;
+                        float densityN = matN.z > 0.01 ? matN.z : 1.0;
+                        float overridePull = max(0.0, densityC - densityN) * conv;
+                        v = mix(v, vN.xy, clamp(overridePull * 8.0 * uDt, 0.0, 1.0));
+
+                        float lock = clamp(uCohesion * uDt, 0.0, 0.35) * boundarySupport;
+                        v = mix(v, 0.5 * (v + vN.xy), lock);
+                    }
+                }
+
+                if(boundary_wsum > 0.00001) { max_conv = max(max_conv, avg_conv / boundary_wsum); max_div = max(max_div, avg_div / boundary_wsum); }
+
+                gradH /= max(gradW, 0.00001);
+                float slope = length(gradH);
+                
+
+                v -= gradH * max(0.0, uRidgePush) * 4.0 * uDt;
+                
+                if(slope > uWastingAngle) {
+                    float wasteForce = clamp((slope - uWastingAngle) * uWastingRate, 0.0, 8.0);
+                    v -= gradH * wasteForce * uDt;
+                }
+
+                vec2 sum = c.xy * c.z; float wsum = c.z;
+                for(int i = 0; i < 4; i++) {
+                    ivec2 off = offsets[i]; float wt = 1.0 / max(length(vec2(off)), 1.0);
+                    vec4 a = texelFetch(uGridVel, wrapc(xy + off, s), 0);
+                    sum += a.xy * a.z * wt; wsum += a.z * wt;
+                }
+                if(wsum > 0.000001) v = mix(v, sum / wsum, uAmount);
+
+                bvec2 w = getWrap();
+                if (!w.x && (xy.x <= 1 || xy.x >= int(uGridSize.x) - 2)) v.x = 0.0;
+                if (!w.y && (xy.y <= 1 || xy.y >= int(uGridSize.y) - 2)) v.y = 0.0;
+
+                float spread_div = max_div; float spread_conv = max_conv;
+                for(int i = 0; i < 4; i++) {
+                    ivec2 off = offsets[i]; float falloff = 0.70 / max(length(vec2(off)), 1.0);
+                    vec4 nAux = texelFetch(uGridAux, wrapc(xy + off, s), 0);
+                    spread_div = max(spread_div, nAux.x * falloff); spread_conv = max(spread_conv, nAux.y * falloff);
+                }
+
+                vec2 rawSignals = vec2(max_div, max_conv); vec2 spreadSignals = vec2(spread_div, spread_conv);
+                vec2 smoothedSignals = mix(rawSignals, max(rawSignals, spreadSignals), clamp(uBoundarySmoothing, 0.0, 0.95));
+                float strongestSignal = max(smoothedSignals.x, smoothedSignals.y);
+                if(strongestSignal <= 0.000001) smoothedSignals = vec2(0.0);
+                else if(smoothedSignals.x >= smoothedSignals.y) smoothedSignals = vec2(smoothedSignals.x, 0.0);
+                else smoothedSignals = vec2(0.0, smoothedSignals.y);
+
+                outGridVel = vec4(v, c.z, c.w);
+                outGridAux = smoothedSignals;
+            }`;
+            const fsTerrainRoute = GLSL_HEADER + GLSL_TOPOLOGY + `
+            in vec2 vUv;
+            uniform sampler2D uTerrain;
+            uniform vec2 uTerrainSize;
+            layout(location=0) out vec4 outRoute;
+            float h(ivec2 p) { return max(0.0, texelFetch(uTerrain, wrapc(p, ivec2(uTerrainSize)), 0).x); }
+            void main() {
+                ivec2 xy = ivec2(clamp(vUv, vec2(0.0), vec2(0.99999)) * uTerrainSize);
+                float center = h(xy);
+                ivec2 dirs[8] = ivec2[](ivec2(0,1), ivec2(1,1), ivec2(1,0), ivec2(1,-1), ivec2(0,-1), ivec2(-1,-1), ivec2(-1,0), ivec2(-1,1));
+                vec2 best = vec2(0.0);
+                float bestSlope = 0.0;
+                for(int i = 0; i < 8; i++) {
+                    float slope = (center - h(xy + dirs[i])) / max(length(vec2(dirs[i])), 1.0);
+                    if(slope > bestSlope) { bestSlope = slope; best = vec2(dirs[i]); }
+                }
+                outRoute = vec4(best, bestSlope, 0.0);
+            }`;
+            const fsTerrainUpdate = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_MATERIAL + `
+            in vec2 vUv;
+            uniform sampler2D uTerrain; uniform sampler2D uTerrainRoute; uniform sampler2D uGridVel; uniform sampler2D uGridAux; uniform sampler2D uGridMat;
+            uniform vec2 uGridSize; uniform vec2 uTerrainSize; uniform float uDt; uniform float uTerrainCoupling;
+            uniform float uThermalErosion; uniform float uErosionRate; uniform float uBasinFillRate; uniform float uRiftThreshold;
+            uniform float uSubductThreshold; uniform float uSubductRate;
+            uniform float uRiftTerrainReset; uniform float uGlobalUplift; uniform float uBuoyancyLift; uniform float uAgeDensityGain;
+            uniform float uMaterialDensityContrast;
+            layout(location=0) out vec4 outTerrain;
+
+            ivec2 terrainWrap(ivec2 p) { return wrapc(p, ivec2(uTerrainSize)); }
+            ivec2 gridFromTerrain(ivec2 p) {
+                ivec2 tp = terrainWrap(p); vec2 uv = (vec2(tp) + vec2(0.5)) / max(uTerrainSize, vec2(1.0));
+                return wrapc(ivec2(floor(uv * uGridSize)), ivec2(uGridSize));
+            }
+            float terrainH(ivec2 p) { return max(0.0, texelFetch(uTerrain, terrainWrap(p), 0).x); }
+            float terrainFlow(ivec2 p) { return max(0.0, texelFetch(uTerrain, terrainWrap(p), 0).w); }
+
+            void main() {
+                ivec2 xy = ivec2(clamp(vUv, vec2(0.0), vec2(0.99999)) * uTerrainSize); vec4 t = texelFetch(uTerrain, xy, 0);
+                ivec2 gxy = gridFromTerrain(xy); vec4 g = texelFetch(uGridVel, gxy, 0); vec4 aux = texelFetch(uGridAux, gxy, 0); vec4 mat = texelFetch(uGridMat, gxy, 0);
+
+                float height = max(0.0, t.x); float crustHeight = max(0.0, g.w); float crustType = clamp(mat.x, 0.0, 4.0);
+                float crustAge = max(0.0, mat.y); float recordedDensity = mat.z; float recordedRest = max(mat.w, 0.08);
+                float tectonicSignal = clamp(aux.x + aux.y, 0.0, 3.0);
+                
+                vec4 props = getMatProps(crustType);
+                float continental = clamp((1.0 - props.x) * 12.5, 0.0, 1.0);
+                float craton = clamp((0.92 - props.x) * 20.0, 0.0, 1.0);
+                float oceanic = 1.0 - continental; 
+                float age01 = clamp(crustAge / 180.0, 0.0, 1.0); float cellMass = clamp(g.z / 4.0, 0.0, 4.0);
+                
+                float densityContrast = max(0.0, uMaterialDensityContrast); float ageDensity = max(0.0, uAgeDensityGain);
+                float crustDensity = recordedDensity > 0.01 ? recordedDensity : crustDensityFromState(crustType, crustAge, cellMass, recordedRest, densityContrast, ageDensity);
+                float lightCrust = clamp(1.0 - crustDensity, 0.0, 0.55); float denseCrust = max(0.0, crustDensity - 1.0);
+                
+                float compactMass = pow(max(cellMass - mix(0.14, 0.06, lightCrust * 2.0), 0.0), 0.72);
+                float thicknessLift = compactMass * mix(0.32, 1.15, clamp(lightCrust * 2.0, 0.0, 1.0));
+                float rootLift = clamp((1.0 - props.x) * 5.0, 0.0, 1.0) * (0.16 + 0.45 * smoothstep(0.8, 2.0, props.y)) * smoothstep(0.14, 1.65, cellMass);
+                
+                float oceanAgeSink = oceanic * age01 * 0.14 * ageDensity; float densitySink = denseCrust * mix(0.22, 0.08, continental);
+                float buoyantTarget = max(0.0, max(crustHeight * 0.92, thicknessLift + max(0.0, uBuoyancyLift) * (rootLift + lightCrust * 0.78) - oceanAgeSink - densitySink));
+                
+
+
+                float stableInterior = 1.0 - clamp(tectonicSignal * 0.80, 0.0, 0.65);
+                float boundaryCouplingBoost = 0.05 + 0.95 * clamp(tectonicSignal, 0.0, 2.0);
+                float coupling = 1.0 - exp(-max(0.0, uTerrainCoupling) * boundaryCouplingBoost * uDt);
+                
+                float crustSurfaceTarget = mix(crustHeight, buoyantTarget, 0.68);
+                height = mix(height, crustSurfaceTarget, clamp(coupling, 0.0, 0.85));
+                
+                float buoyancyK = 1.0 - exp(-max(0.0, uBuoyancyLift) * (0.15 + 0.55 * stableInterior + 0.25 * tectonicSignal) * uDt);
+                height = mix(height, buoyantTarget, clamp(buoyancyK, 0.0, 0.50));
+
+                float riftOpen = max(0.0, aux.x - uRiftThreshold);
+                float riftLower = max(0.0, uRiftTerrainReset) * riftOpen * uDt * (0.08 + 0.24 * continental + 0.10 * oceanic);
+                float subductOpen = max(0.0, aux.y - uSubductThreshold);
+                float subductLower = max(0.0, uSubductRate) * subductOpen * uDt * (0.010 + 0.040 * oceanic + 0.025 * denseCrust);
+                height = max(0.0, height - riftLower - subductLower); float riftBasin = clamp((riftLower + subductLower * 0.45) * 3.0, 0.0, 1.0);
+
+                ivec2 dirs4[4] = ivec2[](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
+                ivec2 dirs8[8] = ivec2[](ivec2(0, 1), ivec2(1, 1), ivec2(1, 0), ivec2(1, -1), ivec2(0, -1), ivec2(-1, -1), ivec2(-1, 0), ivec2(-1, 1));
+
+                float flow = 0.0; 
+                float currentIncision = 0.0; 
+                float currentBasin = 0.0;
+                
+                const float reliefThreshold = 0.035; 
+                float materialResistance = 1.0 / max(0.1, props.z);
+                float reliefActivity = smoothstep(0.015, 0.75, height); 
+                float processScale = materialResistance * (0.42 + 0.58 * reliefActivity);
+                float fillScale = 1.0 + 0.45 * riftBasin;
+
+
+                float dz = 0.0; 
+                for(int i = 0; i < 4; i++) { 
+                    float nh = terrainH(xy + dirs4[i]); 
+                    float diff = nh - height;
+                    dz += diff * smoothstep(0.015, 0.08, abs(diff)); 
+                }
+                height = max(0.0, height + uThermalErosion * processScale * dz * uDt * 2.5);
+
+                flow = 1.0 + fract(max(0.0, t.w));
+                for(int i = 0; i < 8; i++) { ivec2 off = dirs8[i]; ivec2 n = terrainWrap(xy + off); ivec2 nr = ivec2(round(texelFetch(uTerrainRoute, n, 0).xy)); if(nr.x == -off.x && nr.y == -off.y) flow += floor(terrainFlow(n)); }
+
+
+                ivec2 rec = ivec2(round(texelFetch(uTerrainRoute, xy, 0).xy));
+                if(rec.x == 0 && rec.y == 0) { 
+                    height += max(0.0, uBasinFillRate) * fillScale * uDt; 
+                    currentBasin = 1.0; 
+                } 
+                else {
+                    ivec2 rcell = terrainWrap(xy + rec); vec4 receiverCell = texelFetch(uTerrain, rcell, 0); float receiverHeight = max(0.0, receiverCell.x);
+                    flow = floor(flow) + fract(max(0.0, receiverCell.w));
+                    float pslope = (height - receiverHeight) / max(length(vec2(rec)), 1.0); 
+                    
+                    float flowTerm = pow(max(floor(flow), 0.0), 0.55); 
+                    float slopeTerm = pow(max(pslope, 0.0), 1.2);
+                    float dzErosion = min(flowTerm * slopeTerm, height); 
+                    
+                    currentIncision = max(0.0, uErosionRate) * processScale * dzErosion * uDt * 6.0;
+                    height = max(height - currentIncision, receiverHeight); 
+                    float lowBasinDeposition = riftBasin * max(0.0, uBasinFillRate) * (0.40 + 0.06 * log(1.0 + floor(flow))) * uDt;
+                    height += lowBasinDeposition;
+                }
+                height = max(0.0, height + max(0.0, uGlobalUplift) * (0.65 + 0.35 * continental) * uDt);
+
+                if(riftLower > 0.0001) { currentBasin = max(currentBasin, riftBasin); flow = fract(max(0.0, flow)) + max(1.0, floor(flow) * (1.0 - 0.25 * clamp(riftBasin, 0.0, 1.0))); }
+                
+                float basinState = mix(t.y, currentBasin, clamp(uDt * 2.0, 0.0, 1.0));
+                float incisionState = mix(t.z, currentIncision, clamp(uDt * 4.0, 0.0, 1.0));
+
+                outTerrain = vec4(max(0.0, height), basinState, incisionState, max(0.0, flow));
+            }`;
+            const fsClimateB = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_ATLAS + GLSL_PI + GLSL_DIRECTIONS + `
+            in vec2 vUv;
+            uniform sampler2D uTerrain; uniform sampler2D uClimateB; uniform vec2 uTerrainSize; uniform vec2 uClimateSize;
+            uniform float uSeaLevel; uniform float uSeasonPhase; uniform float uAxialTilt; uniform float uSunPower; uniform float uTerrainVerticalScale;
+            layout(location=0) out vec4 outClimate;
+
+            #define OCEAN_DEPTH uSeaLevel
+            #define PASS1 vec2(0.0,0.0)
+            #define PASS2 vec2(0.0,0.5)
+            #define PASS3 vec2(0.5,0.0)
+            #define PASS4 vec2(0.5,0.5)
+            #define SIGMA vec4(6.0,4.0,1.0,1.0)
+            
+            vec4 atlasClimate(vec2 domainUv, vec2 pass) { return sampleAtlas(uClimateB, domainUv, pass, uClimateSize); }
+            float terrainHeightUv(vec2 domainUv) { return texture(uTerrain, topoUv(domainUv, uTerrainSize)).x * uTerrainVerticalScale; }
+            float mapHeight(float y) { return 2.8 * max(0.0, y - OCEAN_DEPTH); }
+            vec4 normpdf(float x) { return 0.39894 * exp(-0.5 * x * x / (SIGMA * SIGMA)) / SIGMA; }
+
+            float seasonWave() { return sin(2.0 * PI * fract(uSeasonPhase)); }
+            float tiltNorm() { return clamp(uAxialTilt / 23.5, 0.0, 2.5); }
+            float sunEnergy() { return clamp(uSunPower, 0.25, 2.25); }
+
+            vec4 mslp(vec2 domainUv) {
+                domainUv = topoUv(domainUv, uClimateSize); float lat = 180.0 * domainUv.y - 90.0; float latRad = lat * PI / 180.0;
+                float y = terrainHeightUv(domainUv); float height = mapHeight(y);
+                float wave = seasonWave(); float tilt = tiltNorm(); float shiftedLat = lat - 8.0 * wave * tilt;
+                float equatorHeat = 1.0 - pow(abs(lat) / 90.0, 0.75); float solarPressure = (sunEnergy() - 1.0) * 3.0 * equatorHeat;
+                vec4 r = vec4(0.0);
+                if (y > OCEAN_DEPTH) {
+                    r.x = 1012.5 - 6.0 * cos(shiftedLat * PI / 45.0) - solarPressure - 1.4 * wave * sin(latRad) * tilt;
+                    r.y = 15.0 * sin(shiftedLat * PI / 90.0);
+                } else {
+                    r.x = 1014.5 - 20.0 * cos(shiftedLat * PI / 30.0) - solarPressure * 0.65 - 0.8 * wave * sin(latRad) * tilt;
+                    r.y = 20.0 * sin(shiftedLat * PI / 35.0) * abs(lat) / 90.0;
+                }
+                r.z = height; return r;
+            }
+
+            vec4 pass1(vec2 localUv) { vec2 domainUv = localUv * 2.0; vec4 r = vec4(0.0); for (float i = -20.0; i <= 20.0; i++) r += mslp(domainUv + i * E / uClimateSize) * normpdf(i); return r; }
+            vec4 pass2(vec2 localUv) { vec2 domainUv = localUv * 2.0; vec4 r = vec4(0.0); for (float i = -20.0; i <= 20.0; i++) r += atlasClimate(domainUv + i * N / uClimateSize, PASS1) * normpdf(i); return r; }
+            vec4 pass3(vec2 localUv) {
+                vec2 domainUv = topoUv(localUv * 2.0, uClimateSize); vec4 c = atlasClimate(domainUv, PASS2);
+                float wave = seasonWave(); float tilt = tiltNorm(); float delta = wave * tilt;
+                float mbar = c.x + c.y * delta; float lat = 180.0 * domainUv.y - 90.0; float latRad = lat * PI / 180.0;
+                float land = step(OCEAN_DEPTH, terrainHeightUv(domainUv)); float height = c.z; float solar = sunEnergy();
+                float itczShift = 5.0 * delta; float temp = -27.0 + 73.0 * tanh(2.2 * exp(-0.5 * pow((lat + itczShift) / 30.0, 2.0)));
+                float polarAmp = mix(0.20, 1.45, pow(abs(sin(latRad)), 0.70)); float thermalInertia = mix(0.38, 1.00, land);
+                temp += 15.0 * delta * sin(latRad) * polarAmp * thermalInertia;
+                temp += 32.0 * (solar - 1.0); temp -= mbar - 1012.0; temp /= 1.8; temp += 1.5 * land;
+                return vec4(mbar, temp - 4.0 * height, temp, fract(uSeasonPhase));
+            }
+            vec4 pass4(vec2 localUv) {
+                vec2 domainUv = localUv * 2.0;
+                float n = atlasClimate(domainUv + N / uClimateSize, PASS3).x; float e = atlasClimate(domainUv + E / uClimateSize, PASS3).x;
+                float s = atlasClimate(domainUv + S / uClimateSize, PASS3).x; float w = atlasClimate(domainUv + W / uClimateSize, PASS3).x;
+                vec2 grad = vec2(e - w, n - s) * 0.5; float lat = 180.0 * topoUv(domainUv, uClimateSize).y - 90.0;
+                vec2 coriolis = 15.0 * sin(lat * PI / 180.0) * vec2(-grad.y, grad.x); vec2 v = coriolis - grad;
+                float cap = 3.0; if(length(v) > cap) v *= cap / max(length(v), 0.0001); return vec4(v, 0.0, 0.0);
+            }
+            void main() {
+                vec2 uv = vUv;
+                if (uv.x < 0.5) { if (uv.y < 0.5) outClimate = pass1(uv - PASS1); else outClimate = pass2(uv - PASS2); } 
+                else { if (uv.y < 0.5) outClimate = pass3(uv - PASS3); else outClimate = pass4(uv - PASS4); }
+            }`;
+            const fsClimateC = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_ATLAS + GLSL_DIRECTIONS + `
+            in vec2 vUv;
+            uniform sampler2D uTerrain; uniform sampler2D uClimateB; uniform sampler2D uClimateC; uniform sampler2D uClimateD;
+            uniform vec2 uTerrainSize; uniform vec2 uClimateSize; uniform float uTime; uniform float uSeaLevel; uniform float uStepScale; uniform float uTerrainVerticalScale;
+            uniform float uWindSpeed; uniform float uCloudAdvection; uniform float uCloudDiffusion; uniform float uCloudVorticity; uniform float uCloudCondensation;
+            uniform float uEvaporationBias; uniform float uTerrainLift; uniform float uTerrainDeflection; uniform float uTerrainRainShadow; uniform float uTerrainThermalLift;
+            layout(location=0) out vec4 outCloud;
+
+            #define PASS3 vec2(0.5,0.0)
+            #define PASS4 vec2(0.5,0.5)
+            #define OCEAN_DEPTH uSeaLevel
+
+            vec4 sampleCloudPx(vec2 p) { return texture(uClimateC, topoUv(p / max(uClimateSize, vec2(1.0)), uClimateSize)); }
+            vec4 climateAt(vec2 uv) { return sampleAtlas(uClimateB, uv, PASS3, uClimateSize); }
+            vec2 pressureWind(vec2 uv) { return sampleAtlas(uClimateB, uv, PASS4, uClimateSize).xy; }
+            vec4 terrainAt(vec2 uv) { return texture(uTerrain, topoUv(uv, uTerrainSize)); }
+            float terrainHeight(vec2 uv) { return terrainAt(uv).x * uTerrainVerticalScale; }
+            vec2 terrainGradient(vec2 uv) {
+                vec2 texel = 1.0 / max(uTerrainSize, vec2(1.0));
+                float hL = terrainHeight(uv + W * texel); float hR = terrainHeight(uv + E * texel);
+                float hD = terrainHeight(uv + S * texel); float hU = terrainHeight(uv + N * texel);
+                return vec2(hR - hL, hU - hD) * 0.5;
+            }
+
+            void main() {
+                vec2 texel = 1.0 / max(uClimateSize, vec2(1.0)); vec2 p = vUv * uClimateSize; float dt = clamp(uStepScale, 0.0, 2.0);
+                if (uTime <= 0.20) { outCloud = vec4(0.0); return; }
+
+                vec4 here = texture(uClimateC, topoUv(vUv, uClimateSize)); vec4 n = texture(uClimateC, topoUv(vUv + N * texel, uClimateSize));
+                vec4 e = texture(uClimateC, topoUv(vUv + E * texel, uClimateSize)); vec4 s = texture(uClimateC, topoUv(vUv + S * texel, uClimateSize));
+                vec4 w = texture(uClimateC, topoUv(vUv + W * texel, uClimateSize)); vec4 terrain = terrainAt(vUv);
+                vec4 bio = texture(uClimateD, topoUv(vUv, uClimateSize)); vec4 climate = climateAt(vUv);
+
+                float h = terrain.x * uTerrainVerticalScale; float waterDepth = max(OCEAN_DEPTH - h, 0.0); float ocean = step(h, OCEAN_DEPTH);
+                float temp = climate.y; vec2 grad = terrainGradient(vUv); vec2 baseWind = pressureWind(vUv) * max(0.0, uWindSpeed) * max(0.0, uCloudAdvection);
+                float baseSpeed = length(baseWind); vec2 windDir = baseSpeed > 0.0001 ? baseWind / baseSpeed : vec2(1.0, 0.0);
+
+                float scaledSlope = length(grad) * 40.0; float upslope = max(0.0, dot(windDir, grad)) * 40.0; float leeSlope = max(0.0, -dot(windDir, grad)) * 40.0;
+                vec2 terrainTurn = vec2(-grad.y, grad.x) * (22.0 * max(0.0, uTerrainDeflection)); vec2 cloudGrad = vec2(e.z - w.z, n.z - s.z) * 0.5;
+                vec2 curl = vec2(cloudGrad.y, -cloudGrad.x) * (0.55 * max(0.0, uCloudVorticity));
+                vec2 targetVel = baseWind + terrainTurn + curl; float maxVel = 2.0 + 5.0 * max(0.0, uWindSpeed);
+                if (length(targetVel) > maxVel) targetVel *= maxVel / max(length(targetVel), 0.0001);
+                vec2 meanVel = 0.25 * (n.xy + e.xy + s.xy + w.xy); vec2 flowVel = mix(mix(here.xy, targetVel, 0.30), meanVel, clamp(uCloudDiffusion * 0.35, 0.0, 0.55));
+
+                vec4 adv = sampleCloudPx(p - flowVel * dt); float cloud = adv.z; float vapour = adv.w;
+                float meanCloud = 0.25 * (n.z + e.z + s.z + w.z); float meanVapour = 0.25 * (n.w + e.w + s.w + w.w);
+                float diffusion = clamp(uCloudDiffusion, 0.0, 0.75);
+                cloud = mix(cloud, meanCloud, diffusion * 0.22 * dt); vapour = mix(vapour, meanVapour, diffusion * 0.18 * dt);
+
+                float temp01 = smoothstep(-6.0, 34.0, temp); float basinWater = smoothstep(0.05, 0.85, terrain.y);
+                float routedFlow = max(0.0, floor(terrain.w)); float oceanSource = ocean * (0.45 + 0.95 * exp(-waterDepth * 2.0) + 0.25 * smoothstep(0.03, 0.9, waterDepth));
+                float landSource = (1.0 - ocean) * (0.42 * smoothstep(0.4, 4.8, bio.w) + 0.36 * basinWater + 0.24 * smoothstep(8.0, 240.0, routedFlow));
+                float bias = clamp(uEvaporationBias, 0.0, 1.0); float oceanWeight = mix(1.65, 0.45, bias); float landWeight = mix(0.45, 1.65, bias);
+                float evaporation = 0.012 * dt * temp01 * (0.75 + 0.15 * baseSpeed) * max(0.0, oceanSource * oceanWeight + landSource * landWeight);
+                vapour += evaporation;
+
+                float thermalLift = smoothstep(8.0, 34.0, temp) * smoothstep(OCEAN_DEPTH + 0.03, OCEAN_DEPTH + 0.65, h) * max(0.0, uTerrainThermalLift);
+                float orographicLift = upslope * max(0.0, uTerrainLift); float lift = 0.05 + 0.12 * thermalLift + 0.18 * orographicLift + 0.02 * scaledSlope;
+                float rainShadow = exp(-0.018 * leeSlope * max(0.0, uTerrainRainShadow) * dt); vapour *= rainShadow;
+
+                float capacity = mix(0.30, 2.45, temp01) * (1.0 + 0.12 * max(h - OCEAN_DEPTH, 0.0));
+                float supersat = max(0.0, vapour - capacity); float condense = (supersat * 0.16 + vapour * lift * 0.055) * max(0.0, uCloudCondensation) * dt;
+                condense = clamp(condense, 0.0, vapour * 0.45); vapour -= condense; cloud += condense;
+
+                float precipitation = cloud * (0.008 + 0.018 * lift) * max(0.0, uCloudCondensation) * dt; precipitation = min(precipitation, cloud * 0.35);
+                cloud = max(0.0, cloud - precipitation); vapour = max(0.0, vapour - precipitation * 0.12);
+                cloud *= exp(-(0.010 + 0.006 * temp01) * dt); vapour *= exp(-0.003 * dt);
+                outCloud = vec4(flowVel, clamp(cloud, 0.0, 3.0), clamp(vapour, 0.0, 3.0));
+            }`;
+            const fsClimateD = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_ATLAS + GLSL_DIRECTIONS + GLSL_PLANTS + `
+            in vec2 vUv;
+            uniform sampler2D uTerrain; uniform sampler2D uClimateB; uniform sampler2D uClimateC; uniform sampler2D uClimateD;
+            uniform vec2 uTerrainSize; uniform vec2 uClimateSize; uniform float uTime; uniform float uSeaLevel; uniform float uStepScale; uniform float uTerrainVerticalScale; uniform float uCloudCondensation;
+            layout(location=0) out vec4 outBio;
+
+            #define OCEAN_DEPTH uSeaLevel
+            #define PASS3 vec2(0.5,0.0)
+
+            float terrainHeightUv(vec2 uv) { return texture(uTerrain, topoUv(uv, uTerrainSize)).x * uTerrainVerticalScale; }
+            float mapHeightUv(vec2 uv) { return 2.8 * max(0.0, terrainHeightUv(uv) - OCEAN_DEPTH); }
+            vec4 climateAt(vec2 uv) { return sampleAtlas(uClimateB, uv, PASS3, uClimateSize); }
+
+            void main() {
+                vec4 c = texture(uClimateD, topoUv(vUv, uClimateSize));
+                if (uTime <= 1.0) { outBio = c; return; }
+                float dt = clamp(uStepScale, 0.0, 2.0); vec2 texel = 1.0 / max(uClimateSize, vec2(1.0));
+                vec4 dN = texture(uClimateD, topoUv(vUv + N * texel, uClimateSize)); vec4 dE = texture(uClimateD, topoUv(vUv + E * texel, uClimateSize));
+                vec4 dS = texture(uClimateD, topoUv(vUv + S * texel, uClimateSize)); vec4 dW = texture(uClimateD, topoUv(vUv + W * texel, uClimateSize));
+                vec4 cloudState = texture(uClimateC, topoUv(vUv, uClimateSize)); vec4 terrainState = texture(uTerrain, topoUv(vUv, uTerrainSize));
+                float height = mapHeightUv(vUv); float temp = climateAt(vUv).y; float cloud = cloudState.z; float vapour = cloudState.w;
+                float rainfall = (cloud * 0.018 + vapour * 0.0025) * max(0.0, uCloudCondensation) * dt;
+                float rainMemory = clamp(c.y * exp(-0.035 * dt) + rainfall * 5.0, 0.0, 3.0);
+
+                float moisture = c.w; float routedFlow = max(0.0, floor(terrainState.w));
+                float hn = mapHeightUv(vUv + N * texel); float he = mapHeightUv(vUv + E * texel); float hs = mapHeightUv(vUv + S * texel); float hw = mapHeightUv(vUv + W * texel);
+                float slope = length(vec2(he - hw, hn - hs)) * 0.5; moisture += rainfall * 0.85 + vapour * 0.0008 * dt;
+                float drainageLoss = (0.008 * slope + 0.0012 * log(1.0 + routedFlow)) * smoothstep(0.25, 5.0, moisture) * dt;
+                moisture = clamp(moisture * exp(-0.0015 * max(temp, 0.0) * dt) - drainageLoss, 0.0, 5.0);
+                if (height <= 0.0001) moisture = max(moisture, 4.75);
+
+                float vegetation = c.x;
+                if (height > 0.0) {
+                    float growth = plant_growth(moisture, temp);
+                    vegetation += dt * (0.045 * vegetation * (growth - 0.16) + 0.010 * growth);
+                    vegetation += dt * 0.018 * (dN.x + dE.x + dS.x + dW.x - 4.0 * vegetation);
+                    vegetation = clamp(vegetation, 0.0, 5.0);
+                } else { vegetation *= exp(-0.08 * dt); }
+                outBio = vec4(vegetation, rainMemory, 0.0, moisture);
+            }`;
+            const fsG2P = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_MPM + GLSL_MATERIAL + GLSL_HASH + `
+            in vec2 vUv;
+            uniform sampler2D uPosVel; uniform sampler2D uF; uniform sampler2D uMeta;
+            uniform sampler2D uGridVel; uniform sampler2D uGridAux; uniform sampler2D uGridMat; uniform mediump usampler2D uTerritoryMap; uniform sampler2D uPlateData;
+            uniform ivec2 uParticleTexSize; uniform int uParticleCount; uniform vec2 uGridSize; uniform float uDt;
+            uniform float uMinJ; uniform float uMaxJ; uniform float uPlasticYield; uniform float uPlasticCreep;
+            uniform float uApicBlend; uniform float uStrainCoupling; uniform float uParticleDamping; uniform float uVelocityClamp;
+            uniform float uTime; uniform float uParticleMass; uniform float uSubductThreshold; uniform float uSubductRate;
+            uniform float uRiftThreshold; uniform float uRiftRecycleRate;
+            uniform float uMaxCrustMass; uniform float uCrustGrowthRate; uniform float uAgeRate; uniform float uAgeDensityGain;
+            uniform float uMaterialDensityContrast;
+            layout(location=0) out vec4 outPosVel; layout(location=1) out vec4 outF; layout(location=2) out vec4 outC; layout(location=3) out vec4 outMeta;
+
+            mat2 clampPlastic(mat2 F) {
+                float J = det2(F); if(abs(J) < 0.00001) F = mat2(1.0, 0.0, 0.0, 1.0); J = det2(F);
+                float targetJ = clamp(J, uMinJ, uMaxJ); if(abs(J) > 0.00001) F *= sqrt(targetJ / J);
+                float tr = 0.5 * (F[0][0] + F[1][1]); mat2 iso = mat2(tr, 0.0, 0.0, tr); mat2 dev = F - iso;
+                float d = length(vec4(dev[0], dev[1]));
+                if(d > uPlasticYield) {
+                    mat2 limited = iso + dev * (uPlasticYield / max(d, 0.00001));
+                    F = mat2(mix(F[0], limited[0], uPlasticCreep), mix(F[1], limited[1], uPlasticCreep));
+                }
+                return F;
+            }
+
+            float divergentBoundary(vec2 sig) {
+                return max(0.0, sig.x - uRiftThreshold);
+            }
+
+            float subductionBoundary(vec2 sig) {
+                return max(0.0, sig.y - uSubductThreshold);
+            }
+
+            void addCrust(inout float mass, inout float crustType, inout float restVol, inout float crustAge, float addedMass, float addedType, float addedRestVolume, float addedAge, float maxCrust) {
+                addedMass = max(0.0, min(addedMass, max(maxCrust - mass, 0.0))); if(addedMass <= 0.000001) return;
+                float oldMass = max(mass, 0.0); float newMass = max(oldMass + addedMass, 0.000001);
+                crustType = (crustType * oldMass + addedType * addedMass) / newMass;
+                crustAge = (crustAge * oldMass + max(0.0, addedAge) * addedMass) / newMass;
+                restVol = clamp(restVol + max(0.02, addedRestVolume), 0.42, maxCrust); mass = newMass;
+            }
+            
+            void main() {
+                ivec2 tc = ivec2(vUv * vec2(uParticleTexSize)); int id = tc.y * uParticleTexSize.x + tc.x;
+                vec4 pv = texelFetch(uPosVel, tc, 0); vec4 fa = texelFetch(uF, tc, 0); vec4 m_data = texelFetch(uMeta, tc, 0);
+                if(id >= uParticleCount) { outPosVel = pv; outF = fa; outC = vec4(0.0); outMeta = m_data; return; }
+                
+                float mass = m_data.x; float crust_type = m_data.y; float rest_vol = max(0.65, m_data.z);
+                float crust_age = max(0.0, m_data.w); float maxCrust = max(0.8, uMaxCrustMass);
+                if(mass <= 0.015) { outPosVel = pv; outF = fa; outC = vec4(0.0); outMeta = m_data; return; }
+
+                vec2 xp = pv.xy - vec2(0.5); vec2 base = floor(xp - vec2(0.5)); vec2 fx = xp - base;
+                vec2 newV = vec2(0.0); mat2 newC = mat2(0.0);
+                for(int j = 0; j < 3; j++) {
+                    for(int i = 0; i < 3; i++) {
+                        float w = wq(fx.x, i) * wq(fx.y, j); ivec2 node = ivec2(base) + ivec2(i, j);
+                        vec4 gv = texelFetch(uGridVel, wrapc(node, ivec2(uGridSize)), 0); vec2 dpos = vec2(node) - xp;
+                        newV += w * gv.xy; newC += 4.0 * w * outerp(gv.xy, dpos);
+                    }
+                }
+                newV *= exp(-uParticleDamping * uDt);
+                
+                float currentClamp = min(uVelocityClamp, 0.45 / max(uDt, 0.0001)); float s = length(newV);
+                if(s > currentClamp) newV *= currentClamp / s;
+                
+                mat2 F = mat2(fa.x, fa.y, fa.z, fa.w);
+                F = (mat2(1.0, 0.0, 0.0, 1.0) + uDt * newC * max(0.0, uStrainCoupling)) * F; F = clampPlastic(F);
+                vec2 pos = wrapPos(pv.xy + uDt * newV, uGridSize);
+                mat2 outAffine = newC * clamp(uApicBlend, 0.0, 1.0);
+                float cLen = max(length(vec2(outAffine[0][0], outAffine[0][1])), length(vec2(outAffine[1][0], outAffine[1][1])));
+                if (cLen > 24.0) outAffine *= 24.0 / cLen;
+
+                ivec2 ccell = wrapc(ivec2(pos), ivec2(uGridSize)); vec2 sig = texelFetch(uGridAux, ccell, 0).xy;
+                float divSignal = divergentBoundary(sig); float convSignal = subductionBoundary(sig);
+                
+
+                float local_crust_type = texelFetch(uGridMat, ccell, 0).x;
+                crust_type = mix(crust_type, local_crust_type, uDt * 0.15); 
+                
+                vec4 props = getMatProps(crust_type);
+                float continental = clamp((1.0 - props.x) * 12.5, 0.0, 1.0);
+                float craton = clamp((0.92 - props.x) * 20.0, 0.0, 1.0);
+                float oceanic = 1.0 - continental; float ageRate = max(0.0, uAgeRate);
+                
+                crust_age = min(crust_age + uDt * ageRate * mix(1.0, 0.28, craton), 420.0); float age01 = clamp(crust_age / 180.0, 0.0, 1.0);
+                float densityContrast = max(0.0, uMaterialDensityContrast); float ageDensity = max(0.0, uAgeDensityGain);
+                float crustDensity = crustDensityFromState(crust_type, crust_age, mass, rest_vol, densityContrast, ageDensity);
+
+                uint plateId = texelFetch(uTerritoryMap, ccell, 0).r;
+                float plateRelief = 0.0; float plateMeanMass = 0.0; float plateMeanHeight = 0.0;
+                if(plateId < 255u) {
+                    vec4 plateSurface = texelFetch(uPlateData, ivec2(int(plateId), 2), 0);
+                    plateRelief = max(0.0, plateSurface.x); plateMeanMass = max(0.0, plateSurface.y); plateMeanHeight = max(0.0, plateSurface.z);
+                }
+
+                float lightCrust = clamp(1.0 - crustDensity, 0.0, 0.55); float boundaryActivity = clamp(divSignal + convSignal, 0.0, 2.0);
+                float stableInterior = 1.0 - clamp(boundaryActivity * 1.15, 0.0, 0.85);
+                float growthCapacity = smoothstep(0.0, 0.72, clamp((maxCrust - mass) / max(maxCrust, 0.0001), 0.0, 1.0));
+                float plateMaturity = smoothstep(0.05, 1.15, plateMeanMass) * (0.60 + 0.40 * smoothstep(0.02, 1.25, plateMeanHeight + plateRelief));
+                float shieldBias = continental * stableInterior * mix(1.0, 0.55, craton); float growthRate = max(0.0, uCrustGrowthRate);
+                float interiorGrowth = growthRate * uDt * 0.050 * growthCapacity * plateMaturity * (0.18 + 0.82 * shieldBias + 0.32 * lightCrust);
+                if(interiorGrowth > 0.0) {
+                    float addedType = mix(2.0, 3.0, craton);
+                    float addedAge = mix(3.0, crust_age, clamp(0.72 * continental + 0.18 * stableInterior + 0.10 * craton, 0.0, 0.96));
+                    addCrust(mass, crust_type, rest_vol, crust_age, interiorGrowth, addedType, interiorGrowth * mix(0.15, 0.30, continental), addedAge, maxCrust);
+                }
+                
+                props = getMatProps(crust_type);
+                continental = clamp((1.0 - props.x) * 12.5, 0.0, 1.0);
+                craton = clamp((0.92 - props.x) * 20.0, 0.0, 1.0);
+                oceanic = 1.0 - continental;
+                
+                float shieldMaturity = continental * stableInterior * smoothstep(85.0, 230.0, crust_age) * smoothstep(uParticleMass * 1.05, uParticleMass * 2.35, mass);
+                float cratonize = clamp(shieldMaturity * uDt * ageRate * 0.0025, 0.0, 0.025);
+                crust_type = mix(crust_type, 3.0, cratonize);
+                
+                props = getMatProps(crust_type);
+                continental = clamp((1.0 - props.x) * 12.5, 0.0, 1.0);
+                craton = clamp((0.92 - props.x) * 20.0, 0.0, 1.0);
+                oceanic = 1.0 - continental;
+
+                if(divSignal > 0.0) {
+                    float riftStrength = divSignal * max(0.0, uRiftRecycleRate) * uDt;
+                    float thinning = riftStrength * mix(0.10, 0.28, continental) * mix(1.0, 0.20, craton);
+                    mass = max(0.0, mass - thinning);
+                    rest_vol = max(0.38, rest_vol - thinning * mix(0.18, 0.34, continental));
+                    float thinEnough = clamp((uParticleMass * 0.92 - mass) / max(uParticleMass, 0.0001), 0.0, 1.0);
+                    float mantleMeltType = clamp(mix(0.05, 0.95, hash22(pos * 0.071 + vec2(uTime, crust_age)).x), 0.0, 1.15);
+                    float basaltBlend = clamp(riftStrength * (0.20 + 0.80 * thinEnough) * mix(1.0, 0.12, craton), 0.0, 0.35);
+                    crust_type = mix(crust_type, mantleMeltType, basaltBlend);
+                    crust_age = mix(crust_age, 0.0, clamp(basaltBlend * 2.5, 0.0, 1.0));
+                    rest_vol = mix(rest_vol, max(rest_vol, mass * 1.04), basaltBlend);
+                    F = clampPlastic(F * (1.0 - basaltBlend) + mat2(0.86, 0.0, 0.0, 0.86) * basaltBlend);
+                    props = getMatProps(crust_type);
+                    continental = clamp((1.0 - props.x) * 12.5, 0.0, 1.0);
+                    craton = clamp((0.92 - props.x) * 20.0, 0.0, 1.0);
+                    oceanic = 1.0 - continental;
+                    crustDensity = crustDensityFromState(crust_type, crust_age, mass, rest_vol, densityContrast, ageDensity);
+                }
+
+                if(convSignal > 0.0) {
+                    float densityFactor = clamp(0.55 + max(0.0, crustDensity - 0.96) * 2.1, 0.45, 1.75);
+                    float ageFactor = mix(0.65, 1.20, age01);
+                    float materialSink = mix(0.35, 1.0, oceanic) * mix(1.0, 0.22, craton);
+                    float subductLoss = uSubductRate * uDt * convSignal * materialSink * densityFactor * ageFactor;
+                    mass = max(0.0, mass - subductLoss);
+                    rest_vol = clamp(rest_vol - subductLoss * mix(0.85, 1.45, oceanic), 0.08, maxCrust);
+                    float resetBlend = clamp(subductLoss * 0.16, 0.0, 0.35);
+                    F = clampPlastic(F * (1.0 - resetBlend) + mat2(0.92, 0.0, 0.0, 0.92) * resetBlend);
+                }
+
+                mass = clamp(mass, 0.0, maxCrust);
+                if(mass < 0.015) { mass = 0.0; crust_type = 0.0; crust_age = 0.0; rest_vol = 1.0; }
+                outPosVel = vec4(pos, newV); outF = vec4(F[0][0], F[0][1], F[1][0], F[1][1]);
+                outC = vec4(outAffine[0][0], outAffine[0][1], outAffine[1][0], outAffine[1][1]); outMeta = vec4(mass, crust_type, rest_vol, crust_age);
+            }`;
+            const fsSpawn = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_HASH + `
+            in vec2 vUv;
+            uniform sampler2D uPosVel;
+            uniform sampler2D uF;
+            uniform sampler2D uC;
+            uniform sampler2D uMeta;
+            uniform sampler2D uGridVel;
+            uniform sampler2D uGridAux;
+            uniform mediump usampler2D uTerritoryMap;
+            uniform ivec2 uParticleTexSize;
+            uniform int uParticleCount;
+            uniform vec2 uGridSize;
+            uniform float uTime;
+            uniform float uDt;
+            uniform float uParticleMass;
+            uniform float uRiftThreshold;
+            uniform float uRiftRate;
+            uniform float uMaterialVariation;
+            layout(location=0) out vec4 outPosVel;
+            layout(location=1) out vec4 outF;
+            layout(location=2) out vec4 outC;
+            layout(location=3) out vec4 outMeta;
+            void main() {
+                ivec2 tc = ivec2(vUv * vec2(uParticleTexSize));
+                int id = tc.y * uParticleTexSize.x + tc.x;
+                vec4 pv = texelFetch(uPosVel, tc, 0);
+                vec4 fa = texelFetch(uF, tc, 0);
+                vec4 ca = texelFetch(uC, tc, 0);
+                vec4 meta = texelFetch(uMeta, tc, 0);
+                if(id >= uParticleCount || meta.x > 0.015) { outPosVel = pv; outF = fa; outC = ca; outMeta = meta; return; }
+                vec2 seed = vec2(float(id) * 0.173, uTime * 1.731 + float(id) * 0.019);
+                vec2 pos = hash22(seed) * uGridSize;
+                ivec2 cell = wrapc(ivec2(pos), ivec2(uGridSize));
+                vec4 gv = texelFetch(uGridVel, cell, 0);
+                float rift = max(0.0, texelFetch(uGridAux, cell, 0).x - uRiftThreshold);
+                float score = rift * (0.7 + 2.3 * smoothstep(1.65, 0.0, gv.z));
+                uint pid = texelFetch(uTerritoryMap, cell, 0).r;
+                float probability = clamp(score * uRiftRate * uDt * (0.75 + 2.25 * smoothstep(1.65, 0.0, gv.z)), 0.0, 1.0);
+                if(pid < 255u && score > 0.0 && hash22(seed + 31.7).x < probability) {
+                    float freshMass = uParticleMass * mix(0.34, 0.58, hash22(seed).x);
+                    float freshVol = freshMass * mix(1.02, 1.18, hash22(seed + 4.7).x);
+                    float freshType = clamp(mix(0.05, 0.95, hash22(seed + 8.1).y) + (hash22(seed).y - 0.5) * clamp(uMaterialVariation, 0.0, 2.0) * 0.18, 0.0, 1.15);
+                    outPosVel = vec4(pos, gv.xy);
+                    outF = vec4(0.86, 0.0, 0.0, 0.86);
+                    outC = vec4(0.0);
+                    outMeta = vec4(freshMass, freshType, freshVol, 0.0);
+                    return;
+                }
+                outPosVel = pv;
+                outF = fa;
+                outC = vec4(0.0);
+                outMeta = vec4(0.0, 0.0, max(0.9, meta.z), 0.0);
+            }`;
+            const vsPlateReduce = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_PI + `
+            uniform sampler2D uGridVel;
+            uniform mediump usampler2D uTerritoryMap;
+            uniform ivec2 uGridSize;
+            uniform int uCellCount;
+            uniform float uVerticalScale;
+            flat out vec4 vA;
+            flat out vec4 vB;
+            void main() {
+                int id = gl_VertexID;
+                if(id >= uCellCount) { gl_Position = vec4(4.0); gl_PointSize = 1.0; return; }
+                ivec2 xy = ivec2(id % uGridSize.x, id / uGridSize.x);
+                uint pid = texelFetch(uTerritoryMap, xy, 0).r;
+                vec4 g = texelFetch(uGridVel, xy, 0);
+                if(pid >= 64u || g.z <= 0.000001) { gl_Position = vec4(4.0); gl_PointSize = 1.0; return; }
+                float m = g.z;
+                bvec2 w = getWrap();
+                float xa = w.x ? m * cos((float(xy.x) + 0.5) * 2.0 * PI / float(uGridSize.x)) : m * (float(xy.x) + 0.5);
+                float xb = w.x ? m * sin((float(xy.x) + 0.5) * 2.0 * PI / float(uGridSize.x)) : 0.0;
+                float ya = w.y ? m * cos((float(xy.y) + 0.5) * 2.0 * PI / float(uGridSize.y)) : m * (float(xy.y) + 0.5);
+                float yb = w.y ? m * sin((float(xy.y) + 0.5) * 2.0 * PI / float(uGridSize.y)) : 0.0;
+                vA = vec4(m, xa, xb, ya);
+                vB = vec4(yb, m * max(0.0, g.w * uVerticalScale), 1.0, 0.0);
+                gl_Position = vec4((float(pid) + 0.5) / 32.0 - 1.0, 0.0, 0.0, 1.0);
+                gl_PointSize = 1.0;
+            }`;
+            const fsPlateReduce = GLSL_HEADER + `
+            flat in vec4 vA;
+            flat in vec4 vB;
+            layout(location=0) out vec4 outA;
+            layout(location=1) out vec4 outB;
+            void main() { outA = vA; outB = vB; }`;
+            const fsSatellite = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_ATLAS + GLSL_DIRECTIONS + `
+            in vec2 vUv;
+            uniform sampler2D uTerrain;
+            uniform sampler2D uClimateB;
+            uniform sampler2D uClimateC;
+            uniform sampler2D uClimateD;
+            uniform sampler2D uGridMat;
+            uniform vec2 uGridSize;
+            uniform vec2 uTerrainSize;
+            uniform vec2 uClimateSize;
+            uniform float uSeaLevel;
+            uniform float uTerrainVerticalScale;
+            uniform float uCloudOpacity;
+            out vec4 fragColor;
+            #define PASS3 vec2(0.5,0.0)
+            #define PASS4 vec2(0.5,0.5)
+            ivec2 gridCoord(vec2 uv) { return wrapc(ivec2(floor(topoUv(uv, uGridSize) * uGridSize)), ivec2(uGridSize)); }
+            float terrainHeight(vec2 uv) { return texture(uTerrain, topoUv(uv, uTerrainSize)).x * uTerrainVerticalScale; }
+            vec4 climateAt(vec2 uv) { return sampleAtlas(uClimateB, uv, PASS3, uClimateSize); }
+            vec2 windAt(vec2 uv) { return sampleAtlas(uClimateB, uv, PASS4, uClimateSize).xy; }
+            vec2 gradientAt(vec2 uv) {
+                vec2 t = 1.0 / max(uTerrainSize, vec2(1.0));
+                return vec2(terrainHeight(uv + E * t) - terrainHeight(uv + W * t), terrainHeight(uv + N * t) - terrainHeight(uv + S * t)) * 0.5;
+            }
+            vec3 materialColor(float t) {
+                t = clamp(t, 0.0, 4.0);
+                vec3 c = mix(vec3(0.05,0.15,0.35), vec3(0.35,0.45,0.35), clamp(t,0.0,1.0));
+                c = mix(c, vec3(0.65,0.44,0.19), clamp(t-1.0,0.0,1.0));
+                c = mix(c, vec3(0.86,0.76,0.38), clamp(t-2.0,0.0,1.0));
+                return mix(c, vec3(0.85), clamp(t-3.0,0.0,1.0));
+            }
+            vec3 coastColor(float t, float temp, float moisture) {
+                vec3 c = materialColor(t) * 0.72 + vec3(0.20,0.18,0.13);
+                c = mix(c, vec3(0.82,0.72,0.48), smoothstep(18.0,35.0,temp) * 0.28);
+                c = mix(c, vec3(0.22,0.24,0.25), (1.0 - smoothstep(-8.0,8.0,temp)) * 0.65);
+                return mix(c, vec3(0.34,0.32,0.28), moisture * 0.14);
+            }
+            float iceMask(float h, float temp, vec2 wind, vec4 cloud) {
+                float depth = max(uSeaLevel - h, 0.0);
+                float heat = temp + smoothstep(0.75,3.2,depth) * 0.55 + length(wind + cloud.xy * 0.35) * 0.18 + cloud.z * 0.10 + cloud.w * 0.04;
+                return step(0.015, depth) * (1.0 - smoothstep(-2.6,-1.2,heat));
+            }
+            void main() {
+                float h = terrainHeight(vUv);
+                vec4 climate = climateAt(vUv);
+                vec4 cloud = texture(uClimateC, topoUv(vUv, uClimateSize));
+                vec4 bio = texture(uClimateD, topoUv(vUv, uClimateSize));
+                ivec2 xy = gridCoord(vUv);
+                vec4 mat = texelFetch(uGridMat, xy, 0);
+                vec2 grad = gradientAt(vUv);
+                float slope = length(grad);
+                float relief = 2.8 * max(0.0, h - uSeaLevel);
+                float temp = climate.z - (h >= uSeaLevel ? 3.5 * relief : 0.0);
+                vec3 normal = normalize(vec3(-grad.x * 1.45, -grad.y * 1.45, 1.0));
+                vec3 sun = normalize(vec3(-0.62,0.55,0.78));
+                float shade = 0.42 + 0.70 * max(dot(normal, sun), 0.0);
+                float moisture = clamp(bio.w / 4.0, 0.0, 1.0);
+                vec2 wind = windAt(vUv);
+                float ice = h < uSeaLevel ? iceMask(h, temp, wind, cloud) : 0.0;
+                vec3 c;
+                if(h < uSeaLevel) {
+                    float depth = uSeaLevel - h;
+                    vec3 shallow = mix(vec3(0.04,0.18,0.28), vec3(0.05,0.34,0.36), smoothstep(8.0,30.0,temp));
+                    c = mix(shallow, vec3(0.004,0.026,0.085), smoothstep(0.03,1.55,depth));
+                    c += vec3(0.03,0.06,0.06) * (1.0 - smoothstep(0.02,0.35,depth));
+                    c = mix(c, mix(vec3(0.78,0.86,0.89), vec3(0.96), clamp((-1.8-temp)/24.0,0.0,1.0)), ice);
+                } else {
+                    float vegetation = clamp(bio.x / 2.0, 0.0, 1.0);
+                    float cold = 1.0 - smoothstep(-4.0,9.0,temp);
+                    vec3 biome = mix(vec3(0.30,0.34,0.31), vec3(0.22,0.42,0.14), smoothstep(-6.0,18.0,temp));
+                    biome = mix(biome, vec3(0.78,0.58,0.33), smoothstep(22.0,36.0,temp) * (1.0 - vegetation * 0.65));
+                    vec3 rock = mix(materialColor(mat.x), vec3(0.52,0.50,0.45), 0.30);
+                    vec3 ground = mix(coastColor(mat.x,temp,moisture), rock, smoothstep(uSeaLevel+0.12,uSeaLevel+1.85,h));
+                    ground = mix(ground, rock, smoothstep(0.055,0.24,slope) * smoothstep(uSeaLevel+0.35,uSeaLevel+2.6,h));
+                    c = mix(ground, biome, vegetation * (1.0 - cold * 0.65));
+                    float snow = (1.0 - smoothstep(-12.0,3.0,temp)) * (0.36 + 0.64 * smoothstep(uSeaLevel+0.55,uSeaLevel+3.25,h)) * (1.0 - 0.28 * smoothstep(0.09,0.34,slope));
+                    c = mix(c, vec3(0.94,0.96,0.96), clamp(snow,0.0,1.0));
+                }
+                float shore = 1.0 - smoothstep(0.0,0.075,abs(h-uSeaLevel));
+                vec3 coast = coastColor(mat.x,temp,moisture);
+                c = mix(c, coast, shore * (h >= uSeaLevel ? 0.62 : 0.32) * (1.0 - ice));
+                c *= shade;
+                float cloudAlpha = clamp(cloud.z * uCloudOpacity, 0.0, 0.86);
+                c = mix(c, mix(vec3(0.94), vec3(0.48), smoothstep(0.10,2.25,cloud.z)), cloudAlpha);
+                fragColor = vec4(pow(max(c,vec3(0.0)), vec3(1.0/1.45)), 1.0);
+            }`;
+            const fsDebug = GLSL_HEADER + GLSL_TOPOLOGY + GLSL_MATERIAL + GLSL_ATLAS + GLSL_DIRECTIONS + `
+            in vec2 vUv;
+            uniform sampler2D uTerrain;
+            uniform mediump usampler2D uTerritoryMap;
+            uniform sampler2D uPlateData;
+            uniform sampler2D uClimateB;
+            uniform sampler2D uClimateD;
+            uniform sampler2D uGridVel;
+            uniform sampler2D uGridAux;
+            uniform sampler2D uGridMat;
+            uniform vec2 uGridSize;
+            uniform vec2 uTerrainSize;
+            uniform vec2 uClimateSize;
+            uniform float uSeaLevel;
+            uniform float uTerrainVerticalScale;
+            uniform float uAgeDensityGain;
+            uniform float uMaterialDensityContrast;
+            uniform int uMode;
+            out vec4 fragColor;
+            #define PASS3 vec2(0.5,0.0)
+            #define PASS4 vec2(0.5,0.5)
+            ivec2 gridCoord(vec2 uv) { return wrapc(ivec2(floor(topoUv(uv,uGridSize)*uGridSize)), ivec2(uGridSize)); }
+            vec4 terrainAt(vec2 uv) { return texture(uTerrain, topoUv(uv,uTerrainSize)); }
+            float terrainHeight(vec2 uv) { return terrainAt(uv).x * uTerrainVerticalScale; }
+            vec4 climateAt(vec2 uv) { return sampleAtlas(uClimateB,uv,PASS3,uClimateSize); }
+            vec2 windAt(vec2 uv) { return sampleAtlas(uClimateB,uv,PASS4,uClimateSize).xy; }
+            vec3 materialColor(float t) { t=clamp(t,0.0,4.0); vec3 c=mix(vec3(0.05,0.15,0.35),vec3(0.35,0.45,0.35),clamp(t,0.0,1.0)); c=mix(c,vec3(0.65,0.44,0.19),clamp(t-1.0,0.0,1.0)); c=mix(c,vec3(0.86,0.76,0.38),clamp(t-2.0,0.0,1.0)); return mix(c,vec3(0.85),clamp(t-3.0,0.0,1.0)); }
+            vec3 ageColor(float age) { float a=clamp(age/220.0,0.0,1.0); return mix(mix(vec3(0.08,0.45,0.95),vec3(0.92,0.90,0.55),smoothstep(0.0,0.55,a)),vec3(0.78,0.24,0.08),smoothstep(0.55,1.0,a)); }
+            vec2 terrainGradient(vec2 uv) { vec2 t=1.0/max(uTerrainSize,vec2(1.0)); return vec2(terrainHeight(uv+E*t)-terrainHeight(uv+W*t),terrainHeight(uv+N*t)-terrainHeight(uv+S*t))*0.5; }
+            float arrowMask(vec2 uv, vec2 wind) { vec2 cells=max(vec2(8.0),min(uClimateSize/18.0,vec2(30.0))); vec2 q=fract(uv*cells)-0.5; float speed=length(wind); if(speed<0.020)return 0.0; vec2 d=normalize(wind),t=vec2(-d.y,d.x); float a=dot(q,d),x=abs(dot(q,t)); float shaft=smoothstep(0.026,0.0,x)*smoothstep(-0.36,-0.30,a)*(1.0-smoothstep(0.15,0.25,a)); vec2 hp=q-d*0.23; float ha=dot(hp,d),hx=abs(dot(hp,t)); float head=smoothstep(0.12,0.0,hx+max(0.0,-ha)*1.35+max(0.0,ha)*3.2); return clamp(max(shaft,head)*smoothstep(0.020,0.75,speed),0.0,1.0); }
+            void main() {
+                ivec2 xy=gridCoord(vUv);
+                if(uMode==1){float h=terrainHeight(vUv);fragColor=vec4(vec3(smoothstep(0.0,max(1.0,uSeaLevel*2.8),h)),1);return;}
+                if(uMode==2){uint pid=texelFetch(uTerritoryMap,xy,0).r;vec3 c=pid<255u?texelFetch(uPlateData,ivec2(int(pid),1),0).yzw:vec3(0.08);c*=0.72+0.42*smoothstep(0.0,0.08,length(terrainGradient(vUv)));fragColor=vec4(pow(c,vec3(0.65)),1);return;}
+                if(uMode==3){float temp=climateAt(vUv).z-3.5*2.8*max(0.0,terrainHeight(vUv)-uSeaLevel);vec3 c=mix(vec3(0.02,0.18,0.85),vec3(0.92),smoothstep(-24.0,4.0,temp));c=mix(c,vec3(0.95,0.30,0.03),smoothstep(8.0,36.0,temp));fragColor=vec4(c,1);return;}
+                if(uMode==4){vec4 cl=climateAt(vUv);vec3 c=mix(vec3(0.86,0.34,0.08),vec3(0.90),smoothstep(996.0,1012.0,cl.x));c=mix(c,vec3(0.08,0.30,0.82),smoothstep(1012.0,1028.0,cl.x));float iso=1.0-smoothstep(0.045,0.16,abs(fract(cl.x/4.0)-0.5)*2.0);c=mix(c,vec3(0.04),0.28*iso);vec2 wind=windAt(vUv);fragColor=vec4(mix(c,mix(vec3(0.05),vec3(1),smoothstep(0.04,1.6,length(wind))),arrowMask(topoUv(vUv,uClimateSize),wind)),1);return;}
+                vec4 gv=texelFetch(uGridVel,xy,0);vec2 aux=texelFetch(uGridAux,xy,0).xy;vec4 mat=texelFetch(uGridMat,xy,0);float type=mat.x,age=mat.y;
+                if(uMode==5){fragColor=vec4(mix(vec3(0.02),ageColor(age),smoothstep(0.02,0.16,gv.z)),1);return;}
+                if(uMode==6){float d=mat.z>0.01?mat.z:crustDensityFromState(type,age,gv.z/4.0,max(mat.w,0.08),max(0.0,uMaterialDensityContrast),max(0.0,uAgeDensityGain));float q=clamp((d-0.78)/0.62,0.0,1.0);vec3 c=mix(vec3(0.88,0.96,0.78),vec3(0.88),smoothstep(0.0,0.48,q));c=mix(c,vec3(0.28,0.08,0.08),smoothstep(0.48,1.0,q));fragColor=vec4(mix(vec3(0.02),c,smoothstep(0.0,1.3,gv.z/4.0)),1);return;}
+                if(uMode==7){fragColor=vec4(mix(vec3(0.02),materialColor(type),smoothstep(0.02,0.16,gv.z)),1);return;}
+                if(uMode==8){fragColor=vec4(mix(vec3(0.03),vec3(0.95),smoothstep(0.0,5.0,gv.z)),1);return;}
+                if(uMode==9){vec3 c=vec3(0.04)+vec3(0.06,0.48,0.95)*smoothstep(0.02,0.9,clamp(aux.x,0.0,1.5))+vec3(0.95,0.28,0.06)*smoothstep(0.02,0.9,clamp(aux.y,0.0,1.5));fragColor=vec4(clamp(c,0.0,1.0),1);return;}
+                if(uMode==10){float lift=clamp(gv.w,0.0,3.0);vec3 c=mix(vec3(0.04,0.06,0.11),vec3(0.45,0.62,0.36),smoothstep(0.02,0.85,lift));c=mix(c,vec3(0.96,0.90,0.65),smoothstep(0.85,2.4,lift));fragColor=vec4(c,1);return;}
+                if(uMode==11||uMode==12){vec4 b=texture(uClimateD,topoUv(vUv,uClimateSize));float v=uMode==11?b.x:b.w;vec3 hi=uMode==11?vec3(0.1,0.8,0.2):vec3(0.1,0.4,0.9);fragColor=vec4(mix(vec3(0.04),hi,v/5.0),1);return;}
+                if(uMode==13){vec4 t=terrainAt(vUv);vec3 c=mix(vec3(0.04),vec3(0.1,0.4,0.8),clamp(fract(t.w),0.0,1.0));c=mix(c,vec3(0.8,0.9,1.0),clamp(floor(t.w)/25.0,0.0,1.0));fragColor=vec4(c,1);return;}
+                if(uMode==14){vec4 t=terrainAt(vUv);vec3 c=mix(vec3(0.04),vec3(0.9,0.2,0.1),smoothstep(0.0,0.015,t.z));c=mix(c,vec3(0.1,0.5,0.9),smoothstep(0.0,0.5,t.y));fragColor=vec4(c,1);return;}
+                fragColor=vec4(0,0,0,1);
+            }`;
+            return {
+                p2g: this.link("p2g", vsP2G, fsP2G),
+                gridUpdate: this.link("gridUpdate", vsFull, fsGridUpdate),
+                gridPhysics: this.link("gridPhysics", vsFull, fsGridPhysics),
+                terrainRoute: this.link("terrainRoute", vsFull, fsTerrainRoute),
+                terrainUpdate: this.link("terrainUpdate", vsFull, fsTerrainUpdate),
+                climateB: this.link("climateB", vsFull, fsClimateB),
+                climateC: this.link("climateC", vsFull, fsClimateC),
+                climateD: this.link("climateD", vsFull, fsClimateD),
+                g2p: this.link("g2p", vsFull, fsG2P),
+                spawn: this.link("spawn", vsFull, fsSpawn),
+                plateReduce: this.link("plateReduce", vsPlateReduce, fsPlateReduce),
+                satellite: this.link("satellite", vsFull, fsSatellite),
+                debug: this.link("debug", vsFull, fsDebug)
+            };
+        }
+
+        link(name, vsSrc, fsSrc) {
+            const gl = this.gl;
+            const compile = (type, source) => {
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    const log = gl.getShaderInfoLog(shader) || "Unknown shader error";
+                    gl.deleteShader(shader);
+                    throw new Error(`${name}: ${log}`);
+                }
+                return shader;
+            };
+            const vs = compile(gl.VERTEX_SHADER, vsSrc);
+            const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+            const p = gl.createProgram();
+            gl.attachShader(p, vs);
+            gl.attachShader(p, fs);
+            gl.linkProgram(p);
+            gl.deleteShader(vs);
+            gl.deleteShader(fs);
+            if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+                const log = gl.getProgramInfoLog(p) || "Unknown link error";
+                gl.deleteProgram(p);
+                throw new Error(`${name}: ${log}`);
+            }
+            const u = {};
+            const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+            for (let i = 0; i < n; i++) {
+                const info = gl.getActiveUniform(p, i);
+                if (info) u[info.name.replace(/\[0\]$/, "")] = gl.getUniformLocation(p, info.name);
+            }
+            return { p, u, samplerUnits: Object.create(null) };
+        }
+
+        tex(w, h, internal, format, type, data = null, filter = null) {
+            const gl = this.gl; const t = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, t);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter || gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter || gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+            gl.texImage2D(gl.TEXTURE_2D, 0, internal, w, h, 0, format, type, data); return t;
+        }
+
+        fbo(textures) {
+            const gl = this.gl; const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); const bufs = [];
+            textures.forEach((t, i) => { gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0); bufs.push(gl.COLOR_ATTACHMENT0 + i); });
+            gl.drawBuffers(bufs);
+            if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("Framebuffer setup failed.");
+            return f;
+        }
+
+        bindFBO(fbo, w, h) { this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fbo); this.gl.viewport(0, 0, w, h); }
+
+        setTex(program, name, unit, tex) {
+            const loc = program.u[name];
+            if (loc === undefined || loc === null) return;
+            const gl = this.gl;
+            gl.activeTexture(gl.TEXTURE0 + unit);
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            if (program.samplerUnits[name] !== unit) {
+                gl.uniform1i(loc, unit);
+                program.samplerUnits[name] = unit;
+            }
+        }
+
+        estimateMemoryBytes() {
+            const particles = this.ptexW * this.ptexH;
+            const grid = this.width * this.height;
+            const terrain = this.terrainWidth * this.terrainHeight;
+            const climate = this.climateWidth * this.climateHeight;
+            return particles * 96 + grid * 81 + terrain * 40 + climate * 48 + 64 * 16 * 8;
+        }
+
+        validateResources() {
+            const dims = [this.width, this.height, this.ptexW, this.ptexH, this.terrainWidth, this.terrainHeight, this.climateWidth, this.climateHeight];
+            if (Math.max(...dims) > this.maxTextureSize) throw new Error(`Requested texture dimension exceeds GPU limit ${this.maxTextureSize}.`);
+            this.memoryBytes = this.estimateMemoryBytes();
+            if (this.memoryBytes > SIM.memoryBudgetBytes) throw new Error(`Estimated GPU allocation ${(this.memoryBytes / 1048576).toFixed(0)} MB exceeds the 512 MB safety budget. Reduce dimensions, resolution, or particle slots.`);
+        }
+
+        effectiveSeaLevel() { return clamp(CONFIG.seaLevel, 0.02, 6.0); }
+        effectivePlateMotionScale() { return Math.max(0.0, CONFIG.plateTimeScale) * this.startupRamp(); }
+        startupRamp() {
+            const frames = Math.max(0, SIM.startupStabilizationFrames | 0);
+            if (frames <= 0 || this.iterCount >= frames) return 1.0;
+            const t = clamp(this.iterCount / Math.max(1, frames), 0.0, 1.0); return t * t * (3.0 - 2.0 * t);
+        }
+
+        initWorld() {
+            const gl = this.gl;
+            this.width = snapDimension(CONFIG.width);
+            this.height = snapDimension(CONFIG.height);
+            CONFIG.width = this.width;
+            CONFIG.height = this.height;
+            const area = this.width * this.height;
+            this.particleCount = Math.max(area, Math.floor(area * clamp(CONFIG.particleSlotDensity, 1.0, 2.0)));
+            this.ptexW = Math.ceil(Math.sqrt(this.particleCount));
+            this.ptexH = Math.ceil(this.particleCount / this.ptexW);
+            this.terrainScale = clamp(Number(CONFIG.terrainResolutionScale) || 1.0, 0.5, 2.0);
+            this.terrainWidth = Math.max(64, Math.round(this.width * this.terrainScale));
+            this.terrainHeight = Math.max(64, Math.round(this.height * this.terrainScale));
+            this.climateScale = clamp(Number(CONFIG.climateResolutionScale) || 0.5, 0.5, 1.0);
+            this.climateWidth = Math.max(64, Math.round(this.width * this.climateScale));
+            this.climateHeight = Math.max(64, Math.round(this.height * this.climateScale));
+            this.renderWidth = Math.max(this.width, this.terrainWidth, this.climateWidth);
+            this.renderHeight = Math.max(this.height, this.terrainHeight, this.climateHeight);
+            this.canvas.width = this.renderWidth;
+            this.canvas.height = this.renderHeight;
+            this.validateResources();
+
+            const wrapX = CONFIG.topology < 2;
+            const wrapY = CONFIG.topology === 0;
+            this.wrapInstances = wrapY ? 9 : wrapX ? 3 : 1;
+
+            this.plates = Array.from({ length: 64 }, (_, i) => new Plate(i));
+
+
+            this.imap = new Uint8Array(area);
+            this.nextImap = new Uint8Array(area);
+            this.smoothImap = new Uint8Array(area);
+            this.territoryBestId = new Uint8Array(area);
+            this.territorySecondId = new Uint8Array(area);
+            this.territoryThirdId = new Uint8Array(area);
+            this.territoryBestScore = new Float32Array(area);
+            this.territorySecondScore = new Float32Array(area);
+            this.territoryThirdScore = new Float32Array(area);
+            this.plateDataBuffer = new Float32Array(64 * 3 * 4);
+            this.territoryCounts = new Uint32Array(64);
+            this.geomInertia = new Float64Array(64);
+            this.geomXX = new Float64Array(64);
+            this.geomXY = new Float64Array(64);
+            this.geomYY = new Float64Array(64);
+            this.maxR2 = new Float32Array(64);
+            this.neighborWeights = new Float32Array(64);
+            this.neighborStamps = new Uint32Array(64);
+            this.neighborStamp = 1;
+            this.boundaryEdges = new Uint32Array(area * 2);
+            this.boundaryEdgeCount = 0;
+            this.pairBoundaryCount = new Uint32Array(4096);
+            this.pairClosing = new Float32Array(4096);
+            this.pairShear = new Float32Array(4096);
+            this.pairMergeProgress = new Float32Array(4096);
+            this.splitLabels = new Uint8Array(area);
+            this.splitQueue = new Uint32Array(area);
+            this.rotationCos = new Float32Array(64);
+            this.rotationSin = new Float32Array(64);
+            this.nextPlateCx = new Float32Array(64);
+            this.nextPlateCy = new Float32Array(64);
+            this.contactScratch = {};
+            this.territoryEpoch = 0;
+
+            const ntex = this.ptexW * this.ptexH;
+            const posVel = new Float32Array(ntex * 4);
+            const F = new Float32Array(ntex * 4);
+            const C = new Float32Array(ntex * 4);
+            const meta = new Float32Array(ntex * 4);
+            const n = Math.max(2, Math.min(64, CONFIG.plates | 0));
+            const aspect = this.width / this.height;
+            const cols = Math.max(1, Math.ceil(Math.sqrt(n * aspect)));
+            const rows = Math.max(1, Math.ceil(n / cols));
+            const cx = new Float32Array(n);
+            const cy = new Float32Array(n);
+
+
+            const areaScale = Math.sqrt(area / n);
+            const continentCx = new Float32Array(n);
+            const continentCy = new Float32Array(n);
+            const continentR = new Float32Array(n);
+            for (let id = 0; id < n; id++) {
+                const row = (id / cols) | 0;
+                const col = id - row * cols;
+                const rowCount = Math.min(cols, n - row * cols);
+                const cellW = this.width / Math.max(1, rowCount);
+                const cellH = this.height / rows;
+                const jx = (hash01(id, 1, 17) - 0.5) * cellW * 0.42;
+                const jy = (hash01(id, 2, 23) - 0.5) * cellH * 0.42;
+                const sx = (col + 0.5) * cellW + jx;
+                const sy = (row + 0.5) * cellH + jy;
+                cx[id] = wrapX ? wrapFloat(sx, this.width, true) : clamp(sx, 0.5, this.width - 0.5);
+                cy[id] = wrapY ? wrapFloat(sy, this.height, true) : clamp(sy, 0.5, this.height - 0.5);
+                const plate = this.plates[id];
+                plate.cx = cx[id];
+                plate.cy = cy[id];
+                plate.materialType = clamp(0.25 + 3.4 * hash01(id, 3, 31), 0.0, 4.0);
+                const direction = hash01(id, 4, 37) * Math.PI * 2;
+                const speed = 0.08 + 0.22 * hash01(id, 5, 41);
+                plate.vx = Math.cos(direction) * speed;
+                plate.vy = Math.sin(direction) * speed;
+                plate.omega = (hash01(id, 6, 43) - 0.5) * 0.006;
+                const continentAngle = hash01(id, 7, 47) * Math.PI * 2;
+                const continentOffset = areaScale * 0.18 * hash01(id, 8, 53);
+                continentCx[id] = wrapFloat(cx[id] + Math.cos(continentAngle) * continentOffset, this.width, wrapX);
+                continentCy[id] = wrapFloat(cy[id] + Math.sin(continentAngle) * continentOffset, this.height, wrapY);
+                continentR[id] = areaScale * (0.20 + 0.34 * hash01(id, 9, 59));
+            }
+
+            const cellType = new Float32Array(area);
+            const cellAge = new Float32Array(area);
+            const cellMass = new Float32Array(area);
+            const cellRest = new Float32Array(area);
+            const materialVariation = clamp(CONFIG.materialVariation, 0.0, 2.0);
+            const ageVariation = clamp(SIM.ageVariation, 0.0, 2.0);
+            for (let cid = 0; cid < area; cid++) {
+                const x = cid % this.width;
+                const y = (cid / this.width) | 0;
+                let best = 0;
+                let bestD = Infinity;
+                for (let id = 0; id < n; id++) {
+                    const dx = wrappedDist(x + 0.5, cx[id], this.width, wrapX);
+                    const dy = wrappedDist(y + 0.5, cy[id], this.height, wrapY);
+                    const d = dx * dx + dy * dy;
+                    if (d < bestD) { bestD = d; best = id; }
+                }
+                this.imap[cid] = best;
+                const dx = wrappedDist(x + 0.5, continentCx[best], this.width, wrapX);
+                const dy = wrappedDist(y + 0.5, continentCy[best], this.height, wrapY);
+                const continent = dx * dx + dy * dy < continentR[best] * continentR[best];
+                const base = continent ? Math.max(1.5, this.plates[best].materialType) : Math.min(1.2, this.plates[best].materialType);
+                const noise = (hash01((x / 5) | 0, (y / 5) | 0, best + 137) - 0.5) * materialVariation;
+                const type = clamp(base + noise, 0.0, 4.0);
+                const propsDensity = type <= 1 ? 1.08 + (1.02 - 1.08) * type : type <= 2 ? 1.02 + (0.94 - 1.02) * (type - 1) : type <= 3 ? 0.94 + (0.88 - 0.94) * (type - 2) : 0.88 + (0.98 - 0.88) * (type - 3);
+                const continentalCrust = propsDensity <= 0.98;
+                const age = continentalCrust ? 45 + 150 * hash01(x, y, best + 11) * ageVariation : 2 + 58 * hash01(x, y, best + 19) * ageVariation;
+                cellType[cid] = type;
+                cellAge[cid] = age;
+                cellMass[cid] = Math.max(0.08, SIM.particleMass * (continentalCrust ? 1.10 + 0.20 * noise : 0.58 + 0.14 * noise));
+                cellRest[cid] = Math.max(0.42, SIM.restVolume * (continentalCrust ? 1.03 + 0.08 * noise : 0.84 + 0.08 * noise));
+            }
+
+            const terrainArea = this.terrainWidth * this.terrainHeight;
+            const terrainData = new Float32Array(terrainArea * 4);
+
+
+            const activeParticles = Math.min(this.particleCount, Math.floor(area * clamp(CONFIG.particleDensity, 0.5, CONFIG.particleSlotDensity)));
+            const massScale = Math.max(1, activeParticles / area);
+            for (let id = 0; id < ntex; id++) {
+                const k = id * 4;
+                F[k] = 1;
+                F[k + 3] = 1;
+                meta[k + 2] = SIM.restVolume;
+                if (id >= activeParticles) continue;
+                const cid = id % area;
+                const x = cid % this.width;
+                const y = (cid / this.width) | 0;
+                const sample = (id / area) | 0;
+                const jx = sample ? 0.12 + 0.76 * hash01(x, y, sample * 13 + 5) : 0.5;
+                const jy = sample ? 0.12 + 0.76 * hash01(x, y, sample * 17 + 7) : 0.5;
+                posVel[k] = wrapFloat(x + jx, this.width, wrapX);
+                posVel[k + 1] = wrapFloat(y + jy, this.height, wrapY);
+                meta[k] = cellMass[cid] / massScale;
+                meta[k + 1] = cellType[cid];
+                meta[k + 2] = cellRest[cid] / massScale;
+                meta[k + 3] = cellAge[cid];
+            }
+
+            this.posVel = [this.tex(this.ptexW, this.ptexH, gl.RGBA32F, gl.RGBA, gl.FLOAT, posVel), this.tex(this.ptexW, this.ptexH, gl.RGBA32F, gl.RGBA, gl.FLOAT)];
+            this.F = [this.tex(this.ptexW, this.ptexH, gl.RGBA32F, gl.RGBA, gl.FLOAT, F), this.tex(this.ptexW, this.ptexH, gl.RGBA32F, gl.RGBA, gl.FLOAT)];
+            this.C = [this.tex(this.ptexW, this.ptexH, gl.RGBA16F, gl.RGBA, gl.FLOAT, C), this.tex(this.ptexW, this.ptexH, gl.RGBA16F, gl.RGBA, gl.FLOAT)];
+            this.meta = [this.tex(this.ptexW, this.ptexH, gl.RGBA16F, gl.RGBA, gl.FLOAT, meta), this.tex(this.ptexW, this.ptexH, gl.RGBA16F, gl.RGBA, gl.FLOAT)];
+            this.gridVel = [this.tex(this.width, this.height, gl.RGBA32F, gl.RGBA, gl.FLOAT), this.tex(this.width, this.height, gl.RGBA32F, gl.RGBA, gl.FLOAT)];
+            this.gridAux = [this.tex(this.width, this.height, gl.RG16F, gl.RG, gl.FLOAT), this.tex(this.width, this.height, gl.RG16F, gl.RG, gl.FLOAT)];
+            this.gridMat = this.tex(this.width, this.height, gl.RGBA16F, gl.RGBA, gl.FLOAT);
+            this.grid0 = this.tex(this.width, this.height, gl.RGBA32F, gl.RGBA, gl.FLOAT);
+            this.grid1 = this.tex(this.width, this.height, gl.RGBA32F, gl.RGBA, gl.FLOAT);
+            this.terrain = [this.tex(this.terrainWidth, this.terrainHeight, gl.RGBA32F, gl.RGBA, gl.FLOAT, terrainData), this.tex(this.terrainWidth, this.terrainHeight, gl.RGBA32F, gl.RGBA, gl.FLOAT, terrainData)];
+            this.terrainRoute = this.tex(this.terrainWidth, this.terrainHeight, gl.RGBA16F, gl.RGBA, gl.FLOAT);
+
+            const climateArea = this.climateWidth * this.climateHeight;
+            const climateEmpty = new Float32Array(climateArea * 4);
+            const climateBio = new Float32Array(climateArea * 4);
+            for (let tid = 0; tid < climateArea; tid++) {
+                const tx = tid % this.climateWidth;
+                const ty = (tid / this.climateWidth) | 0;
+                const sx = Math.min(this.terrainWidth - 1, ((tx + 0.5) * this.terrainWidth / this.climateWidth) | 0);
+                const sy = Math.min(this.terrainHeight - 1, ((ty + 0.5) * this.terrainHeight / this.climateHeight) | 0);
+                const h = terrainData[(sy * this.terrainWidth + sx) * 4];
+                const land = h > CONFIG.seaLevel;
+                climateBio[tid * 4] = land ? 0.08 + 0.12 * hash01(tid, 0, 101) : 0;
+                climateBio[tid * 4 + 3] = land ? 1.0 + 0.6 * hash01(tid, 0, 103) : 5.0;
+            }
+            const climateFilter = this.floatLinear ? gl.LINEAR : gl.NEAREST;
+            this.climateB = [this.tex(this.climateWidth, this.climateHeight, gl.RGBA16F, gl.RGBA, gl.FLOAT, climateEmpty, climateFilter), this.tex(this.climateWidth, this.climateHeight, gl.RGBA16F, gl.RGBA, gl.FLOAT, climateEmpty, climateFilter)];
+            this.climateC = [this.tex(this.climateWidth, this.climateHeight, gl.RGBA16F, gl.RGBA, gl.FLOAT, climateEmpty, climateFilter), this.tex(this.climateWidth, this.climateHeight, gl.RGBA16F, gl.RGBA, gl.FLOAT, climateEmpty, climateFilter)];
+            this.climateD = [this.tex(this.climateWidth, this.climateHeight, gl.RGBA16F, gl.RGBA, gl.FLOAT, climateBio, climateFilter), this.tex(this.climateWidth, this.climateHeight, gl.RGBA16F, gl.RGBA, gl.FLOAT, climateBio, climateFilter)];
+
+            this.accumFbo = this.fbo([this.grid0, this.grid1]);
+            this.gridUpdateFbo = this.fbo([this.gridVel[0], this.gridAux[0], this.gridMat]);
+            this.gridPhysicsFbo = this.fbo([this.gridVel[1], this.gridAux[1]]);
+            this.terrainRouteFbo = this.fbo([this.terrainRoute]);
+            this.terrainFbo = [this.fbo([this.terrain[0]]), this.fbo([this.terrain[1]])];
+            this.climateBFbo = [this.fbo([this.climateB[0]]), this.fbo([this.climateB[1]])];
+            this.climateCFbo = [this.fbo([this.climateC[0]]), this.fbo([this.climateC[1]])];
+            this.climateDFbo = [this.fbo([this.climateD[0]]), this.fbo([this.climateD[1]])];
+            this.particleFbo = [this.fbo([this.posVel[0], this.F[0], this.C[0], this.meta[0]]), this.fbo([this.posVel[1], this.F[1], this.C[1], this.meta[1]])];
+            this.tTerritory = this.tex(this.width, this.height, gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE, this.imap);
+            this.tPlateData = this.tex(64, 3, gl.RGBA32F, gl.RGBA, gl.FLOAT, this.plateDataBuffer);
+            this.plateReduceTex = [this.tex(64, 1, gl.RGBA32F, gl.RGBA, gl.FLOAT), this.tex(64, 1, gl.RGBA32F, gl.RGBA, gl.FLOAT)];
+            this.plateReduceFbo = this.fbo(this.plateReduceTex);
+            this.plateReduceData = new Float32Array(64 * 8);
+            this.plateReduceBytes = 64 * 4 * 4;
+            this.platePbos = [gl.createBuffer(), gl.createBuffer()];
+            this.platePboState = [null, null];
+            this.platePboSerial = 0;
+            this.platePboWrite = 0;
+            for (const b of this.platePbos) {
+                gl.bindBuffer(gl.PIXEL_PACK_BUFFER, b);
+                gl.bufferData(gl.PIXEL_PACK_BUFFER, this.plateReduceBytes * 2, gl.STREAM_READ);
+            }
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+
+            this.iterCount = 0;
+            this.readIndex = 0;
+            this.terrainRead = 0;
+            this.climateBRead = 0;
+            this.climateCRead = 0;
+            this.climateDRead = 0;
+            this.uploadTextures();
+            this.substep(0, Math.min(CONFIG.dt, 0.05), 1);
+            this.dispatchPlateReduction(true);
+            for (let i = 0; i < 2; i++) this.updateTerrain(true);
+            for (let i = 0; i < 4; i++) this.updateClimate(true);
+        }
+
+        clearAccum() {
+            const gl = this.gl; this.bindFBO(this.accumFbo, this.width, this.height);
+            gl.disable(gl.BLEND); gl.clearBufferfv(gl.COLOR, 0, ZERO4); gl.clearBufferfv(gl.COLOR, 1, ZERO4);
+        }
+
+        uploadTextures() {
+            const motionScale = this.effectivePlateMotionScale();
+            for (let i = 0; i < 64; i++) {
+                let p = this.plates[i];
+                this.plateDataBuffer[i * 4 + 0] = p.cx; this.plateDataBuffer[i * 4 + 1] = p.cy;
+                this.plateDataBuffer[i * 4 + 2] = p.vx * motionScale; this.plateDataBuffer[i * 4 + 3] = p.vy * motionScale;
+                this.plateDataBuffer[(64 + i) * 4 + 0] = p.omega * motionScale;
+                this.plateDataBuffer[(64 + i) * 4 + 1] = p.colorR; this.plateDataBuffer[(64 + i) * 4 + 2] = p.colorG; this.plateDataBuffer[(64 + i) * 4 + 3] = p.colorB;
+                this.plateDataBuffer[(128 + i) * 4 + 0] = p.surfaceFloat || 0;
+                this.plateDataBuffer[(128 + i) * 4 + 1] = (p._surfaceCells || 0) > 0 ? (p._surfaceMass || 0) / p._surfaceCells : 0;
+                this.plateDataBuffer[(128 + i) * 4 + 2] = (p._surfaceMass || 0) > 0 ? (p._surfaceExcess || 0) / p._surfaceMass : 0;
+                this.plateDataBuffer[(128 + i) * 4 + 3] = p.materialType || 0; 
+            }
+            const gl = this.gl;
+            gl.bindTexture(gl.TEXTURE_2D, this.tPlateData); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 3, gl.RGBA, gl.FLOAT, this.plateDataBuffer);
+            gl.bindTexture(gl.TEXTURE_2D, this.tTerritory); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.width, this.height, gl.RED_INTEGER, gl.UNSIGNED_BYTE, this.imap);
+        }
+
+        applyPlateReduction(data) {
+            const wrapX = CONFIG.topology < 2;
+            const wrapY = CONFIG.topology === 0;
+            const b = 64 * 4;
+            for (let i = 0; i < 64; i++) {
+                const p = this.plates[i];
+                const k = i * 4;
+                const mass = data[k];
+                p.mass = mass;
+                p._surfaceMass = mass;
+                p._surfaceExcess = data[b + k + 1];
+                p._surfaceCells = data[b + k + 2];
+                if (mass > 0.000001) {
+                    let targetCx;
+                    let targetCy;
+                    if (wrapX) {
+                        let a = Math.atan2(data[k + 2], data[k + 1]);
+                        if (a < 0) a += Math.PI * 2;
+                        targetCx = a * this.width / (Math.PI * 2);
+                    } else targetCx = data[k + 1] / mass;
+                    if (wrapY) {
+                        let a = Math.atan2(data[b + k], data[k + 3]);
+                        if (a < 0) a += Math.PI * 2;
+                        targetCy = a * this.height / (Math.PI * 2);
+                    } else targetCy = data[k + 3] / mass;
+                    if (p.inertia === 1 || this.iterCount < 5) {
+                        p.cx = targetCx;
+                        p.cy = targetCy;
+                    } else {
+                        p.cx = wrapFloat(p.cx + wrappedDist(targetCx, p.cx, this.width, wrapX) * SIM.comInterpolation, this.width, wrapX);
+                        p.cy = wrapFloat(p.cy + wrappedDist(targetCy, p.cy, this.height, wrapY) * SIM.comInterpolation, this.height, wrapY);
+                    }
+                    const meanHeight = p._surfaceExcess / Math.max(mass, 0.0001);
+                    p.surfaceFloat = p.surfaceFloat * 0.94 + Math.min(2, meanHeight) * 0.06;
+                } else p.surfaceFloat *= 0.94;
+            }
+        }
+
+        renderPlateReduction() {
+            const gl = this.gl;
+            const r = this.programs.plateReduce;
+            this.bindFBO(this.plateReduceFbo, 64, 1);
+            gl.disable(gl.BLEND);
+            gl.clearBufferfv(gl.COLOR, 0, ZERO4);
+            gl.clearBufferfv(gl.COLOR, 1, ZERO4);
+            gl.useProgram(r.p);
+            this.setTex(r, "uGridVel", 0, this.gridVel[1]);
+            this.setTex(r, "uTerritoryMap", 1, this.tTerritory);
+            gl.uniform2i(r.u.uGridSize, this.width, this.height);
+            gl.uniform1i(r.u.uCellCount, this.width * this.height);
+            gl.uniform1f(r.u.uVerticalScale, CONFIG.terrainVerticalScale);
+            gl.uniform1i(r.u.uTopology, CONFIG.topology);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE);
+            gl.drawArrays(gl.POINTS, 0, this.width * this.height);
+            gl.disable(gl.BLEND);
+        }
+
+        consumePlateReduction() {
+            const gl = this.gl;
+            const ready = [];
+            for (let i = 0; i < 2; i++) {
+                const state = this.platePboState[i];
+                if (!state) continue;
+                const status = gl.clientWaitSync(state.sync, 0, 0);
+                if (status === gl.WAIT_FAILED) {
+                    gl.deleteSync(state.sync);
+                    this.platePboState[i] = null;
+                } else if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) ready.push([state.serial, i]);
+            }
+            ready.sort((a, b) => a[0] - b[0]);
+            for (const [, i] of ready) {
+                const state = this.platePboState[i];
+                gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.platePbos[i]);
+                gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.plateReduceData);
+                gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+                gl.deleteSync(state.sync);
+                this.platePboState[i] = null;
+                if (state.epoch === this.territoryEpoch) this.applyPlateReduction(this.plateReduceData);
+            }
+        }
+
+        dispatchPlateReduction(sync = false) {
+            const gl = this.gl;
+            this.consumePlateReduction();
+            if (sync) {
+                this.renderPlateReduction();
+                this.bindFBO(this.plateReduceFbo, 64, 1);
+                gl.readBuffer(gl.COLOR_ATTACHMENT0);
+                gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, this.plateReduceData.subarray(0, 256));
+                gl.readBuffer(gl.COLOR_ATTACHMENT1);
+                gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, this.plateReduceData.subarray(256));
+                this.applyPlateReduction(this.plateReduceData);
+                return;
+            }
+            let slot = -1;
+            for (let j = 0; j < 2; j++) {
+                const i = (this.platePboWrite + j) & 1;
+                if (!this.platePboState[i]) { slot = i; break; }
+            }
+            if (slot < 0) return;
+            this.renderPlateReduction();
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.platePbos[slot]);
+            gl.readBuffer(gl.COLOR_ATTACHMENT0);
+            gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, 0);
+            gl.readBuffer(gl.COLOR_ATTACHMENT1);
+            gl.readPixels(0, 0, 64, 1, gl.RGBA, gl.FLOAT, this.plateReduceBytes);
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+            this.platePboState[slot] = { sync: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), serial: ++this.platePboSerial, epoch: this.territoryEpoch };
+            gl.flush();
+            this.platePboWrite = (slot + 1) & 1;
+        }
+
+        applyWallCollision(p, rx, ry, nx, ny) {
+            if (p.mass <= 0.000001) return;
+            const vx = p.vx - p.omega * ry;
+            const vy = p.vy + p.omega * rx;
+            const vn = vx * nx + vy * ny;
+            if (vn <= 0) return;
+            const rn = rx * ny - ry * nx;
+            const invMassN = 1 / p.mass + rn * rn / Math.max(1, p.inertia);
+            const jn = vn * (1 + SIM.boundaryRestitution) / Math.max(invMassN, 0.000001);
+            p.impX -= nx * jn;
+            p.impY -= ny * jn;
+            p.impTorque -= rn * jn;
+            const tx = -ny;
+            const ty = nx;
+            const vt = vx * tx + vy * ty;
+            const rt = rx * ty - ry * tx;
+            const invMassT = 1 / p.mass + rt * rt / Math.max(1, p.inertia);
+            const jtFree = vt / Math.max(invMassT, 0.000001);
+            const jt = clamp(jtFree, -SIM.boundaryFriction * jn, SIM.boundaryFriction * jn);
+            p.impX -= tx * jt;
+            p.impY -= ty * jt;
+            p.impTorque -= rt * jt;
+        }
+
+        rebuildTerritoryGeometry() {
+            const w = this.width;
+            const h = this.height;
+            const area = w * h;
+            const wrapX = CONFIG.topology < 2;
+            const wrapY = CONFIG.topology === 0;
+            this.territoryCounts.fill(0);
+            this.geomInertia.fill(0);
+            this.geomXX.fill(0);
+            this.geomXY.fill(0);
+            this.geomYY.fill(0);
+            this.maxR2.fill(0);
+            let edgeCount = 0;
+            for (let i = 0; i < area; i++) {
+                const pid = this.imap[i];
+                if (pid === 255) continue;
+                const p = this.plates[pid];
+                const x = i % w;
+                const y = (i / w) | 0;
+                const rx = wrappedDist(x + 0.5, p.cx, w, wrapX);
+                const ry = wrappedDist(y + 0.5, p.cy, h, wrapY);
+                const r2 = rx * rx + ry * ry;
+                this.territoryCounts[pid]++;
+                this.geomInertia[pid] += r2;
+                this.geomXX[pid] += rx * rx;
+                this.geomXY[pid] += rx * ry;
+                this.geomYY[pid] += ry * ry;
+                if (r2 > this.maxR2[pid]) this.maxR2[pid] = r2;
+                const right = x + 1 < w ? i + 1 : wrapX ? i - x : -1;
+                if (right >= 0) {
+                    const other = this.imap[right];
+                    if (other !== 255 && other !== pid) this.boundaryEdges[edgeCount++] = i << 1;
+                }
+                const up = y + 1 < h ? i + w : wrapY ? x : -1;
+                if (up >= 0) {
+                    const other = this.imap[up];
+                    if (other !== 255 && other !== pid) this.boundaryEdges[edgeCount++] = (i << 1) | 1;
+                }
+            }
+            this.boundaryEdgeCount = edgeCount;
+            for (const p of this.plates) {
+                const count = this.territoryCounts[p.id];
+                if (!count) {
+                    p.inertia = 1;
+                    if (p.mass < 0.000001) {
+                        p.vx = 0;
+                        p.vy = 0;
+                        p.omega = 0;
+                    }
+                    continue;
+                }
+                const effectiveMass = Math.max(p.mass, count * 0.05);
+                p.inertia = Math.max(1, this.geomInertia[p.id] * effectiveMass / count);
+            }
+        }
+
+        boundaryPairData(code) {
+            const w = this.width;
+            const h = this.height;
+            const wrapX = CONFIG.topology < 2;
+            const wrapY = CONFIG.topology === 0;
+            const axis = code & 1;
+            const indexA = code >>> 1;
+            const x = indexA % w;
+            const y = (indexA / w) | 0;
+            const indexB = axis ? (y + 1 < h ? indexA + w : wrapY ? x : -1) : (x + 1 < w ? indexA + 1 : wrapX ? indexA - x : -1);
+            if (indexB < 0) return null;
+            const pidA = this.imap[indexA];
+            const pidB = this.imap[indexB];
+            if (pidA === 255 || pidB === 255 || pidA === pidB) return null;
+            const pA = this.plates[pidA];
+            const pB = this.plates[pidB];
+            if (pA.mass <= 0.000001 || pB.mass <= 0.000001) return null;
+            const bx = axis ? x : (x + 1 < w ? x + 1 : 0);
+            const by = axis ? (y + 1 < h ? y + 1 : 0) : y;
+            const rxA = wrappedDist(x + 0.5, pA.cx, w, wrapX);
+            const ryA = wrappedDist(y + 0.5, pA.cy, h, wrapY);
+            const rxB = wrappedDist(bx + 0.5, pB.cx, w, wrapX);
+            const ryB = wrappedDist(by + 0.5, pB.cy, h, wrapY);
+            const vxA = pA.vx - pA.omega * ryA;
+            const vyA = pA.vy + pA.omega * rxA;
+            const vxB = pB.vx - pB.omega * ryB;
+            const vyB = pB.vy + pB.omega * rxB;
+            const nx = axis ? 0 : 1;
+            const ny = axis ? 1 : 0;
+            const tx = -ny;
+            const ty = nx;
+            const rvx = vxB - vxA;
+            const rvy = vyB - vyA;
+            const vn = rvx * nx + rvy * ny;
+            const vt = rvx * tx + rvy * ty;
+            const lo = Math.min(pidA, pidB);
+            const hi = Math.max(pidA, pidB);
+            const out = this.contactScratch;
+            out.pidA = pidA;
+            out.pidB = pidB;
+            out.pA = pA;
+            out.pB = pB;
+            out.rxA = rxA;
+            out.ryA = ryA;
+            out.rxB = rxB;
+            out.ryB = ryB;
+            out.nx = nx;
+            out.ny = ny;
+            out.tx = tx;
+            out.ty = ty;
+            out.vn = vn;
+            out.vt = vt;
+            out.key = lo * 64 + hi;
+            return out;
+        }
+
+        resolvePlateContacts(plateDtScale) {
+            this.pairBoundaryCount.fill(0);
+            this.pairClosing.fill(0);
+            this.pairShear.fill(0);
+            const decay = Math.exp(-SIM.mergeProgressDecay * plateDtScale);
+            for (let key = 0; key < 4096; key++) this.pairMergeProgress[key] *= decay;
+            for (let e = 0; e < this.boundaryEdgeCount; e++) {
+                const d = this.boundaryPairData(this.boundaryEdges[e]);
+                if (!d) continue;
+                this.pairBoundaryCount[d.key]++;
+                this.pairClosing[d.key] += Math.max(0, -d.vn);
+                this.pairShear[d.key] += Math.abs(d.vt);
+            }
+            for (let e = 0; e < this.boundaryEdgeCount; e++) {
+                const d = this.boundaryPairData(this.boundaryEdges[e]);
+                if (!d) continue;
+                const pairCount = Math.max(1, this.pairBoundaryCount[d.key]);
+                const contactWeight = 1 / pairCount;
+                let jn = 0;
+                if (d.vn < 0) {
+                    const raN = d.rxA * d.ny - d.ryA * d.nx;
+                    const rbN = d.rxB * d.ny - d.ryB * d.nx;
+                    const invMassN = 1 / d.pA.mass + 1 / d.pB.mass + raN * raN / Math.max(1, d.pA.inertia) + rbN * rbN / Math.max(1, d.pB.inertia);
+                    jn = -d.vn * (1 + SIM.boundaryRestitution) / Math.max(invMassN, 0.000001) * contactWeight;
+                    d.pA.impX -= d.nx * jn;
+                    d.pA.impY -= d.ny * jn;
+                    d.pA.impTorque -= raN * jn;
+                    d.pB.impX += d.nx * jn;
+                    d.pB.impY += d.ny * jn;
+                    d.pB.impTorque += rbN * jn;
+                }
+                if (jn > 0) {
+                    const raT = d.rxA * d.ty - d.ryA * d.tx;
+                    const rbT = d.rxB * d.ty - d.ryB * d.tx;
+                    const invMassT = 1 / d.pA.mass + 1 / d.pB.mass + raT * raT / Math.max(1, d.pA.inertia) + rbT * rbT / Math.max(1, d.pB.inertia);
+                    const jtFree = -d.vt / Math.max(invMassT, 0.000001) * contactWeight;
+                    const friction = SIM.boundaryFriction * (1 + SIM.densityFriction * Math.max(0, Math.min(d.pA.mass, d.pB.mass) / Math.max(1, Math.min(this.territoryCounts[d.pidA], this.territoryCounts[d.pidB])) - 1));
+                    const jt = clamp(jtFree, -friction * jn, friction * jn);
+                    d.pA.impX -= d.tx * jt;
+                    d.pA.impY -= d.ty * jt;
+                    d.pA.impTorque -= raT * jt;
+                    d.pB.impX += d.tx * jt;
+                    d.pB.impY += d.ty * jt;
+                    d.pB.impTorque += rbT * jt;
+                }
+            }
+            if (CONFIG.plateMergeRate <= 0) return false;
+            let mergeKey = -1;
+            let mergeScore = 1;
+            for (let key = 0; key < 4096; key++) {
+                const count = this.pairBoundaryCount[key];
+                if (!count) continue;
+                const idA = (key / 64) | 0;
+                const idB = key & 63;
+                const minCells = Math.min(this.territoryCounts[idA], this.territoryCounts[idB]);
+                if (minCells < 8) continue;
+                const contact = clamp(count / Math.max(4, 2.0 * Math.sqrt(minCells)), 0, 1);
+                const closing = this.pairClosing[key] / count;
+                const shear = this.pairShear[key] / count;
+                const convergence = closing / Math.max(0.04, closing + shear + 0.04);
+                const closingStrength = clamp(closing / 0.18, 0, 1);
+                const contactStrength = clamp((contact - SIM.mergeMinContact) / Math.max(0.001, 1 - SIM.mergeMinContact), 0, 1);
+                const drive = contactStrength * convergence * closingStrength;
+                this.pairMergeProgress[key] += CONFIG.plateMergeRate * plateDtScale * SIM.mergeRateScale * drive;
+                if (this.pairMergeProgress[key] > mergeScore) {
+                    mergeScore = this.pairMergeProgress[key];
+                    mergeKey = key;
+                }
+            }
+            if (mergeKey < 0) return false;
+            const idA = (mergeKey / 64) | 0;
+            const idB = mergeKey & 63;
+            return this.mergePlatePair(idA, idB);
+        }
+
+        mergePlatePair(idA, idB) {
+            if (idA === idB || !this.territoryCounts[idA] || !this.territoryCounts[idB]) return false;
+            const keepId = this.territoryCounts[idA] >= this.territoryCounts[idB] ? idA : idB;
+            const dropId = keepId === idA ? idB : idA;
+            const keep = this.plates[keepId];
+            const drop = this.plates[dropId];
+            const w = this.width;
+            const h = this.height;
+            const wrapX = CONFIG.topology < 2;
+            const wrapY = CONFIG.topology === 0;
+            const massKeep = keep.mass > 0.000001 ? keep.mass : this.territoryCounts[keepId] * 0.7;
+            const massDrop = drop.mass > 0.000001 ? drop.mass : this.territoryCounts[dropId] * 0.7;
+            const totalMass = massKeep + massDrop;
+            const dx = wrappedDist(drop.cx, keep.cx, w, wrapX);
+            const dy = wrappedDist(drop.cy, keep.cy, h, wrapY);
+            const newCx = wrapFloat(keep.cx + dx * massDrop / totalMass, w, wrapX);
+            const newCy = wrapFloat(keep.cy + dy * massDrop / totalMass, h, wrapY);
+            const keepRx = wrappedDist(keep.cx, newCx, w, wrapX);
+            const keepRy = wrappedDist(keep.cy, newCy, h, wrapY);
+            const dropRx = wrappedDist(drop.cx, newCx, w, wrapX);
+            const dropRy = wrappedDist(drop.cy, newCy, h, wrapY);
+            const newVx = (keep.vx * massKeep + drop.vx * massDrop) / totalMass;
+            const newVy = (keep.vy * massKeep + drop.vy * massDrop) / totalMass;
+            const newInertia = Math.max(1, keep.inertia + massKeep * (keepRx * keepRx + keepRy * keepRy) + drop.inertia + massDrop * (dropRx * dropRx + dropRy * dropRy));
+            const angularMomentum = keep.inertia * keep.omega + massKeep * (keepRx * keep.vy - keepRy * keep.vx) + drop.inertia * drop.omega + massDrop * (dropRx * drop.vy - dropRy * drop.vx);
+            keep.cx = newCx;
+            keep.cy = newCy;
+            keep.vx = newVx;
+            keep.vy = newVy;
+            keep.omega = angularMomentum / newInertia;
+            keep.inertia = newInertia;
+            keep.mass = totalMass;
+            keep.materialType = (keep.materialType * massKeep + drop.materialType * massDrop) / totalMass;
+            keep._surfaceMass += drop._surfaceMass;
+            keep._surfaceExcess += drop._surfaceExcess;
+            keep._surfaceCells += drop._surfaceCells;
+            keep.surfaceFloat = (keep.surfaceFloat * massKeep + drop.surfaceFloat * massDrop) / totalMass;
+            keep.splitProgress *= 0.35;
+            keep.splitCooldown = Math.max(keep.splitCooldown, SIM.splitCooldown * 0.5);
+            const area = w * h;
+            for (let i = 0; i < area; i++) if (this.imap[i] === dropId) this.imap[i] = keepId;
+            drop.mass = 0;
+            drop.vx = 0;
+            drop.vy = 0;
+            drop.omega = 0;
+            drop.impX = 0;
+            drop.impY = 0;
+            drop.impTorque = 0;
+            drop.inertia = 1;
+            drop._surfaceMass = 0;
+            drop._surfaceExcess = 0;
+            drop._surfaceCells = 0;
+            drop.surfaceFloat = 0;
+            drop.splitProgress = 0;
+            drop.splitCooldown = 0;
+            for (let id = 0; id < 64; id++) {
+                const a = Math.min(dropId, id) * 64 + Math.max(dropId, id);
+                const b = Math.min(keepId, id) * 64 + Math.max(keepId, id);
+                this.pairMergeProgress[a] = 0;
+                this.pairMergeProgress[b] = 0;
+            }
+            this.territoryEpoch++;
+            return true;
+        }
+
+        principalAxis(pid) {
+            const count = Math.max(1, this.territoryCounts[pid]);
+            const xx = this.geomXX[pid] / count;
+            const xy = this.geomXY[pid] / count;
+            const yy = this.geomYY[pid] / count;
+            const angle = 0.5 * Math.atan2(2 * xy, xx - yy);
+            const trace = xx + yy;
+            const disc = Math.sqrt(Math.max(0, (xx - yy) * (xx - yy) + 4 * xy * xy));
+            const major = Math.max(0.25, 0.5 * (trace + disc));
+            const minor = Math.max(0.25, 0.5 * (trace - disc));
+            return { x: Math.cos(angle), y: Math.sin(angle), elongation: Math.sqrt(major / minor) };
+        }
+
+        attemptPlateSplit(plateDtScale) {
+            if (CONFIG.plateSplitRate <= 0) return false;
+            const targetArea = this.width * this.height / Math.max(2, CONFIG.plates | 0);
+            let splitId = -1;
+            let splitAxis = null;
+            let bestProgress = 1;
+            for (const p of this.plates) {
+                const count = this.territoryCounts[p.id];
+                if (!count || p.splitCooldown > 0) continue;
+                const axis = this.principalAxis(p.id);
+                const sizeRatio = count / targetArea;
+                const sizeDrive = Math.max(0, sizeRatio / SIM.splitAreaRatio - 1);
+                const shapeDrive = Math.max(0, axis.elongation / SIM.splitElongation - 1) * clamp(sizeRatio - 0.85, 0, 2);
+                const criticalDrive = Math.max(0, sizeRatio - 2.8) * 0.8;
+                const drive = sizeDrive + shapeDrive * 0.7 + criticalDrive;
+                if (drive <= 0) {
+                    p.splitProgress *= Math.exp(-0.02 * plateDtScale);
+                    continue;
+                }
+                p.splitProgress += CONFIG.plateSplitRate * plateDtScale * SIM.splitRateScale * drive;
+                if (p.splitProgress > bestProgress) {
+                    bestProgress = p.splitProgress;
+                    splitId = p.id;
+                    splitAxis = axis;
+                }
+            }
+            if (splitId < 0) return false;
+            let newId = -1;
+            for (let id = 0; id < 64; id++) {
+                if (!this.territoryCounts[id]) {
+                    newId = id;
+                    break;
+                }
+            }
+            if (newId < 0) {
+                this.plates[splitId].splitProgress = 0.95;
+                return false;
+            }
+            return this.splitPlate(splitId, newId, splitAxis.x, splitAxis.y);
+        }
+
+        splitPlate(pid, newId, axisX, axisY) {
+            const w = this.width;
+            const h = this.height;
+            const area = w * h;
+            const wrapX = CONFIG.topology < 2;
+            const wrapY = CONFIG.topology === 0;
+            const p = this.plates[pid];
+            let seedA = -1;
+            let seedB = -1;
+            let minProjection = Infinity;
+            let maxProjection = -Infinity;
+            for (let i = 0; i < area; i++) {
+                if (this.imap[i] !== pid) continue;
+                const x = i % w;
+                const y = (i / w) | 0;
+                const rx = wrappedDist(x + 0.5, p.cx, w, wrapX);
+                const ry = wrappedDist(y + 0.5, p.cy, h, wrapY);
+                const projection = rx * axisX + ry * axisY;
+                if (projection < minProjection) {
+                    minProjection = projection;
+                    seedA = i;
+                }
+                if (projection > maxProjection) {
+                    maxProjection = projection;
+                    seedB = i;
+                }
+            }
+            if (seedA < 0 || seedB < 0 || seedA === seedB || maxProjection - minProjection < 3) {
+                p.splitProgress = 0.5;
+                return false;
+            }
+            this.splitLabels.fill(255);
+            let head = 0;
+            let tail = 0;
+            this.splitLabels[seedA] = 0;
+            this.splitLabels[seedB] = 1;
+            this.splitQueue[tail++] = seedA;
+            this.splitQueue[tail++] = seedB;
+            const splitDx = [1, -1, 0, 0];
+            const splitDy = [0, 0, 1, -1];
+            while (head < tail) {
+                const index = this.splitQueue[head++];
+                const label = this.splitLabels[index];
+                const x = index % w;
+                const y = (index / w) | 0;
+                for (let k = 0; k < 4; k++) {
+                    const nx = wrapInt(x + splitDx[k], w, wrapX);
+                    const ny = wrapInt(y + splitDy[k], h, wrapY);
+                    if (nx < 0 || ny < 0) continue;
+                    const ni = ny * w + nx;
+                    if (this.imap[ni] !== pid || this.splitLabels[ni] !== 255) continue;
+                    this.splitLabels[ni] = label;
+                    this.splitQueue[tail++] = ni;
+                }
+            }
+            let countA = 0;
+            let countB = 0;
+            let sumAx = 0;
+            let sumAy = 0;
+            let sumBx = 0;
+            let sumBy = 0;
+            for (let i = 0; i < area; i++) {
+                if (this.imap[i] !== pid) continue;
+                const x = i % w;
+                const y = (i / w) | 0;
+                const rx = wrappedDist(x + 0.5, p.cx, w, wrapX);
+                const ry = wrappedDist(y + 0.5, p.cy, h, wrapY);
+                let label = this.splitLabels[i];
+                if (label === 255) {
+                    label = rx * axisX + ry * axisY >= 0 ? 1 : 0;
+                    this.splitLabels[i] = label;
+                }
+                if (label === 0) {
+                    countA++;
+                    sumAx += rx;
+                    sumAy += ry;
+                } else {
+                    countB++;
+                    sumBx += rx;
+                    sumBy += ry;
+                }
+            }
+            const totalCount = countA + countB;
+            const smallFraction = Math.min(countA, countB) / Math.max(1, totalCount);
+            if (smallFraction < 0.18) {
+                p.splitProgress = 0.65;
+                return false;
+            }
+            const oldCx = p.cx;
+            const oldCy = p.cy;
+            const oldVx = p.vx;
+            const oldVy = p.vy;
+            const oldOmega = p.omega;
+            const oldMass = Math.max(p.mass, totalCount * 0.7);
+            const oldInertia = p.inertia;
+            const fracA = countA / totalCount;
+            const fracB = countB / totalCount;
+            const offAx = sumAx / countA;
+            const offAy = sumAy / countA;
+            const offBx = sumBx / countB;
+            const offBy = sumBy / countB;
+            for (let i = 0; i < area; i++) if (this.imap[i] === pid && this.splitLabels[i] === 1) this.imap[i] = newId;
+            const q = this.plates[newId];
+            q.mass = oldMass * fracB;
+            p.mass = oldMass * fracA;
+            p.cx = wrapFloat(oldCx + offAx, w, wrapX);
+            p.cy = wrapFloat(oldCy + offAy, h, wrapY);
+            q.cx = wrapFloat(oldCx + offBx, w, wrapX);
+            q.cy = wrapFloat(oldCy + offBy, h, wrapY);
+            const baseAVx = oldVx - oldOmega * offAy;
+            const baseAVy = oldVy + oldOmega * offAx;
+            const baseBVx = oldVx - oldOmega * offBy;
+            const baseBVy = oldVy + oldOmega * offBx;
+            const separation = Math.min(0.18, CONFIG.maxPlateSpeed * 0.08);
+            p.vx = baseAVx - axisX * separation * fracB;
+            p.vy = baseAVy - axisY * separation * fracB;
+            q.vx = baseBVx + axisX * separation * fracA;
+            q.vy = baseBVy + axisY * separation * fracA;
+            p.omega = oldOmega;
+            q.omega = oldOmega;
+            p.inertia = Math.max(1, oldInertia * fracA);
+            q.inertia = Math.max(1, oldInertia * fracB);
+            q.materialType = p.materialType;
+            const oldSurfaceMass = p._surfaceMass;
+            const oldSurfaceExcess = p._surfaceExcess;
+            const oldSurfaceCells = p._surfaceCells;
+            q._surfaceMass = oldSurfaceMass * fracB;
+            q._surfaceExcess = oldSurfaceExcess * fracB;
+            q._surfaceCells = oldSurfaceCells * fracB;
+            p._surfaceMass = oldSurfaceMass * fracA;
+            p._surfaceExcess = oldSurfaceExcess * fracA;
+            p._surfaceCells = oldSurfaceCells * fracA;
+            q.surfaceFloat = p.surfaceFloat;
+            p.impX = 0;
+            p.impY = 0;
+            p.impTorque = 0;
+            q.impX = 0;
+            q.impY = 0;
+            q.impTorque = 0;
+            p.splitProgress = 0;
+            q.splitProgress = 0;
+            p.splitCooldown = SIM.splitCooldown;
+            q.splitCooldown = SIM.splitCooldown;
+            this.pairMergeProgress[Math.min(pid, newId) * 64 + Math.max(pid, newId)] = 0;
+            this.territoryEpoch++;
+            return true;
+        }
+
+        accumulateTerritoryVote(index, pid, weight) {
+            if (index < 0 || weight <= 0.000001) return;
+            let id0 = this.territoryBestId[index];
+            let id1 = this.territorySecondId[index];
+            let id2 = this.territoryThirdId[index];
+            if (id0 === pid) {
+                this.territoryBestScore[index] += weight;
+                return;
+            }
+            if (id1 === pid) {
+                this.territorySecondScore[index] += weight;
+                if (this.territorySecondScore[index] > this.territoryBestScore[index]) {
+                    const score = this.territoryBestScore[index];
+                    this.territoryBestScore[index] = this.territorySecondScore[index];
+                    this.territorySecondScore[index] = score;
+                    this.territoryBestId[index] = id1;
+                    this.territorySecondId[index] = id0;
+                }
+                return;
+            }
+            if (id2 === pid) {
+                this.territoryThirdScore[index] += weight;
+                if (this.territoryThirdScore[index] > this.territorySecondScore[index]) {
+                    let score = this.territorySecondScore[index];
+                    this.territorySecondScore[index] = this.territoryThirdScore[index];
+                    this.territoryThirdScore[index] = score;
+                    let id = this.territorySecondId[index];
+                    this.territorySecondId[index] = id2;
+                    this.territoryThirdId[index] = id;
+                    if (this.territorySecondScore[index] > this.territoryBestScore[index]) {
+                        score = this.territoryBestScore[index];
+                        this.territoryBestScore[index] = this.territorySecondScore[index];
+                        this.territorySecondScore[index] = score;
+                        id = this.territoryBestId[index];
+                        this.territoryBestId[index] = this.territorySecondId[index];
+                        this.territorySecondId[index] = id;
+                    }
+                }
+                return;
+            }
+            if (weight > this.territoryBestScore[index]) {
+                this.territoryThirdId[index] = id1;
+                this.territoryThirdScore[index] = this.territorySecondScore[index];
+                this.territorySecondId[index] = id0;
+                this.territorySecondScore[index] = this.territoryBestScore[index];
+                this.territoryBestId[index] = pid;
+                this.territoryBestScore[index] = weight;
+            } else if (weight > this.territorySecondScore[index]) {
+                this.territoryThirdId[index] = id1;
+                this.territoryThirdScore[index] = this.territorySecondScore[index];
+                this.territorySecondId[index] = pid;
+                this.territorySecondScore[index] = weight;
+            } else if (weight > this.territoryThirdScore[index]) {
+                this.territoryThirdId[index] = pid;
+                this.territoryThirdScore[index] = weight;
+            }
+        }
+
+        territoryVoteScore(index, pid) {
+            if (pid === 255) return 0;
+            if (this.territoryBestId[index] === pid) return this.territoryBestScore[index];
+            if (this.territorySecondId[index] === pid) return this.territorySecondScore[index];
+            if (this.territoryThirdId[index] === pid) return this.territoryThirdScore[index];
+            return 0;
+        }
+
+        transportTerritory(plateDtScale) {
+            const w = this.width;
+            const h = this.height;
+            const area = w * h;
+            const wrapX = CONFIG.topology < 2;
+            const wrapY = CONFIG.topology === 0;
+            this.territoryBestId.fill(255);
+            this.territorySecondId.fill(255);
+            this.territoryThirdId.fill(255);
+            this.territoryBestScore.fill(0);
+            this.territorySecondScore.fill(0);
+            this.territoryThirdScore.fill(0);
+            for (const p of this.plates) {
+                if (!this.territoryCounts[p.id]) continue;
+                const theta = p.omega * plateDtScale;
+                this.rotationCos[p.id] = Math.cos(theta);
+                this.rotationSin[p.id] = Math.sin(theta);
+                const cx = p.cx + p.vx * plateDtScale;
+                const cy = p.cy + p.vy * plateDtScale;
+                this.nextPlateCx[p.id] = wrapX ? wrapFloat(cx, w, true) : clamp(cx, 0.5, w - 0.5);
+                this.nextPlateCy[p.id] = wrapY ? wrapFloat(cy, h, true) : clamp(cy, 0.5, h - 0.5);
+            }
+            for (let i = 0; i < area; i++) {
+                const pid = this.imap[i];
+                if (pid === 255 || !this.territoryCounts[pid]) continue;
+                const p = this.plates[pid];
+                const x = i % w;
+                const y = (i / w) | 0;
+                const rx = wrappedDist(x + 0.5, p.cx, w, wrapX);
+                const ry = wrappedDist(y + 0.5, p.cy, h, wrapY);
+                const c = this.rotationCos[pid];
+                const sn = this.rotationSin[pid];
+                let px = this.nextPlateCx[pid] + c * rx - sn * ry;
+                let py = this.nextPlateCy[pid] + sn * rx + c * ry;
+                px = wrapX ? wrapFloat(px, w, true) : clamp(px, 0.5, w - 0.5);
+                py = wrapY ? wrapFloat(py, h, true) : clamp(py, 0.5, h - 0.5);
+                const gx = px - 0.5;
+                const gy = py - 0.5;
+                const x0 = Math.floor(gx);
+                const y0 = Math.floor(gy);
+                const fx = gx - x0;
+                const fy = gy - y0;
+                const x1 = x0 + 1;
+                const y1 = y0 + 1;
+                const ix0 = wrapInt(x0, w, wrapX);
+                const ix1 = wrapInt(x1, w, wrapX);
+                const iy0 = wrapInt(y0, h, wrapY);
+                const iy1 = wrapInt(y1, h, wrapY);
+                if (ix0 >= 0 && iy0 >= 0) this.accumulateTerritoryVote(iy0 * w + ix0, pid, (1 - fx) * (1 - fy));
+                if (ix1 >= 0 && iy0 >= 0) this.accumulateTerritoryVote(iy0 * w + ix1, pid, fx * (1 - fy));
+                if (ix0 >= 0 && iy1 >= 0) this.accumulateTerritoryVote(iy1 * w + ix0, pid, (1 - fx) * fy);
+                if (ix1 >= 0 && iy1 >= 0) this.accumulateTerritoryVote(iy1 * w + ix1, pid, fx * fy);
+            }
+            for (let i = 0; i < area; i++) {
+                const oldId = this.imap[i];
+                let chosen = this.territoryBestId[i];
+                if (chosen === 255) chosen = oldId;
+                else if (oldId !== 255 && oldId !== chosen) {
+                    const oldScore = this.territoryVoteScore(i, oldId);
+                    if (oldScore > 0 && this.territoryBestScore[i] - oldScore < 0.045) chosen = oldId;
+                }
+                this.nextImap[i] = chosen;
+            }
+            const offsets = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 0.70710678], [-1, 1, 0.70710678], [1, -1, 0.70710678], [-1, -1, 0.70710678]];
+            for (let pass = 0; pass < SIM.territoryRelaxPasses; pass++) {
+                this.smoothImap.set(this.nextImap);
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const index = y * w + x;
+                        const current = this.smoothImap[index];
+                        this.neighborStamp = (this.neighborStamp + 1) >>> 0;
+                        if (!this.neighborStamp) {
+                            this.neighborStamps.fill(0);
+                            this.neighborStamp = 1;
+                        }
+                        const stamp = this.neighborStamp;
+                        let challenger = current;
+                        let challengerSupport = 0;
+                        for (let k = 0; k < offsets.length; k++) {
+                            const nx = wrapInt(x + offsets[k][0], w, wrapX);
+                            const ny = wrapInt(y + offsets[k][1], h, wrapY);
+                            if (nx < 0 || ny < 0) continue;
+                            const id = this.smoothImap[ny * w + nx];
+                            if (id === 255) continue;
+                            if (this.neighborStamps[id] !== stamp) {
+                                this.neighborStamps[id] = stamp;
+                                this.neighborWeights[id] = offsets[k][2];
+                            } else this.neighborWeights[id] += offsets[k][2];
+                            if (this.neighborWeights[id] > challengerSupport) {
+                                challengerSupport = this.neighborWeights[id];
+                                challenger = id;
+                            }
+                        }
+                        if (challenger === current || challenger === 255) continue;
+                        const currentSupport = current !== 255 && this.neighborStamps[current] === stamp ? this.neighborWeights[current] : 0;
+                        const currentEnergy = this.territoryVoteScore(index, current) * SIM.territoryDataWeight + currentSupport * SIM.territoryContinuity + SIM.territorySwitchBias;
+                        const challengerEnergy = this.territoryVoteScore(index, challenger) * SIM.territoryDataWeight + challengerSupport * SIM.territoryContinuity;
+                        if (challengerEnergy > currentEnergy + 0.02) this.nextImap[index] = challenger;
+                    }
+                }
+            }
+            this.imap.set(this.nextImap);
+            for (const p of this.plates) {
+                if (!this.territoryCounts[p.id]) continue;
+                p.cx = this.nextPlateCx[p.id];
+                p.cy = this.nextPlateCy[p.id];
+            }
+        }
+
+        updatePlatePhysics(dtScale = 1) {
+            this.consumePlateReduction();
+            const plateScale = Math.max(0, CONFIG.plateTimeScale) * this.startupRamp();
+            const plateDtScale = clamp(dtScale * plateScale, 0, 24);
+            if (plateDtScale <= 0.000001) {
+                this.uploadTextures();
+                return;
+            }
+            const w = this.width;
+            const h = this.height;
+            const wrapX = CONFIG.topology < 2;
+            const wrapY = CONFIG.topology === 0;
+            this.rebuildTerritoryGeometry();
+            for (const p of this.plates) p.splitCooldown = Math.max(0, p.splitCooldown - plateDtScale);
+            const wallCollisionAt = (index, nx, ny) => {
+                const pid = this.imap[index];
+                if (pid === 255 || !this.territoryCounts[pid]) return;
+                const p = this.plates[pid];
+                const x = index % w;
+                const y = (index / w) | 0;
+                const rx = wrappedDist(x + 0.5, p.cx, w, wrapX);
+                const ry = wrappedDist(y + 0.5, p.cy, h, wrapY);
+                this.applyWallCollision(p, rx, ry, nx, ny);
+            };
+            if (!wrapX) for (let y = 0; y < h; y++) {
+                wallCollisionAt(y * w, -1, 0);
+                wallCollisionAt(y * w + w - 1, 1, 0);
+            }
+            if (!wrapY) for (let x = 0; x < w; x++) {
+                wallCollisionAt(x, 0, -1);
+                wallCollisionAt((h - 1) * w + x, 0, 1);
+            }
+            const merged = this.resolvePlateContacts(plateDtScale);
+            if (merged) this.rebuildTerritoryGeometry();
+            const split = this.attemptPlateSplit(plateDtScale);
+            if (split) this.rebuildTerritoryGeometry();
+            const t = this.iterCount * SIM.flowTimeScale * CONFIG.plateTimeScale;
+            const flowScale = Math.max(0.001, SIM.flowScale) / 0.02;
+            const flowDrag = Math.exp(-CONFIG.viscosity * CONFIG.mantleCoupling * plateDtScale);
+            const rotDrag = Math.exp(-(CONFIG.viscosity * SIM.angularDamping + 0.01) * CONFIG.mantleCoupling * plateDtScale);
+            const softRadius2 = (Math.min(w, h) * SIM.maxPlateRadius) ** 2;
+            for (const p of this.plates) {
+                if (!this.territoryCounts[p.id] || p.mass <= 0.000001) continue;
+                const phase = p.id * 2.39996;
+                const mx = p.cx / w * Math.PI * 4 * flowScale;
+                const my = p.cy / h * Math.PI * 4 * flowScale;
+                const thrust = CONFIG.flowForce * p.mass * CONFIG.mantleCoupling * plateDtScale;
+                p.impX += (Math.sin(my + t) + 0.45 * Math.sin(1.7 * mx - 0.6 * t + phase)) * thrust;
+                p.impY += (-Math.sin(mx - 0.8 * t) + 0.45 * Math.cos(1.3 * my + 0.5 * t - phase)) * thrust;
+                p.impTorque += Math.sin(0.7 * mx + 0.9 * my + 0.35 * t + phase) * thrust * Math.sqrt(p.mass) * CONFIG.flowTorque;
+                p.vx += p.impX / p.mass;
+                p.vy += p.impY / p.mass;
+                p.omega += p.impTorque / Math.max(1, p.inertia);
+                p.impX = 0;
+                p.impY = 0;
+                p.impTorque = 0;
+                p.vx *= flowDrag;
+                p.vy *= flowDrag;
+                p.omega *= rotDrag;
+                if (this.maxR2[p.id] > softRadius2) {
+                    const excess = Math.sqrt(this.maxR2[p.id] / softRadius2) - 1;
+                    p.omega *= Math.exp(-Math.max(0, excess) * plateDtScale);
+                }
+                const speed = Math.hypot(p.vx, p.vy);
+                if (speed > CONFIG.maxPlateSpeed) {
+                    const scale = CONFIG.maxPlateSpeed / speed;
+                    p.vx *= scale;
+                    p.vy *= scale;
+                }
+                const radius = Math.sqrt(Math.max(1, this.maxR2[p.id]));
+                const maxOmega = Math.min(0.12, CONFIG.maxPlateSpeed * 0.9 / radius);
+                p.omega = clamp(p.omega, -maxOmega, maxOmega);
+            }
+            this.transportTerritory(plateDtScale);
+            this.uploadTextures();
+        }
+
+        updateTerrain(force = false) {
+            const passes = Math.max(0, SIM.terrainPasses | 0);
+            const every = Math.max(1, CONFIG.terrainEvery | 0);
+            const timeScale = Math.max(0, CONFIG.erosionTimeScale) * (force ? 1 : this.startupRamp());
+            if (!force && (this.iterCount % every || !passes)) return;
+            if (timeScale <= 0.000001) return;
+            const gl = this.gl;
+            const totalDt = CONFIG.dt * every * timeScale;
+            const passCount = Math.max(1, Math.min(64, Math.max(passes, Math.ceil(totalDt / 0.075))));
+            const dt = Math.min(0.08, totalDt / passCount);
+            const route = this.programs.terrainRoute;
+            const update = this.programs.terrainUpdate;
+            for (let i = 0; i < passCount; i++) {
+                gl.useProgram(route.p);
+                this.setTex(route, "uTerrain", 0, this.terrain[this.terrainRead]);
+                gl.uniform2f(route.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
+                gl.uniform1i(route.u.uTopology, CONFIG.topology);
+                this.bindFBO(this.terrainRouteFbo, this.terrainWidth, this.terrainHeight);
+                gl.disable(gl.BLEND);
+                gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+                const dst = 1 - this.terrainRead;
+                gl.useProgram(update.p);
+                this.setTex(update, "uTerrain", 0, this.terrain[this.terrainRead]);
+                this.setTex(update, "uTerrainRoute", 1, this.terrainRoute);
+                this.setTex(update, "uGridVel", 2, this.gridVel[1]);
+                this.setTex(update, "uGridAux", 3, this.gridAux[1]);
+                this.setTex(update, "uGridMat", 4, this.gridMat);
+                gl.uniform2f(update.u.uGridSize, this.width, this.height);
+                gl.uniform2f(update.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
+                gl.uniform1f(update.u.uDt, dt);
+                gl.uniform1f(update.u.uTerrainCoupling, CONFIG.terrainCoupling);
+                gl.uniform1f(update.u.uThermalErosion, CONFIG.thermalErosion);
+                gl.uniform1f(update.u.uErosionRate, CONFIG.erosionRate);
+                gl.uniform1f(update.u.uBasinFillRate, SIM.basinFillRate);
+                gl.uniform1f(update.u.uRiftThreshold, CONFIG.riftThreshold);
+                gl.uniform1f(update.u.uSubductThreshold, CONFIG.subductThreshold);
+                gl.uniform1f(update.u.uSubductRate, CONFIG.subductRate);
+                gl.uniform1f(update.u.uRiftTerrainReset, CONFIG.riftTerrainReset);
+                gl.uniform1f(update.u.uGlobalUplift, SIM.globalUplift);
+                gl.uniform1f(update.u.uBuoyancyLift, CONFIG.buoyancyLift);
+                gl.uniform1f(update.u.uAgeDensityGain, SIM.ageDensityGain);
+                gl.uniform1f(update.u.uMaterialDensityContrast, SIM.materialDensityContrast);
+                gl.uniform1i(update.u.uTopology, CONFIG.topology);
+                this.bindFBO(this.terrainFbo[dst], this.terrainWidth, this.terrainHeight);
+                gl.drawArrays(gl.TRIANGLES, 0, 3);
+                this.terrainRead = dst;
+            }
+        }
+
+        updateClimate(force = false) {
+            const every = Math.max(1, CONFIG.climateEvery | 0);
+            const climateTimeScale = Math.max(0.0, CONFIG.climateTimeScale) * (force ? 1.0 : this.startupRamp());
+            if (!force && (this.iterCount % every) !== 0) return;
+            if (climateTimeScale <= 0.000001) return;
+            const gl = this.gl; const sizeW = this.climateWidth; const sizeH = this.climateHeight;
+            const time = this.iterCount * CONFIG.dt * climateTimeScale; const climateStepScale = Math.max(0.0, every * climateTimeScale);
+            
+            const runB = () => {
+                const cb = this.programs.climateB; const dst = 1 - this.climateBRead; gl.useProgram(cb.p);
+                this.setTex(cb, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(cb, "uClimateB", 1, this.climateB[this.climateBRead]);
+                gl.uniform2f(cb.u.uTerrainSize, this.terrainWidth, this.terrainHeight); gl.uniform2f(cb.u.uClimateSize, sizeW, sizeH);
+                
+                const seasonSpeed = Math.max(0.0, CONFIG.seasonSpeed); const seasonPhase = ((this.iterCount * climateTimeScale * seasonSpeed) / 720.0) % 1.0;
+                gl.uniform1f(cb.u.uSeaLevel, this.effectiveSeaLevel()); gl.uniform1f(cb.u.uSeasonPhase, seasonPhase);
+                gl.uniform1f(cb.u.uAxialTilt, CONFIG.axialTilt); gl.uniform1f(cb.u.uSunPower, CONFIG.sunPower);
+                gl.uniform1f(cb.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale); gl.uniform1i(cb.u.uTopology, CONFIG.topology);
+                
+                this.bindFBO(this.climateBFbo[dst], sizeW, sizeH); gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3); this.climateBRead = dst;
+            };
+            runB();
+            
+            const requestedPasses = Math.max(1, CONFIG.cloudFluidPasses | 0);
+            const passes = Math.max(requestedPasses, Math.min(32, Math.ceil(climateStepScale / 2.0)));
+            const climatePassScale = Math.min(2.0, Math.max(0.0, climateStepScale / passes));
+            
+            for (let i = 0; i < passes; i++) {
+                const cc = this.programs.climateC; let dst = 1 - this.climateCRead; gl.useProgram(cc.p);
+                this.setTex(cc, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(cc, "uClimateB", 1, this.climateB[this.climateBRead]);
+                this.setTex(cc, "uClimateC", 2, this.climateC[this.climateCRead]); this.setTex(cc, "uClimateD", 3, this.climateD[this.climateDRead]);
+                gl.uniform2f(cc.u.uTerrainSize, this.terrainWidth, this.terrainHeight); gl.uniform2f(cc.u.uClimateSize, sizeW, sizeH); 
+                gl.uniform1f(cc.u.uTime, time + i * 0.05 * Math.max(1.0, climatePassScale));
+                gl.uniform1f(cc.u.uSeaLevel, this.effectiveSeaLevel()); gl.uniform1f(cc.u.uStepScale, climatePassScale);
+                gl.uniform1f(cc.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale); gl.uniform1f(cc.u.uWindSpeed, CONFIG.windSpeed);
+                gl.uniform1f(cc.u.uCloudAdvection, CONFIG.cloudAdvection); gl.uniform1f(cc.u.uCloudDiffusion, CONFIG.cloudDiffusion);
+                gl.uniform1f(cc.u.uCloudVorticity, SIM.cloudVorticity); gl.uniform1f(cc.u.uCloudCondensation, CONFIG.cloudCondensation);
+                gl.uniform1f(cc.u.uEvaporationBias, SIM.evaporationBias); gl.uniform1f(cc.u.uTerrainLift, SIM.terrainLift);
+                gl.uniform1f(cc.u.uTerrainDeflection, SIM.terrainDeflection); gl.uniform1f(cc.u.uTerrainRainShadow, SIM.terrainRainShadow);
+                gl.uniform1f(cc.u.uTerrainThermalLift, SIM.terrainThermalLift); gl.uniform1i(cc.u.uTopology, CONFIG.topology);
+                this.bindFBO(this.climateCFbo[dst], sizeW, sizeH); gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3); this.climateCRead = dst;
+
+                const cd = this.programs.climateD; dst = 1 - this.climateDRead; gl.useProgram(cd.p);
+                this.setTex(cd, "uTerrain", 0, this.terrain[this.terrainRead]); this.setTex(cd, "uClimateB", 1, this.climateB[this.climateBRead]);
+                this.setTex(cd, "uClimateC", 2, this.climateC[this.climateCRead]); this.setTex(cd, "uClimateD", 3, this.climateD[this.climateDRead]);
+                gl.uniform2f(cd.u.uTerrainSize, this.terrainWidth, this.terrainHeight); gl.uniform2f(cd.u.uClimateSize, sizeW, sizeH);
+                gl.uniform1f(cd.u.uTime, time + i * 0.05 * Math.max(1.0, climatePassScale));
+                gl.uniform1f(cd.u.uSeaLevel, this.effectiveSeaLevel()); gl.uniform1f(cd.u.uStepScale, climatePassScale);
+                gl.uniform1f(cd.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale); gl.uniform1f(cd.u.uPlantGrowth, CONFIG.plantGrowth);
+                gl.uniform1f(cd.u.uCloudCondensation, CONFIG.cloudCondensation); gl.uniform1i(cd.u.uTopology, CONFIG.topology);
+                this.bindFBO(this.climateDFbo[dst], sizeW, sizeH); gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 3); this.climateDRead = dst;
+            }
+        }
+
+        step(countIteration = true) {
+            const ramp = this.startupRamp();
+            const plateEvery = Math.max(1, CONFIG.plateEvery | 0);
+            if (this.iterCount % plateEvery === 0) this.updatePlatePhysics(plateEvery);
+            const mpmScale = Math.max(0, CONFIG.mpmTimeScale) * ramp;
+            if (mpmScale > 0.000001) {
+                const totalDt = CONFIG.dt * mpmScale;
+                const substeps = Math.max(Math.max(1, CONFIG.substeps | 0), Math.min(64, Math.ceil(totalDt / 0.055)));
+                const dt = totalDt / substeps;
+                for (let i = 0; i < substeps; i++) this.substep(i, dt, substeps);
+                if (this.iterCount % SIM.riftSpawnEvery === 0) this.spawnRiftParticles(totalDt * SIM.riftSpawnEvery);
+            }
+            this.updateTerrain(false);
+            this.updateClimate(false);
+            if ((this.iterCount + 1) % plateEvery === 0) this.dispatchPlateReduction(false);
+            if (countIteration) this.iterCount++;
+        }
+
+        substep(index, dt, substeps) {
+            const gl = this.gl;
+            const globalTime = (this.iterCount + index / Math.max(1, substeps)) * Math.max(0, CONFIG.mpmTimeScale) * this.startupRamp();
+            this.clearAccum();
+            const p2g = this.programs.p2g;
+            gl.useProgram(p2g.p);
+            this.setTex(p2g, "uPosVel", 0, this.posVel[this.readIndex]);
+            this.setTex(p2g, "uF", 1, this.F[this.readIndex]);
+            this.setTex(p2g, "uC", 2, this.C[this.readIndex]);
+            this.setTex(p2g, "uMeta", 3, this.meta[this.readIndex]);
+            gl.uniform2i(p2g.u.uParticleTexSize, this.ptexW, this.ptexH);
+            gl.uniform1i(p2g.u.uParticleCount, this.particleCount);
+            gl.uniform2f(p2g.u.uGridSize, this.width, this.height);
+            gl.uniform1f(p2g.u.uDt, dt);
+            gl.uniform1f(p2g.u.uMu, CONFIG.mu);
+            gl.uniform1f(p2g.u.uLambda, CONFIG.lambda);
+            gl.uniform1f(p2g.u.uStressScale, SIM.stressScale);
+            gl.uniform1f(p2g.u.uStressClamp, SIM.stressClamp);
+            gl.uniform1f(p2g.u.uHardening, SIM.hardening);
+            gl.uniform1f(p2g.u.uCratonStrength, SIM.cratonStrength);
+            gl.uniform1f(p2g.u.uMaterialVariation, CONFIG.materialVariation);
+            gl.uniform1f(p2g.u.uAgeDensityGain, SIM.ageDensityGain);
+            gl.uniform1f(p2g.u.uMaterialDensityContrast, SIM.materialDensityContrast);
+            gl.uniform1i(p2g.u.uTopology, CONFIG.topology);
+            this.bindFBO(this.accumFbo, this.width, this.height);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE);
+            gl.drawArraysInstanced(gl.POINTS, 0, this.particleCount, this.wrapInstances);
+            gl.disable(gl.BLEND);
+
+            const gu = this.programs.gridUpdate;
+            gl.useProgram(gu.p);
+            this.setTex(gu, "uGrid", 0, this.grid0);
+            this.setTex(gu, "uDrive", 1, this.grid1);
+            this.setTex(gu, "uTerritoryMap", 2, this.tTerritory);
+            this.setTex(gu, "uPlateData", 3, this.tPlateData);
+            gl.uniform2f(gu.u.uGridSize, this.width, this.height);
+            gl.uniform1f(gu.u.uDt, dt);
+            gl.uniform1f(gu.u.uFrameDt, CONFIG.dt);
+            gl.uniform1f(gu.u.uDamping, SIM.gridDamping);
+            gl.uniform1f(gu.u.uDriveCoupling, CONFIG.driveCoupling);
+            gl.uniform1f(gu.u.uDensityDetachment, SIM.densityDetachment);
+            gl.uniform1f(gu.u.uAgeDensityGain, SIM.ageDensityGain);
+            gl.uniform1f(gu.u.uMaterialDensityContrast, SIM.materialDensityContrast);
+            gl.uniform1f(gu.u.uBuoyancyLift, CONFIG.buoyancyLift);
+            gl.uniform1f(gu.u.uSpeedClamp, SIM.gridSpeedClamp);
+            gl.uniform1f(gu.u.uMassCutoff, SIM.massCutoff);
+            gl.uniform1i(gu.u.uTopology, CONFIG.topology);
+            this.bindFBO(this.gridUpdateFbo, this.width, this.height);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+            const gp = this.programs.gridPhysics;
+            gl.useProgram(gp.p);
+            this.setTex(gp, "uGridVel", 0, this.gridVel[0]);
+            this.setTex(gp, "uGridAux", 1, this.gridAux[0]);
+            this.setTex(gp, "uGridMat", 2, this.gridMat);
+            this.setTex(gp, "uTerritoryMap", 3, this.tTerritory);
+            this.setTex(gp, "uPlateData", 4, this.tPlateData);
+            gl.uniform2f(gp.u.uGridSize, this.width, this.height);
+            gl.uniform1f(gp.u.uAmount, 1 - Math.exp(-SIM.gridViscosityRate * dt));
+            gl.uniform1f(gp.u.uDt, dt);
+            gl.uniform1f(gp.u.uFrameDt, CONFIG.dt);
+            gl.uniform1f(gp.u.uWastingAngle, SIM.wastingAngle);
+            gl.uniform1f(gp.u.uWastingRate, SIM.wastingRate);
+            gl.uniform1f(gp.u.uCohesion, CONFIG.cohesion);
+            gl.uniform1f(gp.u.uBoundarySmoothing, CONFIG.boundarySmoothing);
+            gl.uniform1f(gp.u.uRidgePush, CONFIG.ridgePush);
+            gl.uniform1i(gp.u.uTopology, CONFIG.topology);
+            this.bindFBO(this.gridPhysicsFbo, this.width, this.height);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+            const g2p = this.programs.g2p;
+            const dst = 1 - this.readIndex;
+            gl.useProgram(g2p.p);
+            this.setTex(g2p, "uPosVel", 0, this.posVel[this.readIndex]);
+            this.setTex(g2p, "uF", 1, this.F[this.readIndex]);
+            this.setTex(g2p, "uMeta", 2, this.meta[this.readIndex]);
+            this.setTex(g2p, "uGridVel", 3, this.gridVel[1]);
+            this.setTex(g2p, "uGridAux", 4, this.gridAux[1]);
+            this.setTex(g2p, "uGridMat", 5, this.gridMat);
+            this.setTex(g2p, "uTerritoryMap", 6, this.tTerritory);
+            this.setTex(g2p, "uPlateData", 7, this.tPlateData);
+            gl.uniform2i(g2p.u.uParticleTexSize, this.ptexW, this.ptexH);
+            gl.uniform1i(g2p.u.uParticleCount, this.particleCount);
+            gl.uniform2f(g2p.u.uGridSize, this.width, this.height);
+            gl.uniform1f(g2p.u.uDt, dt);
+            gl.uniform1f(g2p.u.uMinJ, SIM.minJ);
+            gl.uniform1f(g2p.u.uMaxJ, SIM.maxJ);
+            gl.uniform1f(g2p.u.uPlasticYield, CONFIG.plasticYield);
+            gl.uniform1f(g2p.u.uPlasticCreep, SIM.plasticCreep);
+            gl.uniform1f(g2p.u.uApicBlend, SIM.apicBlend);
+            gl.uniform1f(g2p.u.uStrainCoupling, SIM.strainCoupling);
+            gl.uniform1f(g2p.u.uParticleDamping, SIM.particleDamping);
+            gl.uniform1f(g2p.u.uVelocityClamp, SIM.velocityClamp);
+            gl.uniform1f(g2p.u.uTime, globalTime);
+            gl.uniform1f(g2p.u.uParticleMass, SIM.particleMass);
+            gl.uniform1f(g2p.u.uSubductThreshold, CONFIG.subductThreshold);
+            gl.uniform1f(g2p.u.uSubductRate, CONFIG.subductRate);
+            gl.uniform1f(g2p.u.uRiftThreshold, CONFIG.riftThreshold);
+            gl.uniform1f(g2p.u.uRiftRecycleRate, CONFIG.riftRecycleRate);
+            gl.uniform1f(g2p.u.uMaxCrustMass, CONFIG.maxCrustMass);
+            gl.uniform1f(g2p.u.uCrustGrowthRate, CONFIG.crustGrowthRate);
+            gl.uniform1f(g2p.u.uAgeRate, SIM.ageRate);
+            gl.uniform1f(g2p.u.uAgeDensityGain, SIM.ageDensityGain);
+            gl.uniform1f(g2p.u.uMaterialDensityContrast, SIM.materialDensityContrast);
+            gl.uniform1i(g2p.u.uTopology, CONFIG.topology);
+            this.bindFBO(this.particleFbo[dst], this.ptexW, this.ptexH);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+            this.readIndex = dst;
+        }
+
+        spawnRiftParticles(dt) {
+            if (CONFIG.riftRate <= 0 || dt <= 0.000001) return;
+            const gl = this.gl;
+            const p = this.programs.spawn;
+            const dst = 1 - this.readIndex;
+            gl.useProgram(p.p);
+            this.setTex(p, "uPosVel", 0, this.posVel[this.readIndex]);
+            this.setTex(p, "uF", 1, this.F[this.readIndex]);
+            this.setTex(p, "uC", 2, this.C[this.readIndex]);
+            this.setTex(p, "uMeta", 3, this.meta[this.readIndex]);
+            this.setTex(p, "uGridVel", 4, this.gridVel[1]);
+            this.setTex(p, "uGridAux", 5, this.gridAux[1]);
+            this.setTex(p, "uTerritoryMap", 6, this.tTerritory);
+            gl.uniform2i(p.u.uParticleTexSize, this.ptexW, this.ptexH);
+            gl.uniform1i(p.u.uParticleCount, this.particleCount);
+            gl.uniform2f(p.u.uGridSize, this.width, this.height);
+            gl.uniform1f(p.u.uTime, this.iterCount * CONFIG.dt);
+            gl.uniform1f(p.u.uDt, dt);
+            gl.uniform1f(p.u.uParticleMass, SIM.particleMass);
+            gl.uniform1f(p.u.uRiftThreshold, CONFIG.riftThreshold);
+            gl.uniform1f(p.u.uRiftRate, CONFIG.riftRate);
+            gl.uniform1f(p.u.uMaterialVariation, CONFIG.materialVariation);
+            gl.uniform1i(p.u.uTopology, CONFIG.topology);
+            this.bindFBO(this.particleFbo[dst], this.ptexW, this.ptexH);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+            this.readIndex = dst;
+        }
+
+        render(mode) {
+            const gl = this.gl;
+            this.bindFBO(null, this.canvas.width, this.canvas.height);
+            if (mode === 0) {
+                const r = this.programs.satellite;
+                gl.useProgram(r.p);
+                this.setTex(r, "uTerrain", 0, this.terrain[this.terrainRead]);
+                this.setTex(r, "uClimateB", 1, this.climateB[this.climateBRead]);
+                this.setTex(r, "uClimateC", 2, this.climateC[this.climateCRead]);
+                this.setTex(r, "uClimateD", 3, this.climateD[this.climateDRead]);
+                this.setTex(r, "uGridMat", 4, this.gridMat);
+                gl.uniform2f(r.u.uGridSize, this.width, this.height);
+                gl.uniform2f(r.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
+                gl.uniform2f(r.u.uClimateSize, this.climateWidth, this.climateHeight);
+                gl.uniform1f(r.u.uSeaLevel, this.effectiveSeaLevel());
+                gl.uniform1f(r.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale);
+                gl.uniform1f(r.u.uCloudOpacity, CONFIG.cloudOpacity);
+                gl.uniform1i(r.u.uTopology, CONFIG.topology);
+                gl.drawArrays(gl.TRIANGLES, 0, 3);
+                return;
+            }
+            const r = this.programs.debug;
+            gl.useProgram(r.p);
+            this.setTex(r, "uTerrain", 0, this.terrain[this.terrainRead]);
+            this.setTex(r, "uTerritoryMap", 1, this.tTerritory);
+            this.setTex(r, "uPlateData", 2, this.tPlateData);
+            this.setTex(r, "uClimateB", 3, this.climateB[this.climateBRead]);
+            this.setTex(r, "uClimateD", 4, this.climateD[this.climateDRead]);
+            this.setTex(r, "uGridVel", 5, this.gridVel[1]);
+            this.setTex(r, "uGridAux", 6, this.gridAux[1]);
+            this.setTex(r, "uGridMat", 7, this.gridMat);
+            gl.uniform2f(r.u.uGridSize, this.width, this.height);
+            gl.uniform2f(r.u.uTerrainSize, this.terrainWidth, this.terrainHeight);
+            gl.uniform2f(r.u.uClimateSize, this.climateWidth, this.climateHeight);
+            gl.uniform1f(r.u.uSeaLevel, this.effectiveSeaLevel());
+            gl.uniform1f(r.u.uTerrainVerticalScale, CONFIG.terrainVerticalScale);
+            gl.uniform1f(r.u.uAgeDensityGain, SIM.ageDensityGain);
+            gl.uniform1f(r.u.uMaterialDensityContrast, SIM.materialDensityContrast);
+            gl.uniform1i(r.u.uMode, mode);
+            gl.uniform1i(r.u.uTopology, CONFIG.topology);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+
+        destroy() {
+            const gl = this.gl;
+            for (const state of this.platePboState || []) if (state) gl.deleteSync(state.sync);
+            for (const b of this.platePbos || []) gl.deleteBuffer(b);
+            for (const arr of [this.posVel, this.F, this.C, this.meta, this.gridVel, this.gridAux, this.terrain, this.climateB, this.climateC, this.climateD, this.plateReduceTex]) if (arr) for (const t of arr) gl.deleteTexture(t);
+            for (const t of [this.gridMat, this.grid0, this.grid1, this.terrainRoute, this.tTerritory, this.tPlateData]) if (t) gl.deleteTexture(t);
+            for (const f of [this.accumFbo, this.gridUpdateFbo, this.gridPhysicsFbo, this.terrainRouteFbo, this.plateReduceFbo]) if (f) gl.deleteFramebuffer(f);
+            for (const arr of [this.terrainFbo, this.climateBFbo, this.climateCFbo, this.climateDFbo, this.particleFbo]) if (arr) for (const f of arr) gl.deleteFramebuffer(f);
+            for (const key in this.programs) gl.deleteProgram(this.programs[key].p);
+            gl.deleteVertexArray(this.vao);
+        }
+    }
+
+    const dom = {
+        canvas: document.getElementById("map"), container: document.getElementById("canvas-container"),
+        errorBox: document.getElementById("error-box"), errorText: document.getElementById("error-text"),
+        restart: document.getElementById("btn-restart"), step: document.getElementById("btn-step"),
+        play: document.getElementById("btn-play"), viewMode: document.getElementById("view-mode"),
+        resetView: document.getElementById("btn-reset-view"), iter: document.getElementById("stat-iter"),
+        plates: document.getElementById("stat-plates"), particles: document.getElementById("stat-particles"), energy: document.getElementById("stat-energy")
+    };
+
+    const configInputs = Array.from(document.querySelectorAll(".cfg-input"));
+    const valueFields = new Map();
+    for (const el of configInputs) {
+        const key = el.dataset.key; const field = document.getElementById(`val-${key}`);
+        if (field) valueFields.set(key, { input: el, field });
+    }
+
+    let sim = null, running = false, raf = 0, frameCount = 0;
+    let viewTransform = { x: 0, y: 0, scale: 1 }, isDraggingView = false, dragStartView = { x: 0, y: 0 }, activePointers = new Map(), initialPinchDist = null, initialTransform = null;
+
+    function esc(s) { return String(s).replace(/[&<>]/g, c => c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"); }
+    function showError(err) { dom.errorText.innerHTML = `<strong>GPU MPM initialization failed.</strong><br><br>${esc(String(err.message || err))}`; dom.errorBox.style.display = "flex"; }
+
+    function updateConfig() {
+        Object.assign(CONFIG, DEFAULT_CONFIG);
+        for (const el of configInputs) {
+            let value = Number(el.value); if (!Number.isFinite(value)) value = CONFIG[el.dataset.key];
+            if (el.dataset.key === "width" || el.dataset.key === "height") { value = snapDimension(value); el.value = String(value); }
+            CONFIG[el.dataset.key] = value;
+        }
+        for (const [key, { input, field }] of valueFields) {
+            if (input instanceof HTMLInputElement && input.type === 'range') {
+                const dot = input.step.indexOf("."); field.textContent = dot >= 0 ? Number(CONFIG[key]).toFixed(input.step.length - dot - 1) : String(CONFIG[key]);
+            }
+        }
+    }
+
+    function updateViewTransform() { dom.canvas.style.transform = `translate(${viewTransform.x}px, ${viewTransform.y}px) scale(${viewTransform.scale})`; }
+    function resetView() {
+        if (!sim) return; const rect = dom.container.getBoundingClientRect();
+        const viewW = sim.renderWidth || sim.canvas.width || sim.width; const viewH = sim.renderHeight || sim.canvas.height || sim.height;
+        viewTransform.scale = Math.max(0.05, Math.min((rect.width - 40) / viewW, (rect.height - 40) / viewH, 10));
+        viewTransform.x = (rect.width - viewW * viewTransform.scale) / 2; viewTransform.y = (rect.height - viewH * viewTransform.scale) / 2;
+        updateViewTransform();
+    }
+
+    function renderUI(force = false) {
+        if (!sim) return;
+        if (force || frameCount % Math.max(1, CONFIG.renderEvery | 0) === 0) sim.render(parseInt(dom.viewMode.value, 10));
+        dom.iter.textContent = sim.iterCount;
+        let actP = 0, nrg = 0;
+        for (let p of sim.plates) { if (p.mass > 0) { actP++; nrg += 0.5 * p.mass * (p.vx * p.vx + p.vy * p.vy) + 0.5 * p.inertia * p.omega * p.omega; } }
+        dom.plates.textContent = actP; dom.particles.textContent = (sim.particleCount / 1000).toFixed(1) + "k"; dom.energy.textContent = nrg.toFixed(1);
+    }
+
+    function regenerateWorld() {
+        const wasRunning = running; if (wasRunning) { running = false; cancelAnimationFrame(raf); }
+        updateConfig();
+        try { if (sim) sim.destroy(); dom.errorBox.style.display = "none"; sim = new ShaderMpmEngine(dom.canvas); renderUI(true); resetView(); } 
+        catch (err) { showError(err); sim = null; }
+        if (wasRunning && sim) togglePlay();
+    }
+
+    function tick() {
+        if (!running) return;
+        if (sim) { sim.step(true); frameCount++; renderUI(); }
+        raf = requestAnimationFrame(tick);
+    }
+
+    function togglePlay() {
+        if (!sim) return; running = !running;
+        dom.play.textContent = running ? "Pause" : "Play";
+        dom.play.style.background = running ? "var(--surface-2)" : "var(--run)"; dom.play.style.borderColor = running ? "var(--line)" : "var(--run-hover)";
+        if (running) tick(); else cancelAnimationFrame(raf);
+    }
+
+    configInputs.forEach(el => {
+        const rebuild = ["width", "height", "plates", "topology", "particleSlotDensity", "particleDensity", "terrainResolutionScale", "climateResolutionScale"].includes(el.dataset.key);
+        el.addEventListener(rebuild ? "change" : "input", () => { if (rebuild) regenerateWorld(); else { updateConfig(); renderUI(true); } });
+    });
+
+    dom.restart.addEventListener("click", regenerateWorld);
+    dom.step.addEventListener("click", () => { if (!sim) return; updateConfig(); sim.step(true); renderUI(true); });
+    dom.play.addEventListener("click", togglePlay); dom.viewMode.addEventListener("change", () => renderUI(true));
+    dom.resetView.addEventListener("click", resetView);
+
+    dom.container.addEventListener("pointerdown", e => {
+        const target = e.target instanceof Element ? e.target : null; if (target && (target.closest(".stats-panel") || target.closest(".view-controls"))) return;
+        activePointers.set(e.pointerId, e);
+        if (activePointers.size === 1) { isDraggingView = true; dragStartView.x = e.clientX - viewTransform.x; dragStartView.y = e.clientY - viewTransform.y; } 
+        else if (activePointers.size === 2) { isDraggingView = false; const pts = Array.from(activePointers.values()); initialPinchDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY); initialTransform = { ...viewTransform }; }
+        dom.container.setPointerCapture(e.pointerId);
+    });
+
+    dom.container.addEventListener("pointermove", e => {
+        if (!activePointers.has(e.pointerId)) return; activePointers.set(e.pointerId, e);
+        if (activePointers.size === 1 && isDraggingView) { viewTransform.x = e.clientX - dragStartView.x; viewTransform.y = e.clientY - dragStartView.y; updateViewTransform(); } 
+        else if (activePointers.size === 2 && initialTransform) {
+            const pts = Array.from(activePointers.values()); const rect = dom.container.getBoundingClientRect();
+            const mx = (pts[0].clientX + pts[1].clientX) / 2 - rect.left; const my = (pts[0].clientY + pts[1].clientY) / 2 - rect.top;
+            const newScale = Math.max(0.03, Math.min(initialTransform.scale * (Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY) / initialPinchDist), 100));
+            const z = newScale / initialTransform.scale; viewTransform.x = mx - (mx - initialTransform.x) * z; viewTransform.y = my - (my - initialTransform.y) * z;
+            viewTransform.scale = newScale; updateViewTransform();
+        }
+    });
+
+    function handlePointerEnd(e) {
+        activePointers.delete(e.pointerId); if (activePointers.size < 2) initialPinchDist = null;
+        if (activePointers.size === 1) { const remaining = Array.from(activePointers.values())[0]; isDraggingView = true; dragStartView.x = remaining.clientX - viewTransform.x; dragStartView.y = remaining.clientY - viewTransform.y; } 
+        else if (activePointers.size === 0) { isDraggingView = false; }
+        if (dom.container.hasPointerCapture(e.pointerId)) dom.container.releasePointerCapture(e.pointerId);
+    }
+    dom.container.addEventListener("pointerup", handlePointerEnd); dom.container.addEventListener("pointercancel", handlePointerEnd);
+
+    dom.container.addEventListener("wheel", e => {
+        const target = e.target instanceof Element ? e.target : null; if (target && (target.closest(".stats-panel") || target.closest(".view-controls"))) return;
+        e.preventDefault(); const rect = dom.container.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
+        const newScale = Math.max(0.03, Math.min(viewTransform.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 100)); const z = newScale / viewTransform.scale;
+        viewTransform.x = mx - (mx - viewTransform.x) * z; viewTransform.y = my - (my - viewTransform.y) * z;
+        viewTransform.scale = newScale; updateViewTransform();
+    }, { passive: false });
+
+    window.addEventListener("resize", resetView);
+    regenerateWorld();
+})();
+</script>
+</body>
+</html>
