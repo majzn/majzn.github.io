@@ -1,0 +1,3410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tectonic WebGPU Velocity Grid</title>
+<style>
+*{box-sizing:border-box}:root{color-scheme:dark}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06090d;color:#e8eef6;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#gpu,#overlay{position:fixed;inset:0;width:100vw;height:100vh;display:block}#gpu{pointer-events:none}#overlay{touch-action:none;cursor:default}#overlay.pan{cursor:grabbing}#overlay.drag{cursor:crosshair}#panel{position:fixed;top:12px;right:12px;z-index:20;width:min(392px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(7,10,15,.92);backdrop-filter:blur(10px);box-shadow:0 16px 42px rgba(0,0,0,.36);scrollbar-width:thin}.title{font-size:15px;font-weight:760;margin-bottom:3px}.subtitle{color:#93a4b8;font-size:11px;line-height:1.42;margin-bottom:8px}.status{font-size:10px;color:#7fd0ff;margin-bottom:7px}details{border-top:1px solid rgba(255,255,255,.08);padding:8px 0 2px}details:first-of-type{border-top:0}summary{cursor:pointer;user-select:none;font-size:12px;font-weight:700;color:#dce6f2;margin-bottom:7px}.control{display:grid;grid-template-columns:1fr 132px 60px;gap:8px;align-items:center;min-height:28px;font-size:11px}.control label,.select-row label,.check label{color:#b9c7d8}.control output{text-align:right;color:#eff5fc;font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:#7da9db}.select-row{display:grid;grid-template-columns:1fr 190px;gap:9px;align-items:center;min-height:31px;font-size:11px}select{width:100%;border:1px solid rgba(255,255,255,.13);border-radius:7px;background:#111822;color:#e9eff7;padding:6px 7px;font:inherit;font-size:11px}.check{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:26px;font-size:11px}.check input{accent-color:#7da9db}.note{margin:5px 0 2px;color:#728498;font-size:10px;line-height:1.35}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.camera{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:7px}button{border:1px solid rgba(255,255,255,.13);border-radius:8px;background:rgba(255,255,255,.06);color:#e9f0f8;padding:8px 9px;cursor:pointer;font:inherit;font-size:11px}button:hover{background:rgba(255,255,255,.1)}button.primary{background:rgba(91,136,190,.18);border-color:rgba(128,174,226,.31)}button.pending{border-color:#d5a955;color:#ffe2a2}#sample,#stats,#error{position:fixed;left:12px;z-index:10;padding:7px 9px;border-radius:8px;background:rgba(4,7,11,.78);border:1px solid rgba(255,255,255,.08);font-size:10px;font-variant-numeric:tabular-nums}#sample{bottom:44px;color:#b8c7d8;pointer-events:none}#stats{bottom:12px;color:#96a7ba;pointer-events:none}#error{top:12px;max-width:min(680px,calc(100vw - 24px));color:#ffd0c5;border-color:rgba(255,120,90,.35);display:none}
+</style>
+</head>
+<body>
+<canvas id="gpu"></canvas><canvas id="overlay"></canvas>
+<div id="panel"><div class="title">Tectonic WebGPU velocity grid</div><div class="subtitle">GPU-resident plate labels, cellular updates, velocity field, rendering, and real-time plate statistics. Full topology readback only occurs for actual structural events or optional validation.</div><div id="gpuStatus" class="status">starting WebGPU…</div><div id="settings"></div><div class="camera"><button id="zoomOut">−</button><button id="zoomIn">+</button><button id="fit">Fit</button><button id="one">1:1</button></div><div class="buttons"><button class="primary" id="pause">Pause</button><button id="step">Single step</button><button id="rebuild">Rebuild world</button><button id="randomize">Randomize drives</button><button id="forceSplit">Force split</button><button id="forceMerge">Force merge</button><button id="defaults">Reset defaults</button></div><div class="note">Right-drag pans. Left-drag a plate to set its preferred velocity. Wheel zooms. Space pauses. Areas, centroids and contacts stream asynchronously every frame. Lifecycle events use persistence, hysteresis, and post-event lockouts to prevent split/merge thrashing.</div></div>
+<div id="error"></div><div id="sample">hover uses the last CPU label snapshot; plate vectors and centroids update continuously</div><div id="stats"></div>
+<script>
+(async()=>{
+const gpuCanvas=document.getElementById("gpu"),overlay=document.getElementById("overlay"),octx=overlay.getContext("2d"),settingsEl=document.getElementById("settings"),statusEl=document.getElementById("gpuStatus"),sampleEl=document.getElementById("sample"),statsEl=document.getElementById("stats"),errorEl=document.getElementById("error"),rebuildBtn=document.getElementById("rebuild");
+const D={topology:"torus",worldWidth:2200,worldHeight:1400,cellSize:2.5,initialPlates:12,maxPlates:64,simSpeed:1,caPassRate:120,maxPassesFrame:20,boundaryReuse:4,fieldEvery:1,renderScale:.9,boundaryTension:7.5,areaStiffness:4.8,thermalNoise:3.1,motility:6.3,driveSpeed:1,inertia:2.8,driveStrength:1.35,drag:.16,maxAccel:1.25,sizeMass:.65,neighborCoupling:.55,collisionTransfer:1.2,boundaryFriction:.35,wanderAngle:28,wanderPeriod:75,wanderResponse:25,wanderSpeedVariation:.14,mouseDragScale:.012,manualHold:15,fieldScale:1,rotation:.055,rotationRadius:2200,shear:.04,validationInterval:30,minLiveFraction:.0025,absorberRatio:2.5,splitMinFraction:.055,fissionRate:.14,fissionStress:.42,fissionImpulse:.42,mergeMaxFraction:.085,mergeRate:.6,mergeSpeed:.42,mergeContact:.22,enableLifecycle:true,displayMode:"directionSpeed",displayMaxSpeed:1.75,showBoundaries:true,stressBoundaries:true,showArrows:true,arrowScale:78,repeatWrapped:true,showBorder:true,wheelZoom:.12,autoSplit:false,enableFission:true,enableMerge:true};
+const S={...D};
+const F={worldWidth:v=>`${Math.round(v)} wu`,worldHeight:v=>`${Math.round(v)} wu`,cellSize:v=>`${v.toFixed(2)} wu`,simSpeed:v=>`${v.toFixed(1)}×`,caPassRate:v=>`${Math.round(v)}/s`,maxPassesFrame:v=>`${Math.round(v)}`,boundaryReuse:v=>`${Math.round(v)}`,fieldEvery:v=>`${Math.round(v)} f`,renderScale:v=>`${v.toFixed(2)}×`,areaStiffness:v=>v.toFixed(1),wanderAngle:v=>`${v.toFixed(0)}°`,wanderPeriod:v=>`${v.toFixed(0)} s`,wanderResponse:v=>`${v.toFixed(1)} s`,wanderSpeedVariation:v=>`${(v*100).toFixed(0)}%`,mouseDragScale:v=>v.toFixed(3),manualHold:v=>`${v.toFixed(0)} s`,rotation:v=>v.toFixed(3),rotationRadius:v=>`${Math.round(v)} wu`,shear:v=>v.toFixed(3),validationInterval:v=>`${v.toFixed(0)} s`,minLiveFraction:v=>`${(v*100).toFixed(2)}%`,absorberRatio:v=>`${v.toFixed(2)}×`,splitMinFraction:v=>`${(v*100).toFixed(1)}%`,fissionRate:v=>`${v.toFixed(2)}/min`,fissionStress:v=>v.toFixed(2),mergeMaxFraction:v=>`${(v*100).toFixed(1)}%`,mergeRate:v=>`${v.toFixed(2)}/min`,mergeSpeed:v=>v.toFixed(2),mergeContact:v=>v.toFixed(2),displayMaxSpeed:v=>v.toFixed(2),arrowScale:v=>`${Math.round(v)} wu`,wheelZoom:v=>v.toFixed(2)};
+const G=[
+{title:"World",open:true,note:"Rebuild applies these settings. Physics cell size is the actual GPU plate and velocity-grid resolution.",items:[{key:"topology",label:"Topology",type:"select",rebuild:true,options:[["bounded","Bounded rectangle"],["cylinderX","Cylinder · X wraps"],["cylinderY","Cylinder · Y wraps"],["torus","Torus · X + Y wrap"]]},{key:"worldWidth",label:"World width",min:600,max:6000,step:100,rebuild:true},{key:"worldHeight",label:"World height",min:400,max:4000,step:100,rebuild:true},{key:"cellSize",label:"Physics cell size",min:1,max:12,step:.25,rebuild:true},{key:"initialPlates",label:"Initial plates",min:3,max:32,step:1,rebuild:true},{key:"maxPlates",label:"Maximum live plates",min:8,max:128,step:1,rebuild:true}]},
+{title:"GPU performance",open:true,items:[{key:"simSpeed",label:"Simulation speed",min:.1,max:40,step:.1},{key:"caPassRate",label:"CA color passes / sec",min:10,max:600,step:10},{key:"maxPassesFrame",label:"Max CA passes / frame",min:1,max:64,step:1},{key:"boundaryReuse",label:"Boundary-list reuse",min:1,max:12,step:1},{key:"fieldEvery",label:"Velocity refresh",min:1,max:20,step:1},{key:"renderScale",label:"Canvas resolution",min:.4,max:1.25,step:.05}]},
+{title:"Plate interface",open:false,items:[{key:"boundaryTension",label:"Boundary smoothing",min:0,max:18,step:.1},{key:"areaStiffness",label:"Area rigidity",min:0,max:15,step:.1},{key:"thermalNoise",label:"Boundary noise",min:.1,max:10,step:.1},{key:"motility",label:"Motion → boundary",min:0,max:14,step:.1}]},
+{title:"Plate motion",open:true,items:[{key:"driveSpeed",label:"Preferred speed",min:0,max:3,step:.05},{key:"inertia",label:"Inertia",min:.2,max:10,step:.1},{key:"driveStrength",label:"Drive force",min:0,max:6,step:.05},{key:"drag",label:"Drag",min:0,max:3,step:.02},{key:"maxAccel",label:"Acceleration limit",min:.05,max:8,step:.05},{key:"sizeMass",label:"Large-plate mass",min:0,max:1.5,step:.05},{key:"neighborCoupling",label:"Neighbor entrainment",min:0,max:5,step:.05},{key:"collisionTransfer",label:"Collision transfer",min:0,max:8,step:.05},{key:"boundaryFriction",label:"Sliding friction",min:0,max:5,step:.05},{key:"wanderAngle",label:"Wander course range",min:0,max:100,step:1},{key:"wanderPeriod",label:"Wander timescale",min:10,max:240,step:2},{key:"wanderResponse",label:"Wander response",min:3,max:90,step:.5},{key:"wanderSpeedVariation",label:"Wander speed variation",min:0,max:.6,step:.01},{key:"mouseDragScale",label:"Left-drag velocity scale",min:.002,max:.04,step:.001},{key:"manualHold",label:"Manual vector hold",min:0,max:90,step:1}]},
+{title:"Velocity field",open:true,items:[{key:"fieldScale",label:"Velocity scale",min:0,max:3,step:.05},{key:"rotation",label:"Broad rotation",min:0,max:.3,step:.005},{key:"rotationRadius",label:"Rotation radius",min:300,max:8000,step:50},{key:"shear",label:"Plate-scale shear",min:0,max:.3,step:.005}]},
+{title:"Lifecycle",open:false,note:"Plate areas, centroids and contacts are streamed asynchronously every rendered frame. There is no lifecycle-stats interval. The timer below applies only to the optional full disconnected-island validation.",items:[{key:"enableLifecycle",label:"Enable lifecycle events",type:"check"},{key:"validationInterval",label:"Optional full topology validation",min:5,max:300,step:5},{key:"minLiveFraction",label:"Minimum viable plate",min:.0005,max:.05,step:.0005},{key:"absorberRatio",label:"Microplate absorber ratio",min:1,max:12,step:.25},{key:"splitMinFraction",label:"Minimum plate to split",min:.005,max:.4,step:.005},{key:"autoSplit",label:"Full disconnected-island validation",type:"check"},{key:"enableFission",label:"Enable fission",type:"check"},{key:"fissionRate",label:"Fission rate",min:0,max:3,step:.05},{key:"fissionStress",label:"Fission stress threshold",min:0,max:4,step:.05},{key:"fissionImpulse",label:"Fission impulse",min:0,max:2.5,step:.05},{key:"enableMerge",label:"Enable merging",type:"check"},{key:"mergeMaxFraction",label:"Maximum plate to merge",min:.005,max:.4,step:.005},{key:"mergeRate",label:"Merge rate",min:0,max:6,step:.1},{key:"mergeSpeed",label:"Merge max relative speed",min:.02,max:3,step:.02},{key:"mergeContact",label:"Merge contact threshold",min:.02,max:1.5,step:.02}]},
+{title:"Display",open:false,items:[{key:"displayMode",label:"Velocity encoding",type:"select",options:[["directionSpeed","Direction hue + speed"],["direction","Direction only"],["speed","Speed grayscale"],["vx","Signed X component"],["vy","Signed Y component"]]},{key:"displayMaxSpeed",label:"Display max speed",min:.1,max:5,step:.05},{key:"showBoundaries",label:"Show plate boundaries",type:"check"},{key:"stressBoundaries",label:"Stress-color boundaries",type:"check"},{key:"showArrows",label:"One vector arrow / plate",type:"check"},{key:"arrowScale",label:"Arrow scale",min:20,max:180,step:5},{key:"repeatWrapped",label:"Repeat wrapped world",type:"check"},{key:"showBorder",label:"Show world border",type:"check"},{key:"wheelZoom",label:"Wheel zoom speed",min:.02,max:.3,step:.01}]}
+];
+let device,context,format,useF16=false,velocityStride=8,boundaryBuildPipeline,boundaryFinalizePipeline,caPipeline,velocityPipeline,renderPipeline,labelBuffer,boundaryListBuffer,boundaryCountBuffer,indirectBuffer,plateBuffer,areaBuffer,plateStatsBuffer,contactStatsBuffer,velocityBuffer,uniformBuffer,stepBuffer,readbackBuffer,boundaryBindGroup,caBindGroup,velocityBindGroup,renderBindGroup,worldW=S.worldWidth,worldH=S.worldHeight,GW=1,GH=1,N=1,cellWX=1,cellWY=1,maxPlates=S.maxPlates,plates=[],cpuLabels=new Uint32Array(1),areasCPU=new Uint32Array(1),contactCount=new Int32Array(1),contactNX=new Int32Array(1),contactNY=new Int32Array(1),scanContactCount=new Int32Array(1),scanContactNX=new Int32Array(1),scanContactNY=new Int32Array(1),scanAreas=new Uint32Array(1),scanSX=new Float64Array(1),scanSY=new Float64Array(1),scanSSX=new Float64Array(1),scanSCX=new Float64Array(1),scanSSY=new Float64Array(1),scanSCY=new Float64Array(1),neighborScratch=new Int32Array(1),neighborTouched=new Int32Array(1),compMap=new Int32Array(1),bfsQueue=new Int32Array(1),xSin=new Float32Array(1),xCos=new Float32Array(1),ySin=new Float32Array(1),yCos=new Float32Array(1),plateData=new Float32Array(1),uniformData=new Float32Array(32),stepData=new ArrayBuffer(64*256),stepU32=new Uint32Array(stepData),statsReadbacks=[],statsAreaBytes=0,statsMomentBytes=0,statsContactBytes=0,statsMomentOffset=0,statsContactOffset=0,statsReadbackBytes=0,statsCursor=0,statsGeneration=1,statsSerial=0,lastAppliedStatsSerial=0,lastStatsSimTime=0,statsHz=0,statsHzCount=0,statsHzClock=performance.now(),lastStatsApply=performance.now(),viewportW=1,viewportH=1,DPR=1,paused=false,singleStep=false,lastNow=performance.now(),simTime=0,caCredit=0,caStep=1,fieldFrame=0,lifecycleClock=0,lifecyclePending=false,lifecycleRequest=false,lifecycleAction=null,lifecycleStructural=false,lifecycleNeedsGpuResync=false,lifecyclePhase="",lifecycleProgress=0,forceSplitRequest=false,forceMergeRequest=false,cpuSnapshotVersion=0,splitEvents=0,mergeEvents=0,microEvents=0,fps=0,fpsFrames=0,fpsClock=performance.now(),lastGpuSubmit=0,pan=false,drag=false,pointerId=null,lastPX=0,lastPY=0,dragPlate=null,dragStartX=0,dragStartY=0;
+const camera={x:worldW*.5,y:worldH*.5,zoom:1};
+
+const LIFE={
+  globalCooldown:2.5,
+  postMergeLock:18,
+  postSplitLock:28,
+  siblingMergeLock:55,
+  mergeHold:2.25,
+  fissionHold:7,
+  microRetry:10
+};
+let nextPlateUid=1,
+    structuralCooldownUntil=0,
+    mergeCandidateUidA=0,
+    mergeCandidateUidB=0,
+    mergeCandidateAge=0;
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rand=(a,b)=>a+Math.random()*(b-a),mod=(a,n)=>((a%n)+n)%n,wrapsX=()=>S.topology==="cylinderX"||S.topology==="torus",wrapsY=()=>S.topology==="cylinderY"||S.topology==="torus",shortest=(d,p,w)=>w?(d>p*.5?d-p:d<-p*.5?d+p:d):d;
+const _bitsAB=new ArrayBuffer(4),_bitsU=new Uint32Array(_bitsAB),_bitsF=new Float32Array(_bitsAB);
+function f32bits(v){_bitsF[0]=v;return _bitsU[0]}
+function bitsf32(v){_bitsU[0]=v;return _bitsF[0]}
+function split64(v){return[v>>>0,Math.floor(v/4294967296)>>>0]}
+function join64(lo,hi){return lo+hi*4294967296}
+function align256(v){return(v+255)&~255}
+
+function hslToRgb(h,s,l){h=mod(h,360)/360;s/=100;l/=100;if(!s){const g=Math.round(l*255);return[g,g,g]}const f=(p,q,t)=>{if(t<0)t++;if(t>1)t--;if(t<1/6)return p+(q-p)*6*t;if(t<.5)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p},q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;return[Math.round(f(p,q,h+1/3)*255),Math.round(f(p,q,h)*255),Math.round(f(p,q,h-1/3)*255)]}
+function modeCode(){return S.displayMode==="directionSpeed"?0:S.displayMode==="direction"?1:S.displayMode==="speed"?2:S.displayMode==="vx"?3:4}
+function topoCode(){return S.topology==="bounded"?0:S.topology==="cylinderX"?1:S.topology==="cylinderY"?2:3}
+function buildSettings(){settingsEl.innerHTML="";for(const g of G){const d=document.createElement("details");d.open=g.open;const sm=document.createElement("summary");sm.textContent=g.title;d.append(sm);for(const it of g.items){if(it.type==="select"){const r=document.createElement("div");r.className="select-row";const l=document.createElement("label");l.textContent=it.label;const e=document.createElement("select");e.id=it.key;for(const [v,n] of it.options){const o=document.createElement("option");o.value=v;o.textContent=n;e.append(o)}e.value=S[it.key];e.onchange=()=>{S[it.key]=e.value;if(it.rebuild)markRebuild()};r.append(l,e);d.append(r)}else if(it.type==="check"){const r=document.createElement("div");r.className="check";const l=document.createElement("label");l.textContent=it.label;const e=document.createElement("input");e.type="checkbox";e.checked=!!S[it.key];e.onchange=()=>S[it.key]=e.checked;r.append(l,e);d.append(r)}else{const r=document.createElement("div");r.className="control";const l=document.createElement("label");l.textContent=it.label;const e=document.createElement("input");e.type="range";e.min=it.min;e.max=it.max;e.step=it.step;e.value=S[it.key];const o=document.createElement("output");const upd=()=>o.textContent=F[it.key]?F[it.key](S[it.key]):Number.isInteger(S[it.key])?String(S[it.key]):Number(S[it.key]).toFixed(2);upd();e.oninput=()=>{S[it.key]=+e.value;upd();if(it.key==="renderScale")resize();if(it.rebuild)markRebuild()};r.append(l,e,o);d.append(r)}}if(g.note){const n=document.createElement("div");n.className="note";n.textContent=g.note;d.append(n)}settingsEl.append(d)}}
+function markRebuild(){rebuildBtn.classList.add("pending");rebuildBtn.textContent="Rebuild world *"}
+function createPlate(id,parent=null){
+  const hue=parent
+    ?mod(parent.hue+rand(-20,20),360)
+    :mod(
+      195+id*(360/Math.max(1,S.initialPlates))+rand(-15,15),
+      360
+    );
+
+  const heading=parent
+    ?parent.heading+rand(-.08,.08)
+    :rand(0,Math.PI*2);
+
+  const speedFactor=parent
+    ?parent.speedFactor*rand(.96,1.04)
+    :rand(.82,1.18);
+
+  const base=S.driveSpeed*speedFactor;
+  const dirX=Math.cos(heading);
+  const dirY=Math.sin(heading);
+  const driveX=parent?parent.driveX:dirX*base;
+  const driveY=parent?parent.driveY:dirY*base;
+
+  return{
+    id,
+    uid:nextPlateUid++,
+    hue,
+    rgb:hslToRgb(hue,64,68),
+
+    area:0,
+    targetArea:0,
+    cx:0,
+    cy:0,
+    wcx:0,
+    wcy:0,
+
+    arrowX:NaN,
+    arrowY:NaN,
+
+    heading,
+    dirX,
+    dirY,
+    driveX,
+    driveY,
+    driveRateX:parent?parent.driveRateX:0,
+    driveRateY:parent?parent.driveRateY:0,
+
+    wanderTargetAngle:parent
+      ?parent.wanderTargetAngle+rand(-.05,.05)
+      :heading,
+    wanderSpeedTarget:parent?parent.wanderSpeedTarget:1,
+    wanderTimer:rand(.4,1.2)*S.wanderPeriod,
+    wanderPeriodFactor:parent
+      ?clamp(parent.wanderPeriodFactor*rand(.92,1.08),.65,1.5)
+      :rand(.78,1.25),
+    wanderResponseFactor:parent
+      ?clamp(parent.wanderResponseFactor*rand(.94,1.06),.7,1.4)
+      :rand(.82,1.2),
+
+    manualActive:false,
+    manualHold:0,
+
+    speedFactor,
+    spin:parent?parent.spin:(Math.random()<.5?-1:1),
+    spinFactor:parent
+      ?parent.spinFactor*rand(.94,1.06)
+      :rand(.5,1),
+
+    vx:parent?parent.vx:driveX,
+    vy:parent?parent.vy:driveY,
+    forceX:0,
+    forceY:0,
+    speed:parent?parent.speed:base,
+    motionX:dirX,
+    motionY:dirY,
+
+    lifeLockUntil:0,
+    microRetryUntil:0,
+    fissionHotTime:0,
+    siblingUid:0,
+    siblingMergeUntil:0
+  };
+}
+
+function plateIdByUid(uid){
+  if(!uid)return-1;
+  for(let i=0;i<plates.length;i++){
+    if(plates[i].uid===uid)return i;
+  }
+  return-1;
+}
+
+function plateByUid(uid){
+  const id=plateIdByUid(uid);
+  return id>=0?plates[id]:null;
+}
+
+function lifeLocked(p){
+  return !!p&&simTime<(p.lifeLockUntil||0);
+}
+
+function siblingMergeBlocked(a,b){
+  return !!(
+    a&&b&&(
+      (a.siblingUid===b.uid&&simTime<(a.siblingMergeUntil||0))||
+      (b.siblingUid===a.uid&&simTime<(b.siblingMergeUntil||0))
+    )
+  );
+}
+
+function resetMergeCandidate(){
+  mergeCandidateUidA=0;
+  mergeCandidateUidB=0;
+  mergeCandidateAge=0;
+}
+
+function beginStructuralCooldown(seconds=LIFE.globalCooldown){
+  structuralCooldownUntil=Math.max(
+    structuralCooldownUntil,
+    simTime+seconds
+  );
+  resetMergeCandidate();
+}
+
+function lockAfterSplit(parent,child){
+  const lockUntil=simTime+LIFE.postSplitLock;
+  const siblingUntil=simTime+LIFE.siblingMergeLock;
+
+  parent.lifeLockUntil=Math.max(
+    parent.lifeLockUntil||0,
+    lockUntil
+  );
+  child.lifeLockUntil=Math.max(
+    child.lifeLockUntil||0,
+    lockUntil
+  );
+
+  parent.siblingUid=child.uid;
+  child.siblingUid=parent.uid;
+  parent.siblingMergeUntil=siblingUntil;
+  child.siblingMergeUntil=siblingUntil;
+
+  parent.fissionHotTime=0;
+  child.fissionHotTime=0;
+  parent.microRetryUntil=lockUntil;
+  child.microRetryUntil=lockUntil;
+
+  beginStructuralCooldown();
+}
+
+function chooseWanderTarget(t){const m=Math.hypot(t.driveX,t.driveY),a=m>1e-7?Math.atan2(t.driveY,t.driveX):t.heading,z=(rand(-1,1)+rand(-1,1)+rand(-1,1))/3,max=S.wanderAngle*Math.PI/180,delta=z*max,sv=(rand(-1,1)+rand(-1,1))/2;t.wanderTargetAngle=a+delta;t.wanderSpeedTarget=clamp(1+sv*S.wanderSpeedVariation-.1*(max?Math.abs(delta)/max:0),.45,1.6);t.wanderTimer=Math.max(2,S.wanderPeriod)*t.wanderPeriodFactor*rand(.82,1.22)}
+function updateDrive(dt){for(const t of plates){if(t.manualActive){const sp=Math.hypot(t.driveX,t.driveY);if(sp>1e-7){t.heading=Math.atan2(t.driveY,t.driveX);t.dirX=t.driveX/sp;t.dirY=t.driveY/sp}continue}if(t.manualHold>0){t.manualHold=Math.max(0,t.manualHold-dt);if(t.manualHold>0)continue;chooseWanderTarget(t)}t.wanderTimer-=dt;if(t.wanderTimer<=0)chooseWanderTarget(t);const tm=S.driveSpeed*t.speedFactor*t.wanderSpeedTarget,tx=Math.cos(t.wanderTargetAngle)*tm,ty=Math.sin(t.wanderTargetAngle)*tm,tau=Math.max(.5,S.wanderResponse*t.wanderResponseFactor),w=2/tau,k=w*w,d=2*w;let ax=(tx-t.driveX)*k-t.driveRateX*d,ay=(ty-t.driveY)*k-t.driveRateY*d,am=Math.hypot(ax,ay),lim=Math.max(.02,Math.max(.3,S.driveSpeed)*3/tau);if(am>lim){const q=lim/am;ax*=q;ay*=q}t.driveRateX+=ax*dt;t.driveRateY+=ay*dt;t.driveX+=t.driveRateX*dt;t.driveY+=t.driveRateY*dt;const sp=Math.hypot(t.driveX,t.driveY);if(sp>1e-7){t.heading=Math.atan2(t.driveY,t.driveX);t.dirX=t.driveX/sp;t.dirY=t.driveY/sp}}}
+
+function randomizeDrives(){
+  for(const t of plates){
+    const a=rand(0,Math.PI*2);
+    const speed=S.driveSpeed*t.speedFactor*rand(.8,1.2);
+
+    t.heading=a;
+    t.dirX=Math.cos(a);
+    t.dirY=Math.sin(a);
+
+    t.driveX=t.dirX*speed;
+    t.driveY=t.dirY*speed;
+    t.driveRateX=0;
+    t.driveRateY=0;
+
+    t.wanderTargetAngle=a+rand(-.35,.35);
+    t.wanderSpeedTarget=rand(.85,1.15);
+    t.wanderTimer=rand(.45,1.15)*Math.max(2,S.wanderPeriod);
+    t.wanderPeriodFactor=rand(.78,1.25);
+    t.wanderResponseFactor=rand(.82,1.2);
+
+    t.manualActive=false;
+    t.manualHold=0;
+  }
+
+  uploadPlates();
+  dispatchVelocity();
+}
+function pairSlot(a,b){return a<b?a*maxPlates+b:b*maxPlates+a}
+function updateMotion(dt){for(const t of plates){const gain=t.manualActive?S.driveStrength*3:S.driveStrength;t.forceX=(t.driveX-t.vx)*gain-t.vx*S.drag;t.forceY=(t.driveY-t.vy)*gain-t.vy*S.drag}for(let a=0;a<plates.length;a++)for(let b=a+1;b<plates.length;b++){const slot=a*maxPlates+b,c=contactCount[slot];if(c<=0)continue;const A=plates[a],B=plates[b],w=Math.sqrt(c)*.125,rx=B.vx-A.vx,ry=B.vy-A.vy,cx=rx*S.neighborCoupling*w,cy=ry*S.neighborCoupling*w;A.forceX+=cx;A.forceY+=cy;B.forceX-=cx;B.forceY-=cy;const nx0=contactNX[slot],ny0=contactNY[slot],nl=Math.hypot(nx0,ny0);if(nl>1e-6){const nx=nx0/nl,ny=ny0/nl,tx=-ny,ty=nx,rn=rx*nx+ry*ny;if(rn<0){const f=-rn*S.collisionTransfer*w;A.forceX-=nx*f;A.forceY-=ny*f;B.forceX+=nx*f;B.forceY+=ny*f}const rt=rx*tx+ry*ty,ff=rt*S.boundaryFriction*w;A.forceX+=tx*ff;A.forceY+=ty*ff;B.forceX-=tx*ff;B.forceY-=ty*ff}}for(const t of plates){const ratio=t.targetArea?Math.max(.15,t.area/t.targetArea):1,mass=Math.max(.05,S.inertia*Math.pow(ratio,S.sizeMass));let ax=t.forceX/mass,ay=t.forceY/mass,am=Math.hypot(ax,ay);if(am>S.maxAccel){const q=S.maxAccel/am;ax*=q;ay*=q}t.vx+=ax*dt;t.vy+=ay*dt;let sp=Math.hypot(t.vx,t.vy),lim=Math.max(.3,S.driveSpeed*4+1);if(sp>lim){const q=lim/sp;t.vx*=q;t.vy*=q;sp=lim}t.speed=sp;if(sp>1e-7){t.motionX=t.vx/sp;t.motionY=t.vy/sp}else{t.motionX=t.dirX;t.motionY=t.dirY}}}
+function integrateDynamics(dt){const n=Math.max(1,Math.ceil(dt/.04)),h=dt/n;for(let i=0;i<n;i++){simTime+=h;updateDrive(h);updateMotion(h)}}
+function topologyNeighbor(x,y,dx,dy){let xx=x+dx,yy=y+dy;if(wrapsX())xx=mod(xx,GW);else if(xx<0||xx>=GW)return-1;if(wrapsY())yy=mod(yy,GH);else if(yy<0||yy>=GH)return-1;return yy*GW+xx}
+function rebuildCpuStats(){for(const p of plates){p.area=0;p._sx=0;p._sy=0;p._ssx=0;p._scx=0;p._ssy=0;p._scy=0}contactCount.fill(0);contactNX.fill(0);contactNY.fill(0);for(let i=0;i<N;i++){const id=cpuLabels[i],p=plates[id],x=i%GW,y=(i/GW)|0;p.area++;p._sx+=x;p._sy+=y;if(wrapsX()){p._ssx+=xSin[x];p._scx+=xCos[x]}if(wrapsY()){p._ssy+=ySin[y];p._scy+=yCos[y]}const r=topologyNeighbor(x,y,1,0),d=topologyNeighbor(x,y,0,1);if(r>=0&&cpuLabels[r]!==id)addContact(id,cpuLabels[r],1,0);if(d>=0&&cpuLabels[d]!==id)addContact(id,cpuLabels[d],0,1)}for(const p of plates){if(!p.area)continue;if(wrapsX()){let a=Math.atan2(p._ssx,p._scx);if(a<0)a+=Math.PI*2;p.cx=a/(Math.PI*2)*GW-.5}else p.cx=p._sx/p.area;if(wrapsY()){let a=Math.atan2(p._ssy,p._scy);if(a<0)a+=Math.PI*2;p.cy=a/(Math.PI*2)*GH-.5}else p.cy=p._sy/p.area;p.wcx=(p.cx+.5)*cellWX;p.wcy=(p.cy+.5)*cellWY}areasCPU.fill(0);for(const p of plates)areasCPU[p.id]=p.area}
+function addContact(a,b,nx,ny){if(a===b)return;let lo=a,hi=b,sx=nx,sy=ny;if(lo>hi){lo=b;hi=a;sx=-sx;sy=-sy}const q=lo*maxPlates+hi;contactCount[q]++;contactNX[q]+=sx;contactNY[q]+=sy}
+function dominantNeighbor(id,ratio=true){const src=plates[id];let best=-1,score=-1;for(let j=0;j<plates.length;j++){if(j===id)continue;const c=contactCount[pairSlot(id,j)];if(c<=0)continue;if(ratio&&plates[j].area<src.area*S.absorberRatio)continue;const v=c*(1+.12*Math.log2(2+plates[j].area/Math.max(1,src.area)));if(v>score){score=v;best=j}}return best}
+function compact(){
+  const used=new Uint8Array(plates.length);
+
+  for(let i=0;i<N;i++){
+    const id=cpuLabels[i];
+    if(id<used.length)used[id]=1;
+  }
+
+  const remap=new Int32Array(plates.length);
+  remap.fill(-1);
+
+  const next=[];
+
+  for(let i=0;i<plates.length;i++){
+    if(!used[i])continue;
+    remap[i]=next.length;
+    plates[i].id=next.length;
+    next.push(plates[i]);
+  }
+
+  for(let i=0;i<N;i++){
+    cpuLabels[i]=remap[cpuLabels[i]];
+  }
+
+  if(dragPlate&&!next.includes(dragPlate)){
+    dragPlate.manualActive=false;
+    dragPlate=null;
+    drag=false;
+    overlay.classList.remove("drag");
+  }
+
+  plates=next;
+  return remap;
+}
+function splitDisconnected(){if(!S.autoSplit)return false;compMap.fill(-1);const compPlate=[],compSize=[],compNeighbors=[],largest=new Int32Array(plates.length);largest.fill(-1);let cc=0;for(let start=0;start<N;start++){if(compMap[start]>=0)continue;const pid=cpuLabels[start],neigh=new Map();let h=0,t=0;bfsQueue[t++]=start;compMap[start]=cc;let size=0;while(h<t){const i=bfsQueue[h++],x=i%GW,y=(i/GW)|0;size++;for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const j=topologyNeighbor(x,y,dx,dy);if(j<0)continue;const q=cpuLabels[j];if(q===pid){if(compMap[j]<0){compMap[j]=cc;bfsQueue[t++]=j}}else neigh.set(q,(neigh.get(q)||0)+1)}}compPlate.push(pid);compSize.push(size);compNeighbors.push(neigh);const old=largest[pid];if(old<0||size>compSize[old])largest[pid]=cc;cc++}const action=new Int32Array(cc);action.fill(-1);let changed=false;const minLive=Math.max(2,Math.floor(N*S.minLiveFraction)),splitMin=Math.max(minLive*2,Math.floor(N*S.splitMinFraction));for(let c=0;c<cc;c++){const pid=compPlate[c];if(c===largest[pid])continue;if(plates[pid].area>=splitMin&&compSize[c]>=minLive&&plates.length<maxPlates){const np=createPlate(plates.length,plates[pid]);np.targetArea=compSize[c];plates.push(np);action[c]=np.id;splitEvents++;changed=true}else{let best=-1,bv=-1;for(const [n,v] of compNeighbors[c])if(v>bv){best=n;bv=v}if(best>=0){action[c]=best;changed=true}}}if(changed){for(let i=0;i<N;i++){const a=action[compMap[i]];if(a>=0)cpuLabels[i]=a}compact();rebuildCpuStats();for(const p of plates)if(!p.targetArea)p.targetArea=p.area}return changed}
+function cleanupMicro(){const minA=Math.max(2,Math.floor(N*S.minLiveFraction));let changed=false;for(let k=0;k<12;k++){const p=plates.filter(x=>x.area<minA).sort((a,b)=>a.area-b.area)[0];if(!p)break;const t=dominantNeighbor(p.id,true);if(t<0)break;for(let i=0;i<N;i++)if(cpuLabels[i]===p.id)cpuLabels[i]=t;microEvents++;changed=true;compact();rebuildCpuStats()}return changed}
+function mergePair(a,b){if(a===b||!plates[a]||!plates[b])return false;let keep=a,lose=b;if(plates[lose].area>plates[keep].area)[keep,lose]=[lose,keep];const A=plates[keep],B=plates[lose],ma=Math.max(1,A.area),mb=Math.max(1,B.area),m=ma+mb;A.vx=(A.vx*ma+B.vx*mb)/m;A.vy=(A.vy*ma+B.vy*mb)/m;A.driveX=(A.driveX*ma+B.driveX*mb)/m;A.driveY=(A.driveY*ma+B.driveY*mb)/m;for(let i=0;i<N;i++)if(cpuLabels[i]===lose)cpuLabels[i]=keep;mergeEvents++;compact();rebuildCpuStats();A.targetArea=A.area;return true}
+function bestMerge(force=false,strict=false){
+  let best=null;
+  const maxA=N*S.mergeMaxFraction;
+  const speedLimit=S.mergeSpeed*(strict?.86:1);
+  const contactMin=S.mergeContact*(strict?1.12:1);
+
+  for(let a=0;a<plates.length;a++){
+    for(let b=a+1;b<plates.length;b++){
+      const A=plates[a];
+      const B=plates[b];
+
+      if(!A||!B||A.area<=0||B.area<=0)continue;
+
+      if(!force){
+        if(
+          A.area>maxA||
+          B.area>maxA||
+          lifeLocked(A)||
+          lifeLocked(B)||
+          siblingMergeBlocked(A,B)
+        )continue;
+      }
+
+      const c=Math.max(
+        0,
+        contactCount[a*maxPlates+b]
+      );
+
+      if(c<=0)continue;
+
+      const rs=Math.hypot(
+        B.vx-A.vx,
+        B.vy-A.vy
+      );
+
+      const cr=
+        c/
+        Math.max(
+          1,
+          4*Math.sqrt(
+            Math.max(
+              1,
+              Math.min(A.area,B.area)
+            )
+          )
+        );
+
+      if(
+        !force&&(
+          rs>speedLimit||
+          cr<contactMin
+        )
+      )continue;
+
+      const score=
+        cr/
+        Math.max(.05,rs+.05);
+
+      if(!best||score>best.score){
+        best={
+          a,
+          b,
+          aUid:A.uid,
+          bUid:B.uid,
+          score,
+          rs,
+          cr
+        };
+      }
+    }
+  }
+
+  return best;
+}
+function tryMerge(force=false){if(plates.length<2)return false;const c=bestMerge(force);if(!c)return false;if(!force){const p=1-Math.exp(-(S.mergeRate/60)*S.validationInterval*Math.max(.25,c.cr/Math.max(.02,S.mergeContact))*clamp(1-c.rs/Math.max(.02,S.mergeSpeed),.05,1));if(Math.random()>p)return false}return mergePair(c.a,c.b)}
+function plateStress(id){let s=0,w=0;for(let j=0;j<plates.length;j++){if(j===id)continue;const c=contactCount[pairSlot(id,j)];if(c<=0)continue;const q=Math.sqrt(c),r=Math.hypot(plates[j].vx-plates[id].vx,plates[j].vy-plates[id].vy);s+=r*q;w+=q}return w?s/w:0}
+function fission(id,force=false){const p=plates[id],minLive=Math.max(2,Math.floor(N*S.minLiveFraction)),minParent=Math.max(minLive*2,Math.floor(N*S.splitMinFraction));if(!p||p.area<minParent||plates.length>=maxPlates)return false;const angle=Math.atan2(p.vy,p.vx)+Math.PI*.5+rand(-.7,.7),nx=Math.cos(angle),ny=Math.sin(angle),side=[];let count=0;for(let i=0;i<N;i++)if(cpuLabels[i]===id){const x=i%GW,y=(i/GW)|0,dx=shortest(x-p.cx,GW,wrapsX()),dy=shortest(y-p.cy,GH,wrapsY());if(dx*nx+dy*ny>=0){side.push(i);count++}}if(count<minLive||p.area-count<minLive)return false;const np=createPlate(plates.length,p);plates.push(np);for(const i of side)cpuLabels[i]=np.id;rebuildCpuStats();const m1=Math.max(1,p.area),m2=Math.max(1,np.area),m=m1+m2;p.vx-=nx*S.fissionImpulse*m2/m;p.vy-=ny*S.fissionImpulse*m2/m;np.vx+=nx*S.fissionImpulse*m1/m;np.vy+=ny*S.fissionImpulse*m1/m;p.targetArea=p.area;np.targetArea=np.area;splitEvents++;return true}
+function tryFission(force=false){const candidates=plates.filter(p=>p.area>=Math.max(N*S.splitMinFraction,2*N*S.minLiveFraction)).sort((a,b)=>b.area-a.area);if(!candidates.length)return false;if(force){for(const p of candidates)if(fission(p.id,true))return true;return false}for(const p of candidates){const st=plateStress(p.id);if(st<S.fissionStress)continue;const prob=1-Math.exp(-(S.fissionRate/60)*S.validationInterval*(1+Math.max(0,st-S.fissionStress)));if(Math.random()<prob)return fission(p.id)}return false}
+const yieldScan=()=>globalThis.scheduler&&typeof scheduler.yield==="function"?scheduler.yield():new Promise(r=>setTimeout(r,0));
+
+function clearScanScratch(){
+  scanAreas.fill(0);
+  scanSX.fill(0);
+  scanSY.fill(0);
+  scanSSX.fill(0);
+  scanSCX.fill(0);
+  scanSSY.fill(0);
+  scanSCY.fill(0);
+  scanContactCount.fill(0);
+  scanContactNX.fill(0);
+  scanContactNY.fill(0);
+}
+
+function scanAddContact(a,b,nx,ny){
+  if(a===b)return;
+  let lo=a,hi=b,sx=nx,sy=ny;
+  if(lo>hi){
+    lo=b;
+    hi=a;
+    sx=-sx;
+    sy=-sy;
+  }
+  const q=lo*maxPlates+hi;
+  scanContactCount[q]++;
+  scanContactNX[q]+=sx;
+  scanContactNY[q]+=sy;
+}
+
+function commitScanStats(){
+  contactCount.set(scanContactCount);
+  contactNX.set(scanContactNX);
+  contactNY.set(scanContactNY);
+  areasCPU.fill(0);
+  const wx=wrapsX(),wy=wrapsY();
+
+  for(const p of plates){
+    const id=p.id,area=scanAreas[id];
+    p.area=area;
+    p._sx=scanSX[id];
+    p._sy=scanSY[id];
+    p._ssx=scanSSX[id];
+    p._scx=scanSCX[id];
+    p._ssy=scanSSY[id];
+    p._scy=scanSCY[id];
+    areasCPU[id]=area;
+    if(!area)continue;
+
+    if(wx){
+      let a=Math.atan2(scanSSX[id],scanSCX[id]);
+      if(a<0)a+=Math.PI*2;
+      p.cx=a/(Math.PI*2)*GW-.5;
+    }else{
+      p.cx=scanSX[id]/area;
+    }
+
+    if(wy){
+      let a=Math.atan2(scanSSY[id],scanSCY[id]);
+      if(a<0)a+=Math.PI*2;
+      p.cy=a/(Math.PI*2)*GH-.5;
+    }else{
+      p.cy=scanSY[id]/area;
+    }
+
+    p.wcx=(p.cx+.5)*cellWX;
+    p.wcy=(p.cy+.5)*cellWY;
+  }
+}
+
+async function scanStatsFast(){
+  clearScanScratch();
+  lifecyclePhase="stats";
+  lifecycleProgress=0;
+
+  const wx=wrapsX(),wy=wrapsY();
+  const chunk=180000;
+
+  for(let base=0;base<N;base+=chunk){
+    const end=Math.min(N,base+chunk);
+
+    for(let i=base;i<end;i++){
+      const id=cpuLabels[i];
+      const y=(i/GW)|0;
+      const x=i-y*GW;
+
+      scanAreas[id]++;
+      scanSX[id]+=x;
+      scanSY[id]+=y;
+
+      if(wx){
+        scanSSX[id]+=xSin[x];
+        scanSCX[id]+=xCos[x];
+      }
+
+      if(wy){
+        scanSSY[id]+=ySin[y];
+        scanSCY[id]+=yCos[y];
+      }
+
+      const r=
+        x<GW-1
+          ? i+1
+          : wx
+            ? i-GW+1
+            : -1;
+
+      const d=
+        i<N-GW
+          ? i+GW
+          : wy
+            ? i-N+GW
+            : -1;
+
+      if(r>=0){
+        const q=cpuLabels[r];
+        if(q!==id)scanAddContact(id,q,1,0);
+      }
+
+      if(d>=0){
+        const q=cpuLabels[d];
+        if(q!==id)scanAddContact(id,q,0,1);
+      }
+    }
+
+    lifecycleProgress=end/N;
+    await yieldScan();
+  }
+
+  commitScanStats();
+  lifecycleProgress=1;
+}
+
+async function scanComponentsFast(){
+  clearScanScratch();
+  compMap.fill(-1);
+  lifecyclePhase="connectivity";
+  lifecycleProgress=0;
+
+  const wx=wrapsX(),wy=wrapsY();
+  const compPlate=[];
+  const compSize=[];
+  const compNeighbor=[];
+  const largest=new Int32Array(plates.length);
+  largest.fill(-1);
+
+  let cc=0;
+  let processed=0;
+  let sinceYield=0;
+  const yieldEvery=120000;
+
+  for(let start=0;start<N;start++){
+    if(compMap[start]>=0)continue;
+
+    const pid=cpuLabels[start];
+    let head=0,tail=0,size=0,touchedCount=0;
+
+    bfsQueue[tail++]=start;
+    compMap[start]=cc;
+
+    while(head<tail){
+      const i=bfsQueue[head++];
+      const y=(i/GW)|0;
+      const x=i-y*GW;
+
+      size++;
+      processed++;
+      sinceYield++;
+
+      scanAreas[pid]++;
+      scanSX[pid]+=x;
+      scanSY[pid]+=y;
+
+      if(wx){
+        scanSSX[pid]+=xSin[x];
+        scanSCX[pid]+=xCos[x];
+      }
+
+      if(wy){
+        scanSSY[pid]+=ySin[y];
+        scanSCY[pid]+=yCos[y];
+      }
+
+      const l=
+        x>0
+          ? i-1
+          : wx
+            ? i+GW-1
+            : -1;
+
+      const r=
+        x<GW-1
+          ? i+1
+          : wx
+            ? i-GW+1
+            : -1;
+
+      const u=
+        i>=GW
+          ? i-GW
+          : wy
+            ? i+N-GW
+            : -1;
+
+      const d=
+        i<N-GW
+          ? i+GW
+          : wy
+            ? i-N+GW
+            : -1;
+
+      if(r>=0){
+        const q=cpuLabels[r];
+        if(q!==pid)scanAddContact(pid,q,1,0);
+      }
+
+      if(d>=0){
+        const q=cpuLabels[d];
+        if(q!==pid)scanAddContact(pid,q,0,1);
+      }
+
+      const n0=l,n1=r,n2=u,n3=d;
+
+      for(let k=0;k<4;k++){
+        const j=
+          k===0?n0:
+          k===1?n1:
+          k===2?n2:n3;
+
+        if(j<0)continue;
+
+        const q=cpuLabels[j];
+
+        if(q===pid){
+          if(compMap[j]<0){
+            compMap[j]=cc;
+            bfsQueue[tail++]=j;
+          }
+        }else{
+          if(neighborScratch[q]===0){
+            neighborTouched[touchedCount++]=q;
+          }
+          neighborScratch[q]++;
+        }
+      }
+
+      if(sinceYield>=yieldEvery){
+        lifecycleProgress=processed/N;
+        sinceYield=0;
+        await yieldScan();
+      }
+    }
+
+    let best=-1,bestCount=-1;
+
+    for(let k=0;k<touchedCount;k++){
+      const q=neighborTouched[k];
+      const count=neighborScratch[q];
+      neighborScratch[q]=0;
+
+      if(count>bestCount){
+        bestCount=count;
+        best=q;
+      }
+    }
+
+    compPlate.push(pid);
+    compSize.push(size);
+    compNeighbor.push(best);
+
+    const old=largest[pid];
+
+    if(
+      old<0 ||
+      size>compSize[old]
+    ){
+      largest[pid]=cc;
+    }
+
+    cc++;
+  }
+
+  commitScanStats();
+  lifecycleProgress=1;
+
+  return{
+    count:cc,
+    plate:compPlate,
+    size:compSize,
+    neighbor:compNeighbor,
+    largest
+  };
+}
+
+async function relabelByComponent(meta){
+  const action=new Int32Array(meta.count);
+  action.fill(-1);
+
+  const minLive=Math.max(2,Math.floor(N*S.minLiveFraction));
+  const splitMin=Math.max(
+    minLive*2,
+    Math.floor(N*S.splitMinFraction)
+  );
+
+  let changed=false;
+
+  for(let c=0;c<meta.count;c++){
+    const pid=meta.plate[c];
+
+    if(c===meta.largest[pid])continue;
+
+    if(
+      plates[pid] &&
+      plates[pid].area>=splitMin &&
+      meta.size[c]>=minLive &&
+      plates.length<maxPlates
+    ){
+      const np=createPlate(
+        plates.length,
+        plates[pid]
+      );
+
+      np.targetArea=meta.size[c];
+      plates.push(np);
+      np.lifeLockUntil=simTime+LIFE.postSplitLock;
+      np.microRetryUntil=np.lifeLockUntil;
+      plates[pid].lifeLockUntil=Math.max(
+        plates[pid].lifeLockUntil||0,
+        simTime+LIFE.postSplitLock*.5
+      );
+      action[c]=np.id;
+      splitEvents++;
+      changed=true;
+    }else{
+      const best=meta.neighbor[c];
+
+      if(best>=0){
+        action[c]=best;
+        changed=true;
+      }
+    }
+  }
+
+  if(!changed)return false;
+
+  lifecycleStructural=true;
+  lifecyclePhase="repair";
+  const chunk=250000;
+
+  for(let base=0;base<N;base+=chunk){
+    const end=Math.min(N,base+chunk);
+
+    for(let i=base;i<end;i++){
+      const a=action[compMap[i]];
+      if(a>=0)cpuLabels[i]=a;
+    }
+
+    lifecycleProgress=end/N;
+    await yieldScan();
+  }
+
+  compact();
+  await scanStatsFast();
+
+  for(const p of plates){
+    if(!p.targetArea)p.targetArea=p.area;
+  }
+
+  beginStructuralCooldown();
+
+  return true;
+}
+
+async function cleanupMicroFast(){
+  const minA=Math.max(2,Math.floor(N*S.minLiveFraction));
+  const micros=plates
+    .filter(p=>p.area>0&&p.area<minA)
+    .sort((a,b)=>a.area-b.area);
+
+  if(!micros.length)return false;
+
+  const remap=new Int32Array(plates.length);
+
+  for(let i=0;i<remap.length;i++)remap[i]=i;
+
+  let changed=false;
+
+  for(const p of micros){
+    const target=dominantNeighbor(p.id,true);
+
+    if(target>=0){
+      remap[p.id]=target;
+      microEvents++;
+      changed=true;
+    }
+  }
+
+  if(!changed)return false;
+
+  lifecycleStructural=true;
+
+  for(let i=0;i<remap.length;i++){
+    let r=i;
+    let guard=0;
+
+    while(
+      remap[r]!==r &&
+      guard++<remap.length
+    ){
+      r=remap[r];
+    }
+
+    remap[i]=r;
+  }
+
+  lifecyclePhase="microplates";
+  const chunk=250000;
+
+  for(let base=0;base<N;base+=chunk){
+    const end=Math.min(N,base+chunk);
+
+    for(let i=base;i<end;i++){
+      cpuLabels[i]=remap[cpuLabels[i]];
+    }
+
+    lifecycleProgress=end/N;
+    await yieldScan();
+  }
+
+  compact();
+  await scanStatsFast();
+
+  for(const p of plates){
+    if(!p.targetArea)p.targetArea=p.area;
+  }
+
+  return true;
+}
+
+async function absorbMicroFast(sourceId,targetId){
+  if(
+    sourceId<0||
+    targetId<0||
+    sourceId===targetId||
+    !plates[sourceId]||
+    !plates[targetId]
+  )return false;
+
+  const source=plates[sourceId];
+  const target=plates[targetId];
+
+  lifecycleStructural=true;
+  lifecyclePhase="microplate absorption";
+
+  const ma=Math.max(1,target.area);
+  const mb=Math.max(1,source.area);
+  const m=ma+mb;
+
+  target.vx=(target.vx*ma+source.vx*mb)/m;
+  target.vy=(target.vy*ma+source.vy*mb)/m;
+  target.driveX=(target.driveX*ma+source.driveX*mb)/m;
+  target.driveY=(target.driveY*ma+source.driveY*mb)/m;
+  target.driveRateX=
+    (target.driveRateX*ma+source.driveRateX*mb)/m;
+  target.driveRateY=
+    (target.driveRateY*ma+source.driveRateY*mb)/m;
+
+  if(dragPlate===source){
+    source.manualActive=false;
+    dragPlate=target;
+    target.manualActive=drag;
+  }
+
+  const chunk=250000;
+
+  for(let base=0;base<N;base+=chunk){
+    const end=Math.min(N,base+chunk);
+
+    for(let i=base;i<end;i++){
+      if(cpuLabels[i]===sourceId){
+        cpuLabels[i]=targetId;
+      }
+    }
+
+    lifecycleProgress=end/N;
+    await yieldScan();
+  }
+
+  microEvents++;
+  compact();
+  await scanStatsFast();
+
+  target.targetArea=target.area;
+  target.lifeLockUntil=Math.max(
+    target.lifeLockUntil||0,
+    simTime+LIFE.postMergeLock*.6
+  );
+  target.microRetryUntil=target.lifeLockUntil;
+  target.fissionHotTime=0;
+
+  beginStructuralCooldown();
+
+  return true;
+}
+
+
+async function mergePairFast(a,b){
+  if(
+    a===b||
+    !plates[a]||
+    !plates[b]
+  )return false;
+
+  let keep=a;
+  let lose=b;
+
+  if(plates[lose].area>plates[keep].area){
+    [keep,lose]=[lose,keep];
+  }
+
+  lifecycleStructural=true;
+
+  const A=plates[keep];
+  const B=plates[lose];
+  const ma=Math.max(1,A.area);
+  const mb=Math.max(1,B.area);
+  const m=ma+mb;
+
+  A.vx=(A.vx*ma+B.vx*mb)/m;
+  A.vy=(A.vy*ma+B.vy*mb)/m;
+  A.driveX=(A.driveX*ma+B.driveX*mb)/m;
+  A.driveY=(A.driveY*ma+B.driveY*mb)/m;
+  A.driveRateX=(A.driveRateX*ma+B.driveRateX*mb)/m;
+  A.driveRateY=(A.driveRateY*ma+B.driveRateY*mb)/m;
+
+  const driveSpeed=Math.hypot(A.driveX,A.driveY);
+
+  if(driveSpeed>1e-7){
+    A.heading=Math.atan2(A.driveY,A.driveX);
+    A.dirX=A.driveX/driveSpeed;
+    A.dirY=A.driveY/driveSpeed;
+  }
+
+  const actualSpeed=Math.hypot(A.vx,A.vy);
+  A.speed=actualSpeed;
+
+  if(actualSpeed>1e-7){
+    A.motionX=A.vx/actualSpeed;
+    A.motionY=A.vy/actualSpeed;
+  }
+
+  if(dragPlate===B){
+    B.manualActive=false;
+    dragPlate=A;
+    A.manualActive=drag;
+  }
+
+  lifecyclePhase="merge";
+  const chunk=250000;
+
+  for(let base=0;base<N;base+=chunk){
+    const end=Math.min(N,base+chunk);
+
+    for(let i=base;i<end;i++){
+      if(cpuLabels[i]===lose){
+        cpuLabels[i]=keep;
+      }
+    }
+
+    lifecycleProgress=end/N;
+    await yieldScan();
+  }
+
+  mergeEvents++;
+  compact();
+  await scanStatsFast();
+
+  A.targetArea=A.area;
+  A.lifeLockUntil=Math.max(
+    A.lifeLockUntil||0,
+    simTime+LIFE.postMergeLock
+  );
+  A.microRetryUntil=A.lifeLockUntil;
+  A.fissionHotTime=0;
+  A.siblingUid=0;
+  A.siblingMergeUntil=0;
+
+  beginStructuralCooldown();
+
+  return true;
+}
+async function tryMergeFast(force=false){
+  if(plates.length<2)return false;
+
+  const c=bestMerge(force);
+  if(!c)return false;
+
+  if(!force){
+    const p=
+      1-
+      Math.exp(
+        -(S.mergeRate/60)*
+        S.validationInterval*
+        Math.max(
+          .25,
+          c.cr/Math.max(.02,S.mergeContact)
+        )*
+        clamp(
+          1-c.rs/Math.max(.02,S.mergeSpeed),
+          .05,
+          1
+        )
+      );
+
+    if(Math.random()>p)return false;
+  }
+
+  return mergePairFast(c.a,c.b);
+}
+
+async function repairFissionConnectivity(a,b){
+  const ids=[a,b];
+  const chunk=220000;
+
+  for(let iteration=0;iteration<3;iteration++){
+    compMap.fill(-1);
+
+    const compLabel=[];
+    const compSize=[];
+    const largest=new Int32Array(2);
+    largest.fill(-1);
+
+    let cc=0;
+    let processed=0;
+
+    for(let start=0;start<N;start++){
+      const label=cpuLabels[start];
+
+      if(
+        (label!==a&&label!==b)||
+        compMap[start]>=0
+      )continue;
+
+      let head=0;
+      let tail=0;
+      let size=0;
+
+      bfsQueue[tail++]=start;
+      compMap[start]=cc;
+
+      while(head<tail){
+        const i=bfsQueue[head++];
+        const y=(i/GW)|0;
+        const x=i-y*GW;
+
+        size++;
+        processed++;
+
+        const l=topologyNeighbor(x,y,-1,0);
+        const r=topologyNeighbor(x,y,1,0);
+        const u=topologyNeighbor(x,y,0,-1);
+        const d=topologyNeighbor(x,y,0,1);
+
+        if(
+          l>=0&&
+          cpuLabels[l]===label&&
+          compMap[l]<0
+        ){
+          compMap[l]=cc;
+          bfsQueue[tail++]=l;
+        }
+
+        if(
+          r>=0&&
+          cpuLabels[r]===label&&
+          compMap[r]<0
+        ){
+          compMap[r]=cc;
+          bfsQueue[tail++]=r;
+        }
+
+        if(
+          u>=0&&
+          cpuLabels[u]===label&&
+          compMap[u]<0
+        ){
+          compMap[u]=cc;
+          bfsQueue[tail++]=u;
+        }
+
+        if(
+          d>=0&&
+          cpuLabels[d]===label&&
+          compMap[d]<0
+        ){
+          compMap[d]=cc;
+          bfsQueue[tail++]=d;
+        }
+
+        if(processed%chunk===0){
+          lifecyclePhase="fission connectivity";
+          lifecycleProgress=
+            Math.min(.98,processed/Math.max(1,N));
+          await yieldScan();
+        }
+      }
+
+      compLabel.push(label);
+      compSize.push(size);
+
+      const slot=label===a?0:1;
+      const old=largest[slot];
+
+      if(
+        old<0||
+        size>compSize[old]
+      ){
+        largest[slot]=cc;
+      }
+
+      cc++;
+    }
+
+    let componentsA=0;
+    let componentsB=0;
+
+    for(let c=0;c<cc;c++){
+      if(compLabel[c]===a)componentsA++;
+      else if(compLabel[c]===b)componentsB++;
+    }
+
+    if(
+      componentsA<=1&&
+      componentsB<=1
+    ){
+      return true;
+    }
+
+    const keepA=largest[0];
+    const keepB=largest[1];
+
+    if(keepA<0||keepB<0){
+      return false;
+    }
+
+    let changed=false;
+
+    for(let base=0;base<N;base+=chunk){
+      const end=Math.min(N,base+chunk);
+
+      for(let i=base;i<end;i++){
+        const label=cpuLabels[i];
+        const c=compMap[i];
+
+        if(
+          label===a&&
+          c>=0&&
+          c!==keepA
+        ){
+          cpuLabels[i]=b;
+          changed=true;
+        }else if(
+          label===b&&
+          c>=0&&
+          c!==keepB
+        ){
+          cpuLabels[i]=a;
+          changed=true;
+        }
+      }
+
+      lifecyclePhase="fission connectivity repair";
+      lifecycleProgress=end/N;
+      await yieldScan();
+    }
+
+    if(!changed){
+      break;
+    }
+  }
+
+  // Final validation of the two labels. If the proposed split remains
+  // topologically ambiguous, reject it rather than leave broken plates.
+  compMap.fill(-1);
+  const seen=[0,0];
+
+  for(let start=0;start<N;start++){
+    const label=cpuLabels[start];
+
+    if(
+      (label!==a&&label!==b)||
+      compMap[start]>=0
+    )continue;
+
+    const slot=label===a?0:1;
+    seen[slot]++;
+
+    if(seen[slot]>1){
+      return false;
+    }
+
+    let head=0;
+    let tail=0;
+
+    bfsQueue[tail++]=start;
+    compMap[start]=slot;
+
+    while(head<tail){
+      const i=bfsQueue[head++];
+      const y=(i/GW)|0;
+      const x=i-y*GW;
+
+      const ns=[
+        topologyNeighbor(x,y,-1,0),
+        topologyNeighbor(x,y,1,0),
+        topologyNeighbor(x,y,0,-1),
+        topologyNeighbor(x,y,0,1)
+      ];
+
+      for(const j of ns){
+        if(
+          j>=0&&
+          cpuLabels[j]===label&&
+          compMap[j]<0
+        ){
+          compMap[j]=slot;
+          bfsQueue[tail++]=j;
+        }
+      }
+    }
+  }
+
+  return seen[0]===1&&seen[1]===1;
+}
+
+
+async function fissionFast(id,force=false){
+  const p=plates[id];
+  const minLive=Math.max(
+    2,
+    Math.floor(N*S.minLiveFraction)
+  );
+  const minParent=Math.max(
+    minLive*2,
+    Math.floor(N*S.splitMinFraction)
+  );
+
+  if(
+    !p||
+    p.area<minParent||
+    plates.length>=maxPlates||
+    (!force&&lifeLocked(p))
+  )return false;
+
+  const angle=
+    Math.atan2(p.vy,p.vx)+
+    Math.PI*.5+
+    rand(-.55,.55);
+
+  const nx=Math.cos(angle);
+  const ny=Math.sin(angle);
+
+  let sideCount=0;
+  const chunk=250000;
+
+  lifecyclePhase="fission measure";
+
+  for(let base=0;base<N;base+=chunk){
+    const end=Math.min(N,base+chunk);
+
+    for(let i=base;i<end;i++){
+      if(cpuLabels[i]!==id)continue;
+
+      const y=(i/GW)|0;
+      const x=i-y*GW;
+      const dx=shortest(
+        x-p.cx,
+        GW,
+        wrapsX()
+      );
+      const dy=shortest(
+        y-p.cy,
+        GH,
+        wrapsY()
+      );
+
+      if(dx*nx+dy*ny>=0){
+        sideCount++;
+      }
+    }
+
+    lifecycleProgress=end/N;
+    await yieldScan();
+  }
+
+  const stableMin=Math.max(
+    minLive,
+    Math.ceil(minParent*.18)
+  );
+
+  if(
+    sideCount<stableMin||
+    p.area-sideCount<stableMin
+  )return false;
+
+  lifecycleStructural=true;
+
+  const originalLabels=new Uint32Array(N);
+  originalLabels.set(cpuLabels);
+
+  const np=createPlate(
+    plates.length,
+    p
+  );
+
+  plates.push(np);
+  lifecyclePhase="fission apply";
+
+  for(let base=0;base<N;base+=chunk){
+    const end=Math.min(N,base+chunk);
+
+    for(let i=base;i<end;i++){
+      if(cpuLabels[i]!==id)continue;
+
+      const y=(i/GW)|0;
+      const x=i-y*GW;
+      const dx=shortest(
+        x-p.cx,
+        GW,
+        wrapsX()
+      );
+      const dy=shortest(
+        y-p.cy,
+        GH,
+        wrapsY()
+      );
+
+      if(dx*nx+dy*ny>=0){
+        cpuLabels[i]=np.id;
+      }
+    }
+
+    lifecycleProgress=end/N;
+    await yieldScan();
+  }
+
+  const connected=await repairFissionConnectivity(
+    id,
+    np.id
+  );
+
+  if(!connected){
+    cpuLabels.set(originalLabels);
+    plates.pop();
+    lifecycleStructural=false;
+    lifecycleNeedsGpuResync=true;
+    await scanStatsFast();
+    p.fissionHotTime=0;
+    p.lifeLockUntil=Math.max(
+      p.lifeLockUntil||0,
+      simTime+LIFE.postSplitLock*.35
+    );
+    beginStructuralCooldown(
+      LIFE.globalCooldown*.75
+    );
+    return false;
+  }
+
+  await scanStatsFast();
+
+  const m1=Math.max(1,p.area);
+  const m2=Math.max(1,np.area);
+  const m=m1+m2;
+
+  p.vx-=nx*S.fissionImpulse*m2/m;
+  p.vy-=ny*S.fissionImpulse*m2/m;
+  np.vx+=nx*S.fissionImpulse*m1/m;
+  np.vy+=ny*S.fissionImpulse*m1/m;
+
+  p.speed=Math.hypot(p.vx,p.vy);
+  np.speed=Math.hypot(np.vx,np.vy);
+
+  if(p.speed>1e-7){
+    p.motionX=p.vx/p.speed;
+    p.motionY=p.vy/p.speed;
+  }
+
+  if(np.speed>1e-7){
+    np.motionX=np.vx/np.speed;
+    np.motionY=np.vy/np.speed;
+  }
+
+  p.targetArea=p.area;
+  np.targetArea=np.area;
+
+  lockAfterSplit(p,np);
+
+  p.arrowX=p.wcx;
+  p.arrowY=p.wcy;
+  np.arrowX=np.wcx;
+  np.arrowY=np.wcy;
+
+  splitEvents++;
+
+  return true;
+}
+async function tryFissionFast(force=false){
+  const minArea=Math.max(
+    N*S.splitMinFraction,
+    2*N*S.minLiveFraction
+  );
+
+  const candidates=plates
+    .filter(p=>p.area>=minArea)
+    .sort((a,b)=>b.area-a.area);
+
+  if(!candidates.length)return false;
+
+  if(force){
+    for(const p of candidates){
+      if(await fissionFast(p.id,true))return true;
+    }
+    return false;
+  }
+
+  for(const p of candidates){
+    const st=plateStress(p.id);
+
+    if(st<S.fissionStress)continue;
+
+    const prob=
+      1-
+      Math.exp(
+        -(S.fissionRate/60)*
+        S.validationInterval*
+        (
+          1+
+          Math.max(
+            0,
+            st-S.fissionStress
+          )
+        )
+      );
+
+    if(Math.random()<prob){
+      return fissionFast(p.id,false);
+    }
+  }
+
+  return false;
+}
+
+async function processLifecycle(){
+  lifecycleProgress=0;
+  const action=lifecycleAction||{type:"validate"};
+
+  if(action.type==="validate"){
+    if(S.autoSplit){
+      const meta=await scanComponentsFast();
+      await relabelByComponent(meta);
+    }
+  }else if(action.type==="micro"){
+    const sourceId=plateIdByUid(action.uid);
+    const targetId=plateIdByUid(action.targetUid);
+
+    if(sourceId>=0&&targetId>=0){
+      await absorbMicroFast(
+        sourceId,
+        targetId
+      );
+    }
+  }else if(action.type==="merge"){
+    const a=plateIdByUid(action.aUid);
+    const b=plateIdByUid(action.bUid);
+
+    if(a>=0&&b>=0){
+      await mergePairFast(a,b);
+    }
+  }else if(action.type==="fission"){
+    const id=plateIdByUid(action.uid);
+
+    if(id>=0){
+      await fissionFast(id,true);
+    }
+  }else if(action.type==="forceMerge"){
+    const c=bestMerge(true);
+
+    if(c){
+      await mergePairFast(c.a,c.b);
+    }
+  }else if(action.type==="forceFission"){
+    await tryFissionFast(true);
+  }
+
+  if(lifecycleStructural){
+    for(const p of plates){
+      if(!p.targetArea){
+        p.targetArea=p.area;
+      }
+    }
+  }
+
+  forceSplitRequest=false;
+  forceMergeRequest=false;
+  lifecycleAction=null;
+  cpuSnapshotVersion++;
+  lifecyclePhase="";
+  lifecycleProgress=1;
+}
+
+function buildSeedLabels(){
+  cpuLabels=new Uint32Array(N);
+
+  const count=Math.max(1,Math.min(S.initialPlates,maxPlates));
+  const aspect=worldW/Math.max(1,worldH);
+  const cols=Math.max(1,Math.ceil(Math.sqrt(count*aspect)));
+  const rows=Math.max(1,Math.ceil(count/cols));
+  const cw=GW/cols;
+  const ch=GH/rows;
+  const seeds=[];
+
+  let id=0;
+
+  for(let gy=0;gy<rows&&id<count;gy++){
+    for(let gx=0;gx<cols&&id<count;gx++){
+      seeds.push({
+        id,
+        x:(gx+.5)*cw+rand(-.16,.16)*cw,
+        y:(gy+.5)*ch+rand(-.16,.16)*ch
+      });
+      id++;
+    }
+  }
+
+  const wx=wrapsX();
+  const wy=wrapsY();
+
+  for(let y=0;y<GH;y++){
+    for(let x=0;x<GW;x++){
+      let bestId=0;
+      let bestD2=Infinity;
+
+      for(let k=0;k<seeds.length;k++){
+        const q=seeds[k];
+
+        const dx=shortest(
+          x-q.x,
+          GW,
+          wx
+        );
+
+        const dy=shortest(
+          y-q.y,
+          GH,
+          wy
+        );
+
+        const d2=dx*dx+dy*dy;
+
+        if(d2<bestD2){
+          bestD2=d2;
+          bestId=q.id;
+        }
+      }
+
+      cpuLabels[y*GW+x]=bestId;
+    }
+  }
+}
+
+function buildTrig(){xSin=new Float32Array(GW);xCos=new Float32Array(GW);ySin=new Float32Array(GH);yCos=new Float32Array(GH);for(let x=0;x<GW;x++){const a=(x+.5)/GW*Math.PI*2;xSin[x]=Math.sin(a);xCos[x]=Math.cos(a)}for(let y=0;y<GH;y++){const a=(y+.5)/GH*Math.PI*2;ySin[y]=Math.sin(a);yCos[y]=Math.cos(a)}}
+
+function buildGpuStatsUpload(){
+  const moments=new Uint32Array(maxPlates*8);
+  const contacts=new Int32Array(maxPlates*maxPlates*4);
+
+  for(const p of plates){
+    const o=p.id*8;
+    let q=split64(Math.max(0,Math.round(p._sx||0)));
+    moments[o]=q[0];
+    moments[o+1]=q[1];
+    q=split64(Math.max(0,Math.round(p._sy||0)));
+    moments[o+2]=q[0];
+    moments[o+3]=q[1];
+    moments[o+4]=f32bits(p._ssx||0);
+    moments[o+5]=f32bits(p._scx||0);
+    moments[o+6]=f32bits(p._ssy||0);
+    moments[o+7]=f32bits(p._scy||0);
+  }
+
+  for(let a=0;a<plates.length;a++){
+    for(let b=a+1;b<plates.length;b++){
+      const src=a*maxPlates+b;
+      const dst=src*4;
+      contacts[dst]=contactCount[src];
+      contacts[dst+1]=contactNX[src];
+      contacts[dst+2]=contactNY[src];
+    }
+  }
+
+  return{moments,contacts};
+}
+
+function uploadRealtimeStatsFromCPU(){
+  if(!device||!plateStatsBuffer||!contactStatsBuffer)return;
+  uploadAreas();
+  const packed=buildGpuStatsUpload();
+  device.queue.writeBuffer(plateStatsBuffer,0,packed.moments);
+  device.queue.writeBuffer(contactStatsBuffer,0,packed.contacts);
+}
+
+function createStatsReadbacks(){
+  statsAreaBytes=maxPlates*4;
+  statsMomentBytes=maxPlates*32;
+  statsContactBytes=maxPlates*maxPlates*16;
+  statsMomentOffset=align256(statsAreaBytes);
+  statsContactOffset=align256(statsMomentOffset+statsMomentBytes);
+  statsReadbackBytes=align256(statsContactOffset+statsContactBytes);
+  statsReadbacks=[];
+
+  for(let i=0;i<8;i++){
+    statsReadbacks.push({
+      buffer:gpuBuffer(
+        statsReadbackBytes,
+        GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ
+      ),
+      busy:false,
+      generation:statsGeneration,
+      serial:0,
+      simTime:0
+    });
+  }
+
+  statsCursor=0;
+}
+
+function scheduleStatsCopy(encoder){
+  if(lifecyclePending||lifecycleRequest||!statsReadbacks.length)return null;
+
+  let slot=null;
+
+  for(let k=0;k<statsReadbacks.length;k++){
+    const q=statsReadbacks[(statsCursor+k)%statsReadbacks.length];
+    if(!q.busy){
+      slot=q;
+      statsCursor=(statsCursor+k+1)%statsReadbacks.length;
+      break;
+    }
+  }
+
+  if(!slot)return null;
+
+  slot.busy=true;
+  slot.generation=statsGeneration;
+  slot.serial=++statsSerial;
+  slot.simTime=simTime;
+
+  encoder.copyBufferToBuffer(
+    areaBuffer,0,
+    slot.buffer,0,
+    statsAreaBytes
+  );
+
+  encoder.copyBufferToBuffer(
+    plateStatsBuffer,0,
+    slot.buffer,statsMomentOffset,
+    statsMomentBytes
+  );
+
+  encoder.copyBufferToBuffer(
+    contactStatsBuffer,0,
+    slot.buffer,statsContactOffset,
+    statsContactBytes
+  );
+
+  return slot;
+}
+
+function requestStructuralAction(action){
+  if(lifecyclePending||lifecycleRequest)return false;
+  lifecycleAction=action;
+  lifecycleRequest=true;
+  return true;
+}
+
+function evaluateRealtimeLifecycle(dtSim){
+  if(
+    !S.enableLifecycle||
+    lifecyclePending||
+    lifecycleRequest||
+    dtSim<=0||
+    simTime<structuralCooldownUntil
+  )return;
+
+  const dt=Math.min(dtSim,1);
+  const minArea=Math.max(
+    2,
+    Math.floor(N*S.minLiveFraction)
+  );
+
+  // Microplates only request a structural action when a real absorber
+  // currently exists. This prevents no-op readback loops.
+  for(const p of plates){
+    if(
+      p.area<=0||
+      p.area>=minArea||
+      simTime<(p.microRetryUntil||0)
+    )continue;
+
+    if(
+      lifeLocked(p)&&
+      p.area>=Math.max(2,minArea*.25)
+    )continue;
+
+    const target=dominantNeighbor(
+      p.id,
+      true
+    );
+
+    if(target<0){
+      p.microRetryUntil=
+        simTime+LIFE.microRetry;
+      continue;
+    }
+
+    const targetPlate=plates[target];
+
+    if(!targetPlate)continue;
+
+    p.microRetryUntil=
+      simTime+LIFE.microRetry;
+
+    requestStructuralAction({
+      type:"micro",
+      uid:p.uid,
+      targetUid:targetPlate.uid
+    });
+
+    return;
+  }
+
+  // Merge requires a continuously valid pair for a while. New split
+  // siblings and recently modified plates are excluded.
+  if(
+    S.enableMerge&&
+    plates.length>1
+  ){
+    const c=bestMerge(
+      false,
+      true
+    );
+
+    if(c){
+      let aUid=c.aUid;
+      let bUid=c.bUid;
+
+      if(aUid>bUid){
+        [aUid,bUid]=[bUid,aUid];
+      }
+
+      if(
+        aUid===mergeCandidateUidA&&
+        bUid===mergeCandidateUidB
+      ){
+        mergeCandidateAge+=dt;
+      }else{
+        mergeCandidateUidA=aUid;
+        mergeCandidateUidB=bUid;
+        mergeCandidateAge=dt;
+      }
+
+      if(mergeCandidateAge>=LIFE.mergeHold){
+        const rate=
+          (S.mergeRate/60)*
+          Math.max(
+            .25,
+            c.cr/Math.max(.02,S.mergeContact)
+          )*
+          clamp(
+            1-c.rs/Math.max(.02,S.mergeSpeed),
+            .05,
+            1
+          );
+
+        if(
+          Math.random()<
+          1-Math.exp(-rate*dt)
+        ){
+          resetMergeCandidate();
+
+          requestStructuralAction({
+            type:"merge",
+            aUid:c.aUid,
+            bUid:c.bUid
+          });
+
+          return;
+        }
+      }
+    }else{
+      resetMergeCandidate();
+    }
+  }else{
+    resetMergeCandidate();
+  }
+
+  // Fission stress must persist instead of triggering from one noisy
+  // realtime contact sample.
+  if(
+    S.enableFission&&
+    plates.length<maxPlates
+  ){
+    const minimumArea=Math.max(
+      N*S.splitMinFraction,
+      2*N*S.minLiveFraction
+    );
+
+    const high=
+      Math.max(
+        .001,
+        S.fissionStress*1.08
+      );
+
+    const low=
+      Math.max(
+        0,
+        S.fissionStress*.9
+      );
+
+    for(const p of plates){
+      if(
+        p.area<minimumArea||
+        lifeLocked(p)
+      ){
+        p.fissionHotTime=0;
+        continue;
+      }
+
+      const st=plateStress(p.id);
+
+      if(st>=high){
+        p.fissionHotTime=
+          (p.fissionHotTime||0)+dt;
+      }else if(st<=low){
+        p.fissionHotTime=Math.max(
+          0,
+          (p.fissionHotTime||0)-dt*2
+        );
+      }else{
+        p.fissionHotTime=Math.max(
+          0,
+          (p.fissionHotTime||0)-dt*.2
+        );
+      }
+
+      if(
+        p.fissionHotTime<
+        LIFE.fissionHold
+      )continue;
+
+      const rate=
+        (S.fissionRate/60)*
+        (
+          1+
+          Math.max(
+            0,
+            st-S.fissionStress
+          )
+        );
+
+      if(
+        Math.random()<
+        1-Math.exp(-rate*dt)
+      ){
+        p.fissionHotTime=0;
+
+        requestStructuralAction({
+          type:"fission",
+          uid:p.uid
+        });
+
+        return;
+      }
+    }
+  }else{
+    for(const p of plates){
+      p.fissionHotTime=0;
+    }
+  }
+}
+
+function requestStatsMap(slot){
+  if(!slot)return;
+
+  slot.buffer.mapAsync(GPUMapMode.READ).then(()=>{
+    try{
+      const range=slot.buffer.getMappedRange();
+
+      if(
+        slot.generation!==statsGeneration ||
+        slot.serial<=lastAppliedStatsSerial
+      ){
+        return;
+      }
+
+      const areaView=new Uint32Array(
+        range,0,maxPlates
+      );
+
+      const momentView=new Uint32Array(
+        range,
+        statsMomentOffset,
+        maxPlates*8
+      );
+
+      const contactView=new Int32Array(
+        range,
+        statsContactOffset,
+        maxPlates*maxPlates*4
+      );
+
+      const wx=wrapsX();
+      const wy=wrapsY();
+
+      let totalArea=0;
+
+      for(const p of plates){
+        totalArea+=areaView[p.id];
+      }
+
+      if(totalArea!==N){
+        return;
+      }
+
+      for(const p of plates){
+        const id=p.id;
+        const area=areaView[id];
+
+        p.area=area;
+        areasCPU[id]=area;
+
+        if(!area)continue;
+
+        const o=id*8;
+
+        if(wx){
+          const sx=bitsf32(momentView[o+4]);
+          const cx=bitsf32(momentView[o+5]);
+          const mag=Math.hypot(sx,cx);
+
+          if(
+            Number.isFinite(mag)&&
+            mag>Math.max(1e-4,area*1e-7)
+          ){
+            let a=Math.atan2(sx,cx);
+
+            if(a<0)a+=Math.PI*2;
+
+            const next=
+              a/(Math.PI*2)*GW-.5;
+
+            if(Number.isFinite(next)){
+              p.cx=next;
+            }
+          }
+        }else{
+          const next=
+            join64(
+              momentView[o],
+              momentView[o+1]
+            )/area;
+
+          if(
+            Number.isFinite(next)&&
+            next>=-.5&&
+            next<=GW-.5
+          ){
+            p.cx=next;
+          }
+        }
+
+        if(wy){
+          const sy=bitsf32(momentView[o+6]);
+          const cy=bitsf32(momentView[o+7]);
+          const mag=Math.hypot(sy,cy);
+
+          if(
+            Number.isFinite(mag)&&
+            mag>Math.max(1e-4,area*1e-7)
+          ){
+            let a=Math.atan2(sy,cy);
+
+            if(a<0)a+=Math.PI*2;
+
+            const next=
+              a/(Math.PI*2)*GH-.5;
+
+            if(Number.isFinite(next)){
+              p.cy=next;
+            }
+          }
+        }else{
+          const next=
+            join64(
+              momentView[o+2],
+              momentView[o+3]
+            )/area;
+
+          if(
+            Number.isFinite(next)&&
+            next>=-.5&&
+            next<=GH-.5
+          ){
+            p.cy=next;
+          }
+        }
+
+        p.wcx=(p.cx+.5)*cellWX;
+        p.wcy=(p.cy+.5)*cellWY;
+      }
+
+      contactCount.fill(0);
+      contactNX.fill(0);
+      contactNY.fill(0);
+
+      for(let a=0;a<plates.length;a++){
+        for(let b=a+1;b<plates.length;b++){
+          const q=a*maxPlates+b;
+          const o=q*4;
+
+          const c=Math.max(
+            0,
+            contactView[o]
+          );
+
+          contactCount[q]=c;
+
+          if(c>0){
+            contactNX[q]=clamp(
+              contactView[o+1],
+              -c,
+              c
+            );
+            contactNY[q]=clamp(
+              contactView[o+2],
+              -c,
+              c
+            );
+          }else{
+            contactNX[q]=0;
+            contactNY[q]=0;
+          }
+        }
+      }
+
+      const dt=
+        Math.max(
+          0,
+          slot.simTime-lastStatsSimTime
+        );
+
+      lastStatsSimTime=
+        Math.max(
+          lastStatsSimTime,
+          slot.simTime
+        );
+
+      lastAppliedStatsSerial=slot.serial;
+      lastStatsApply=performance.now();
+
+      statsHzCount++;
+
+      const now=performance.now();
+
+      if(now-statsHzClock>=500){
+        statsHz=
+          statsHzCount*1000/
+          (now-statsHzClock);
+
+        statsHzCount=0;
+        statsHzClock=now;
+      }
+
+      if(dt>0){
+        evaluateRealtimeLifecycle(dt);
+      }
+    }finally{
+      slot.buffer.unmap();
+      slot.busy=false;
+    }
+  }).catch(e=>{
+    slot.busy=false;
+
+    if(slot.generation===statsGeneration){
+      showError(
+        "Realtime stats readback failed: "+
+        e.message
+      );
+    }
+  });
+}
+
+function gpuBuffer(size,usage){return device.createBuffer({size:Math.max(4,(size+3)&~3),usage})}
+const boundaryWGSL=`
+struct U {
+  a: vec4<f32>,
+  b: vec4<f32>,
+  c: vec4<f32>,
+  d: vec4<f32>,
+  e: vec4<f32>,
+  f: vec4<f32>,
+  g: vec4<f32>,
+  h: vec4<f32>,
+}
+
+@group(0) @binding(0) var<storage, read> L: array<u32>;
+@group(0) @binding(1) var<storage, read_write> B: array<u32>;
+@group(0) @binding(2) var<storage, read_write> C: atomic<u32>;
+@group(0) @binding(3) var<storage, read_write> D: array<u32>;
+@group(0) @binding(4) var<uniform> U0: U;
+
+fn wx() -> bool {
+  let t = i32(U0.b.x);
+  return t == 1 || t == 3;
+}
+
+fn wy() -> bool {
+  let t = i32(U0.b.x);
+  return t == 2 || t == 3;
+}
+
+fn I(x0: i32, y0: i32) -> i32 {
+  let w = i32(U0.a.x);
+  let h = i32(U0.a.y);
+
+  var x = x0;
+  var y = y0;
+
+  if (wx()) {
+    x = ((x % w) + w) % w;
+  } else if (x < 0 || x >= w) {
+    return -1;
+  }
+
+  if (wy()) {
+    y = ((y % h) + h) % h;
+  } else if (y < 0 || y >= h) {
+    return -1;
+  }
+
+  return y * w + x;
+}
+
+@compute @workgroup_size(16, 16)
+fn build(@builtin(global_invocation_id) g: vec3<u32>) {
+  let w = u32(U0.a.x);
+  let h = u32(U0.a.y);
+
+  if (g.x >= w || g.y >= h) {
+    return;
+  }
+
+  let i = g.y * w + g.x;
+  let id = L[i];
+  let x = i32(g.x);
+  let y = i32(g.y);
+
+  let l = I(x - 1, y);
+  let r = I(x + 1, y);
+  let u = I(x, y - 1);
+  let d = I(x, y + 1);
+
+  if (
+    (l >= 0 && L[u32(l)] != id) ||
+    (r >= 0 && L[u32(r)] != id) ||
+    (u >= 0 && L[u32(u)] != id) ||
+    (d >= 0 && L[u32(d)] != id)
+  ) {
+    let n = atomicAdd(&C, 1u);
+    B[n] = i;
+  }
+}
+
+@compute @workgroup_size(1)
+fn finalize() {
+  let n = atomicLoad(&C);
+  let total = (n + 255u) / 256u;
+  let gx = min(total, 65535u);
+
+  D[0] = gx;
+  D[1] = (total + max(1u, gx) - 1u) / max(1u, gx);
+  D[2] = 1u;
+}
+`;
+const caWGSL=`
+struct Plate {
+  a: vec4<f32>,
+  b: vec4<f32>,
+  c: vec4<f32>,
+  d: vec4<f32>,
+}
+
+struct U {
+  a: vec4<f32>,
+  b: vec4<f32>,
+  c: vec4<f32>,
+  d: vec4<f32>,
+  e: vec4<f32>,
+  f: vec4<f32>,
+  g: vec4<f32>,
+  h: vec4<f32>,
+}
+
+struct Step {
+  seed: u32,
+  phase: u32,
+  p0: u32,
+  p1: u32,
+}
+
+struct PlateStats {
+  sxLo: atomic<u32>,
+  sxHi: atomic<u32>,
+  syLo: atomic<u32>,
+  syHi: atomic<u32>,
+  sinX: atomic<u32>,
+  cosX: atomic<u32>,
+  sinY: atomic<u32>,
+  cosY: atomic<u32>,
+}
+
+struct Contact {
+  count: atomic<i32>,
+  nx: atomic<i32>,
+  ny: atomic<i32>,
+  pad: atomic<i32>,
+}
+
+@group(0) @binding(0) var<storage, read_write> L: array<u32>;
+@group(0) @binding(1) var<storage, read> P: array<Plate>;
+@group(0) @binding(2) var<storage, read_write> A: array<atomic<u32>>;
+@group(0) @binding(3) var<uniform> U0: U;
+@group(0) @binding(4) var<uniform> S0: Step;
+@group(0) @binding(5) var<storage, read> B: array<u32>;
+@group(0) @binding(6) var<storage, read_write> C: atomic<u32>;
+@group(0) @binding(7) var<storage, read> D: array<u32>;
+@group(0) @binding(8) var<storage, read_write> PS: array<PlateStats>;
+@group(0) @binding(9) var<storage, read_write> CT: array<Contact>;
+
+fn H(x0: u32) -> u32 {
+  var x = x0;
+  x = (x ^ (x >> 16u)) * 0x7feb352du;
+  x = (x ^ (x >> 15u)) * 0x846ca68bu;
+  return x ^ (x >> 16u);
+}
+
+fn R(x: u32) -> f32 {
+  return f32(H(x) & 0x00ffffffu) / 16777216.0;
+}
+
+fn wx() -> bool {
+  let t = i32(U0.b.x);
+  return t == 1 || t == 3;
+}
+
+fn wy() -> bool {
+  let t = i32(U0.b.x);
+  return t == 2 || t == 3;
+}
+
+fn I(x0: i32, y0: i32) -> i32 {
+  let w = i32(U0.a.x);
+  let h = i32(U0.a.y);
+  var x = x0;
+  var y = y0;
+
+  if (wx()) {
+    x = ((x % w) + w) % w;
+  } else if (x < 0 || x >= w) {
+    return -1;
+  }
+
+  if (wy()) {
+    y = ((y % h) + h) % h;
+  } else if (y < 0 || y >= h) {
+    return -1;
+  }
+
+  return y * w + x;
+}
+
+fn BE(x: i32, y: i32, id: u32) -> f32 {
+  var e = 0.0;
+
+  let dirs = array<vec2<i32>, 8>(
+    vec2<i32>( 1,  0),
+    vec2<i32>(-1,  0),
+    vec2<i32>( 0,  1),
+    vec2<i32>( 0, -1),
+    vec2<i32>( 1,  1),
+    vec2<i32>(-1,  1),
+    vec2<i32>( 1, -1),
+    vec2<i32>(-1, -1)
+  );
+
+  for (var k = 0; k < 8; k = k + 1) {
+    let j = I(x + dirs[k].x, y + dirs[k].y);
+    let diagonal = k >= 4;
+    let edgeWeight = select(1.0, 0.70710678, diagonal);
+
+    if (j < 0) {
+      e = e + edgeWeight * 0.3;
+    } else if (L[u32(j)] != id) {
+      e = e + edgeWeight;
+    }
+  }
+
+  return e * U0.b.y * 0.58578644;
+}
+
+fn keepsOldConnected(x: i32, y: i32, oldId: u32) -> bool {
+  let ring = array<vec2<i32>, 8>(
+    vec2<i32>( 0, -1),
+    vec2<i32>( 1, -1),
+    vec2<i32>( 1,  0),
+    vec2<i32>( 1,  1),
+    vec2<i32>( 0,  1),
+    vec2<i32>(-1,  1),
+    vec2<i32>(-1,  0),
+    vec2<i32>(-1, -1)
+  );
+
+  var same: array<bool, 8>;
+
+  for (var k = 0; k < 8; k = k + 1) {
+    let j = I(x + ring[k].x, y + ring[k].y);
+    same[k] = false;
+    if (j >= 0) {
+      same[k] = L[u32(j)] == oldId;
+    }
+  }
+
+  let cardinalCount =
+    select(0u, 1u, same[0]) +
+    select(0u, 1u, same[2]) +
+    select(0u, 1u, same[4]) +
+    select(0u, 1u, same[6]);
+
+  if (cardinalCount <= 1u) {
+    return true;
+  }
+
+  var groups = 0u;
+
+  for (var k = 0; k < 8; k = k + 1) {
+    let prev = (k + 7) % 8;
+    if (same[k] && !same[prev]) {
+      groups = groups + 1u;
+    }
+  }
+
+  return groups <= 1u;
+}
+
+fn addSx(id: u32, value: u32) {
+  let old = atomicAdd(&PS[id].sxLo, value);
+  if (old > 0xffffffffu - value) {
+    atomicAdd(&PS[id].sxHi, 1u);
+  }
+}
+
+fn subSx(id: u32, value: u32) {
+  let old = atomicSub(&PS[id].sxLo, value);
+  if (old < value) {
+    atomicSub(&PS[id].sxHi, 1u);
+  }
+}
+
+fn addSy(id: u32, value: u32) {
+  let old = atomicAdd(&PS[id].syLo, value);
+  if (old > 0xffffffffu - value) {
+    atomicAdd(&PS[id].syHi, 1u);
+  }
+}
+
+fn subSy(id: u32, value: u32) {
+  let old = atomicSub(&PS[id].syLo, value);
+  if (old < value) {
+    atomicSub(&PS[id].syHi, 1u);
+  }
+}
+
+fn addF32(
+  p: ptr<storage, atomic<u32>, read_write>,
+  delta: f32
+) {
+  var old = atomicLoad(p);
+
+  loop {
+    let next = bitcast<u32>(bitcast<f32>(old) + delta);
+    let result = atomicCompareExchangeWeak(p, old, next);
+
+    if (result.exchanged) {
+      break;
+    }
+
+    old = result.old_value;
+  }
+}
+
+fn updateMoments(
+  id: u32,
+  x: u32,
+  y: u32,
+  adding: bool
+) {
+  if (wx()) {
+    let ax = (f32(x) + 0.5) / U0.a.x * 6.28318530718;
+    let sign = select(-1.0, 1.0, adding);
+    addF32(&PS[id].sinX, sin(ax) * sign);
+    addF32(&PS[id].cosX, cos(ax) * sign);
+  } else {
+    if (adding) {
+      addSx(id, x);
+    } else {
+      subSx(id, x);
+    }
+  }
+
+  if (wy()) {
+    let ay = (f32(y) + 0.5) / U0.a.y * 6.28318530718;
+    let sign = select(-1.0, 1.0, adding);
+    addF32(&PS[id].sinY, sin(ay) * sign);
+    addF32(&PS[id].cosY, cos(ay) * sign);
+  } else {
+    if (adding) {
+      addSy(id, y);
+    } else {
+      subSy(id, y);
+    }
+  }
+}
+
+fn contactDelta(
+  center: u32,
+  other: u32,
+  dx: i32,
+  dy: i32,
+  delta: i32
+) {
+  if (center == other) {
+    return;
+  }
+
+  var lo = center;
+  var hi = other;
+  var nx = dx;
+  var ny = dy;
+
+  if (lo > hi) {
+    lo = other;
+    hi = center;
+    nx = -nx;
+    ny = -ny;
+  }
+
+  let maxPlates = u32(U0.g.w);
+  let slot = lo * maxPlates + hi;
+
+  atomicAdd(&CT[slot].count, delta);
+  atomicAdd(&CT[slot].nx, delta * nx);
+  atomicAdd(&CT[slot].ny, delta * ny);
+}
+
+fn updateContacts(
+  x: i32,
+  y: i32,
+  oldId: u32,
+  newId: u32
+) {
+  let dirs = array<vec2<i32>, 4>(
+    vec2<i32>( 1,  0),
+    vec2<i32>(-1,  0),
+    vec2<i32>( 0,  1),
+    vec2<i32>( 0, -1)
+  );
+
+  for (var k = 0; k < 4; k = k + 1) {
+    let j = I(x + dirs[k].x, y + dirs[k].y);
+
+    if (j < 0) {
+      continue;
+    }
+
+    let neighborId = L[u32(j)];
+
+    if (neighborId != oldId) {
+      contactDelta(oldId, neighborId, dirs[k].x, dirs[k].y, -1);
+    }
+
+    if (neighborId != newId) {
+      contactDelta(newId, neighborId, dirs[k].x, dirs[k].y, 1);
+    }
+  }
+}
+
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) g: vec3<u32>) {
+  let n = atomicLoad(&C);
+  let bi = g.x + g.y * D[0] * 256u;
+
+  if (bi >= n) {
+    return;
+  }
+
+  let i = B[bi];
+  let w = u32(U0.a.x);
+  let x = i32(i % w);
+  let y = i32(i / w);
+
+  let color = (u32(x) & 1u) | ((u32(y) & 1u) << 1u);
+
+  if (color != S0.phase) {
+    return;
+  }
+
+  let old = L[i];
+
+  let dirs = array<vec2<i32>, 8>(
+    vec2<i32>( 1,  0),
+    vec2<i32>(-1,  0),
+    vec2<i32>( 0,  1),
+    vec2<i32>( 0, -1),
+    vec2<i32>( 1,  1),
+    vec2<i32>(-1,  1),
+    vec2<i32>( 1, -1),
+    vec2<i32>(-1, -1)
+  );
+
+  let r = H(i ^ S0.seed);
+  let k = i32(r & 7u);
+
+  let j = I(x + dirs[k].x, y + dirs[k].y);
+
+  if (j < 0) {
+    return;
+  }
+
+  let neu = L[u32(j)];
+
+  if (neu == old) {
+    return;
+  }
+
+  if (!keepsOldConnected(x, y, old)) {
+    return;
+  }
+
+  if (k >= 4) {
+    let j1 = I(x + dirs[k].x, y);
+    let j2 = I(x, y + dirs[k].y);
+
+    if (
+      (j1 < 0 || L[u32(j1)] != neu) &&
+      (j2 < 0 || L[u32(j2)] != neu)
+    ) {
+      return;
+    }
+  }
+
+  let oa = atomicLoad(&A[old]);
+  let na = atomicLoad(&A[neu]);
+  let ot = P[old].c.w;
+  let nt = P[neu].c.w;
+
+  if (f32(oa) <= max(8.0, ot * 0.1)) {
+    return;
+  }
+
+  var de = BE(x, y, neu) - BE(x, y, old);
+
+  let ko = U0.b.z * 0.001 * 10000.0 / max(1.0, ot);
+  let kn = U0.b.z * 0.001 * 10000.0 / max(1.0, nt);
+  let od = f32(oa) - ot;
+  let nd = f32(na) - nt;
+
+  de = de + ko * (-2.0 * od + 1.0) + kn * (2.0 * nd + 1.0);
+
+  let dv = vec2<f32>(f32(dirs[k].x), f32(dirs[k].y));
+
+  // dv points from the destination cell toward the source cell.
+  // Copying the source label into the destination advances that plate
+  // in the opposite direction, so the physical displacement is -dv.
+  let align = dot(-normalize(dv), P[neu].b.xy);
+
+  de = de - U0.b.w * P[neu].b.z * align;
+
+  let temp = max(0.001, U0.c.x);
+
+  if (
+    de > 0.0 &&
+    R(r ^ 0x9e3779b9u) >= exp(-de / temp)
+  ) {
+    return;
+  }
+
+  updateContacts(x, y, old, neu);
+  updateMoments(old, u32(x), u32(y), false);
+  updateMoments(neu, u32(x), u32(y), true);
+
+  L[i] = neu;
+  atomicSub(&A[old], 1u);
+  atomicAdd(&A[neu], 1u);
+}
+`;
+const velocityWGSL=`
+struct Plate {
+  a: vec4<f32>,
+  b: vec4<f32>,
+  c: vec4<f32>,
+  d: vec4<f32>,
+}
+
+struct U {
+  a: vec4<f32>,
+  b: vec4<f32>,
+  c: vec4<f32>,
+  d: vec4<f32>,
+  e: vec4<f32>,
+  f: vec4<f32>,
+  g: vec4<f32>,
+  h: vec4<f32>,
+}
+
+@group(0) @binding(0) var<storage, read> L: array<u32>;
+@group(0) @binding(1) var<storage, read> P: array<Plate>;
+@group(0) @binding(2) var<storage, read_write> V: array<__VELTYPE__>;
+@group(0) @binding(3) var<uniform> U0: U;
+
+fn SX(d: f32, p: f32, wrapped: bool) -> f32 {
+  if (!wrapped) {
+    return d;
+  }
+
+  if (d > 0.5 * p) {
+    return d - p;
+  }
+
+  if (d < -0.5 * p) {
+    return d + p;
+  }
+
+  return d;
+}
+
+@compute @workgroup_size(16, 16)
+fn main(@builtin(global_invocation_id) g: vec3<u32>) {
+  let w = u32(U0.a.x);
+  let h = u32(U0.a.y);
+
+  if (g.x >= w || g.y >= h) {
+    return;
+  }
+
+  let i = g.y * w + g.x;
+  let id = L[i];
+  let p = P[id];
+
+  let worldX =
+    (f32(g.x) + 0.5) /
+    f32(w) *
+    U0.a.z;
+
+  let worldY =
+    (f32(g.y) + 0.5) /
+    f32(h) *
+    U0.a.w;
+
+  let top = i32(U0.b.x);
+  let xWrapped = top == 1 || top == 3;
+  let yWrapped = top == 2 || top == 3;
+
+  let rx =
+    SX(
+      worldX - p.a.z,
+      U0.a.z,
+      xWrapped
+    );
+
+  let ry =
+    SX(
+      worldY - p.a.w,
+      U0.a.w,
+      yWrapped
+    );
+
+  let dist =
+    max(
+      0.0001,
+      length(vec2<f32>(rx, ry))
+    );
+
+  let n =
+    vec2<f32>(rx, ry) /
+    dist;
+
+  var v =
+    p.a.xy *
+    U0.c.y;
+
+  let curvature =
+    clamp(
+      dist /
+      max(1.0, U0.c.w),
+      0.0,
+      2.0
+    );
+
+  let rotationMagnitude =
+    length(v) *
+    U0.c.z *
+    curvature *
+    p.b.w;
+
+  v =
+    v +
+    vec2<f32>(-n.y, n.x) *
+    rotationMagnitude;
+
+  let perp =
+    vec2<f32>(
+      -p.b.y,
+       p.b.x
+    );
+
+  let cross =
+    (
+      rx * perp.x +
+      ry * perp.y
+    ) /
+    max(1.0, U0.c.w);
+
+  v =
+    v +
+    perp *
+    (
+      length(v) *
+      U0.d.x *
+      clamp(cross, -1.5, 1.5)
+    );
+
+  V[i] = __VELSTORE__;
+}
+`;
+const renderWGSL=`
+struct Plate {
+  a: vec4<f32>,
+  b: vec4<f32>,
+  c: vec4<f32>,
+  d: vec4<f32>,
+}
+
+struct U {
+  a: vec4<f32>,
+  b: vec4<f32>,
+  c: vec4<f32>,
+  d: vec4<f32>,
+  e: vec4<f32>,
+  f: vec4<f32>,
+  g: vec4<f32>,
+  h: vec4<f32>,
+}
+
+@group(0) @binding(0) var<storage, read> L: array<u32>;
+@group(0) @binding(1) var<storage, read> P: array<Plate>;
+@group(0) @binding(2) var<storage, read> V: array<__VELTYPE__>;
+@group(0) @binding(3) var<uniform> U0: U;
+
+struct O {
+  @builtin(position) p: vec4<f32>,
+}
+
+@vertex
+fn vs(
+  @builtin(vertex_index) i: u32
+) -> O {
+  var q = array<vec2<f32>, 3>(
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>( 3.0, -1.0),
+    vec2<f32>(-1.0,  3.0)
+  );
+
+  var o: O;
+
+  o.p =
+    vec4<f32>(
+      q[i],
+      0.0,
+      1.0
+    );
+
+  return o;
+}
+
+fn wrapX() -> bool {
+  let t = i32(U0.b.x);
+  return t == 1 || t == 3;
+}
+
+fn wrapY() -> bool {
+  let t = i32(U0.b.x);
+  return t == 2 || t == 3;
+}
+
+fn I(
+  x0: i32,
+  y0: i32
+) -> i32 {
+  let w = i32(U0.a.x);
+  let h = i32(U0.a.y);
+
+  var x = x0;
+  var y = y0;
+
+  if (wrapX()) {
+    x = ((x % w) + w) % w;
+  } else if (x < 0 || x >= w) {
+    return -1;
+  }
+
+  if (wrapY()) {
+    y = ((y % h) + h) % h;
+  } else if (y < 0 || y >= h) {
+    return -1;
+  }
+
+  return y * w + x;
+}
+
+fn hsv(
+  h0: f32,
+  s: f32,
+  v: f32
+) -> vec3<f32> {
+  let h = fract(h0);
+
+  let k =
+    vec4<f32>(
+      1.0,
+      2.0 / 3.0,
+      1.0 / 3.0,
+      3.0
+    );
+
+  let p =
+    abs(
+      fract(
+        vec3<f32>(h) +
+        k.xyz
+      ) *
+      6.0 -
+      k.www
+    );
+
+  return
+    v *
+    mix(
+      k.xxx,
+      clamp(
+        p - k.xxx,
+        vec3<f32>(0.0),
+        vec3<f32>(1.0)
+      ),
+      s
+    );
+}
+
+fn signedColor(
+  value: f32,
+  maxMagnitude: f32
+) -> vec3<f32> {
+  let n =
+    clamp(
+      value /
+      max(0.0001, maxMagnitude),
+      -1.0,
+      1.0
+    );
+
+  if (n < 0.0) {
+    let t = -n;
+
+    return
+      mix(
+        vec3<f32>(0.47, 0.49, 0.51),
+        vec3<f32>(0.16, 0.43, 1.00),
+        t
+      );
+  }
+
+  let t = n;
+
+  return
+    mix(
+      vec3<f32>(0.47, 0.49, 0.51),
+      vec3<f32>(1.00, 0.33, 0.20),
+      t
+    );
+}
+
+@fragment
+fn fs(
+  @builtin(position) pos: vec4<f32>
+) -> @location(0) vec4<f32> {
+  let canvasW = U0.e.x;
+  let canvasH = U0.e.y;
+  let zoom = max(0.0001, U0.f.x);
+
+  var worldX =
+    U0.e.z +
+    (pos.x - canvasW * 0.5) /
+    zoom;
+
+  var worldY =
+    U0.e.w +
+    (pos.y - canvasH * 0.5) /
+    zoom;
+
+  let repeatWrapped =
+    U0.f.w > 0.5;
+
+  let xWrapped = wrapX();
+  let yWrapped = wrapY();
+
+  var valid = true;
+
+  if (xWrapped && repeatWrapped) {
+    worldX =
+      worldX -
+      floor(worldX / U0.a.z) *
+      U0.a.z;
+  } else if (
+    worldX < 0.0 ||
+    worldX >= U0.a.z
+  ) {
+    valid = false;
+  }
+
+  if (yWrapped && repeatWrapped) {
+    worldY =
+      worldY -
+      floor(worldY / U0.a.w) *
+      U0.a.w;
+  } else if (
+    worldY < 0.0 ||
+    worldY >= U0.a.w
+  ) {
+    valid = false;
+  }
+
+  if (!valid) {
+    return
+      vec4<f32>(
+        0.023,
+        0.035,
+        0.050,
+        1.0
+      );
+  }
+
+  let gx =
+    clamp(
+      i32(
+        floor(
+          worldX /
+          U0.a.z *
+          U0.a.x
+        )
+      ),
+      0,
+      i32(U0.a.x) - 1
+    );
+
+  let gy =
+    clamp(
+      i32(
+        floor(
+          worldY /
+          U0.a.w *
+          U0.a.y
+        )
+      ),
+      0,
+      i32(U0.a.y) - 1
+    );
+
+  let i =
+    u32(
+      gy *
+      i32(U0.a.x) +
+      gx
+    );
+
+  let id = L[i];
+  let v = __VELLOAD__;
+  let speed = length(v);
+
+  let mode = i32(U0.d.y);
+  let maxSpeed =
+    max(
+      0.0001,
+      U0.d.z
+    );
+
+  var col =
+    vec3<f32>(0.0);
+
+  if (mode == 0) {
+    let hue =
+      fract(
+        atan2(v.y, v.x) /
+        6.28318530718 +
+        1.0
+      );
+
+    col =
+      select(
+        vec3<f32>(0.0),
+        hsv(
+          hue,
+          1.0,
+          0.08 +
+          0.92 *
+          clamp(
+            speed / maxSpeed,
+            0.0,
+            1.0
+          )
+        ),
+        speed > 1e-7
+      );
+  } else if (mode == 1) {
+    let hue =
+      fract(
+        atan2(v.y, v.x) /
+        6.28318530718 +
+        1.0
+      );
+
+    col =
+      select(
+        vec3<f32>(0.0),
+        hsv(hue, 1.0, 1.0),
+        speed > 1e-7
+      );
+  } else if (mode == 2) {
+    let q =
+      clamp(
+        speed / maxSpeed,
+        0.0,
+        1.0
+      );
+
+    col = vec3<f32>(q);
+  } else if (mode == 3) {
+    col =
+      signedColor(
+        v.x,
+        maxSpeed
+      );
+  } else {
+    col =
+      signedColor(
+        v.y,
+        maxSpeed
+      );
+  }
+
+  if (U0.f.y > 0.5) {
+    let dirs = array<vec2<i32>, 4>(
+      vec2<i32>( 1,  0),
+      vec2<i32>(-1,  0),
+      vec2<i32>( 0,  1),
+      vec2<i32>( 0, -1)
+    );
+
+    var hit = false;
+    var other = id;
+    var nx = 0.0;
+    var ny = 0.0;
+
+    for (
+      var k = 0;
+      k < 4;
+      k = k + 1
+    ) {
+      let j =
+        I(
+          gx + dirs[k].x,
+          gy + dirs[k].y
+        );
+
+      if (
+        !hit &&
+        j >= 0 &&
+        L[u32(j)] != id
+      ) {
+        hit = true;
+        other = L[u32(j)];
+        nx = f32(dirs[k].x);
+        ny = f32(dirs[k].y);
+      }
+    }
+
+    if (hit) {
+      if (U0.f.z > 0.5) {
+        let relativeVelocity =
+          P[other].a.xy -
+          P[id].a.xy;
+
+        let separation =
+          relativeVelocity.x * nx +
+          relativeVelocity.y * ny;
+
+        let threshold =
+          0.14 *
+          max(
+            U0.c.y,
+            0.2
+          );
+
+        if (separation < -threshold) {
+          col =
+            vec3<f32>(
+              0.96,
+              0.41,
+              0.30
+            );
+        } else if (separation > threshold) {
+          col =
+            vec3<f32>(
+              0.28,
+              0.73,
+              0.92
+            );
+        } else {
+          col =
+            vec3<f32>(
+              0.92,
+              0.82,
+              0.45
+            );
+        }
+      } else {
+        col = P[id].c.rgb;
+      }
+    }
+  }
+
+  if (U0.g.x > 0.5) {
+    let borderWidth =
+      1.5 /
+      zoom;
+
+    let edgeX =
+      (!xWrapped || !repeatWrapped) &&
+      (
+        worldX < borderWidth ||
+        U0.a.z - worldX < borderWidth
+      );
+
+    let edgeY =
+      (!yWrapped || !repeatWrapped) &&
+      (
+        worldY < borderWidth ||
+        U0.a.w - worldY < borderWidth
+      );
+
+    if (edgeX || edgeY) {
+      col =
+        vec3<f32>(
+          0.75,
+          0.80,
+          0.86
+        );
+    }
+  }
+
+  return
+    vec4<f32>(
+      col,
+      1.0
+    );
+}
+`;
+function shader(code,label){const m=device.createShaderModule({code,label});m.getCompilationInfo().then(info=>{const e=info.messages.filter(x=>x.type==="error");if(e.length)showError(label+" shader: "+e.map(x=>x.message).join(" | "))});return m}
+function showError(m){errorEl.style.display="block";errorEl.textContent=m;console.error(m)}
+async function initGPU(){if(!navigator.gpu)throw new Error("WebGPU is unavailable in this browser. Use a current Chrome, Edge, Firefox Nightly with WebGPU enabled, or Safari with WebGPU support.");const adapter=await navigator.gpu.requestAdapter({powerPreference:"high-performance"});if(!adapter)throw new Error("No WebGPU adapter was returned.");useF16=adapter.features.has("shader-f16");velocityStride=useF16?4:8;device=await adapter.requestDevice(useF16?{requiredFeatures:["shader-f16"]}:{});device.lost.then(x=>showError("WebGPU device lost: "+x.message));context=gpuCanvas.getContext("webgpu");format=navigator.gpu.getPreferredCanvasFormat();const velocityType=useF16?"vec2<f16>":"vec2<f32>",velCode=(useF16?"enable f16;\n":"")+velocityWGSL.replaceAll("__VELTYPE__",velocityType).replaceAll("__VELSTORE__",useF16?"vec2<f16>(v)":"v"),renCode=(useF16?"enable f16;\n":"")+renderWGSL.replaceAll("__VELTYPE__",velocityType).replaceAll("__VELLOAD__",useF16?"vec2<f32>(V[i])":"V[i]");const boundaryModule=shader(boundaryWGSL,"boundary"),caModule=shader(caWGSL,"CA"),velModule=shader(velCode,"velocity"),renModule=shader(renCode,"render");if(device.limits.maxStorageBuffersPerShaderStage<8)throw new Error(`This version needs 8 storage buffers in the CA compute stage; this GPU exposes ${device.limits.maxStorageBuffersPerShaderStage}.`);const boundaryLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:"read-only-storage"}},{binding:1,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}},{binding:2,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}},{binding:3,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}},{binding:4,visibility:GPUShaderStage.COMPUTE,buffer:{type:"uniform"}}]});const caLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}},{binding:1,visibility:GPUShaderStage.COMPUTE,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}},{binding:3,visibility:GPUShaderStage.COMPUTE,buffer:{type:"uniform"}},{binding:4,visibility:GPUShaderStage.COMPUTE,buffer:{type:"uniform",hasDynamicOffset:true}},{binding:5,visibility:GPUShaderStage.COMPUTE,buffer:{type:"read-only-storage"}},{binding:6,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}},{binding:7,visibility:GPUShaderStage.COMPUTE,buffer:{type:"read-only-storage"}},{binding:8,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}},{binding:9,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}}]});const velLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:"read-only-storage"}},{binding:1,visibility:GPUShaderStage.COMPUTE,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.COMPUTE,buffer:{type:"storage"}},{binding:3,visibility:GPUShaderStage.COMPUTE,buffer:{type:"uniform"}}]});const renLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,buffer:{type:"read-only-storage"}},{binding:1,visibility:GPUShaderStage.FRAGMENT,buffer:{type:"read-only-storage"}},{binding:2,visibility:GPUShaderStage.FRAGMENT,buffer:{type:"read-only-storage"}},{binding:3,visibility:GPUShaderStage.FRAGMENT,buffer:{type:"uniform"}}]});boundaryBuildPipeline=device.createComputePipeline({layout:device.createPipelineLayout({bindGroupLayouts:[boundaryLayout]}),compute:{module:boundaryModule,entryPoint:"build"}});boundaryFinalizePipeline=device.createComputePipeline({layout:device.createPipelineLayout({bindGroupLayouts:[boundaryLayout]}),compute:{module:boundaryModule,entryPoint:"finalize"}});caPipeline=device.createComputePipeline({layout:device.createPipelineLayout({bindGroupLayouts:[caLayout]}),compute:{module:caModule,entryPoint:"main"}});velocityPipeline=device.createComputePipeline({layout:device.createPipelineLayout({bindGroupLayouts:[velLayout]}),compute:{module:velModule,entryPoint:"main"}});renderPipeline=device.createRenderPipeline({layout:device.createPipelineLayout({bindGroupLayouts:[renLayout]}),vertex:{module:renModule,entryPoint:"vs"},fragment:{module:renModule,entryPoint:"fs",targets:[{format}]},primitive:{topology:"triangle-list"}});uniformBuffer=gpuBuffer(128,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST);stepBuffer=gpuBuffer(64*256,GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST);statusEl.textContent=`WebGPU · ${useF16?"FP16 velocity grid":"FP32 velocity grid"} · ${adapter.info?.architecture||adapter.info?.device||"high-performance adapter"}`;resize()}
+function resize(){viewportW=innerWidth;viewportH=innerHeight;DPR=devicePixelRatio||1;const rs=S.renderScale,w=Math.max(1,Math.floor(viewportW*DPR*rs)),h=Math.max(1,Math.floor(viewportH*DPR*rs));gpuCanvas.width=w;gpuCanvas.height=h;overlay.width=Math.max(1,Math.floor(viewportW*DPR));overlay.height=Math.max(1,Math.floor(viewportH*DPR));overlay.style.width=viewportW+"px";overlay.style.height=viewportH+"px";octx.setTransform(DPR,0,0,DPR,0,0);if(context)context.configure({device,format,alphaMode:"opaque"})}
+function destroyWorld(){for(const q of statsReadbacks)try{q.buffer.unmap()}catch{}for(const b of [labelBuffer,boundaryListBuffer,boundaryCountBuffer,indirectBuffer,plateBuffer,areaBuffer,plateStatsBuffer,contactStatsBuffer,velocityBuffer,readbackBuffer,...statsReadbacks.map(x=>x.buffer)])try{b?.destroy()}catch{}statsReadbacks=[]}
+function validateSize(){const labelBytes=N*4,velBytes=N*velocityStride,lim=device.limits.maxStorageBufferBindingSize,maxBuf=device.limits.maxBufferSize;if(labelBytes>lim||velBytes>lim||labelBytes>maxBuf||velBytes>maxBuf)throw new Error(`Grid ${GW}×${GH} is too large for this GPU. Increase Physics cell size. Velocity buffer ${(velBytes/1048576).toFixed(1)} MB; storage binding limit ${(lim/1048576).toFixed(1)} MB; max buffer ${(maxBuf/1048576).toFixed(1)} MB.`)}
+function makeBindings(){boundaryBindGroup=device.createBindGroup({layout:boundaryBuildPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:labelBuffer}},{binding:1,resource:{buffer:boundaryListBuffer}},{binding:2,resource:{buffer:boundaryCountBuffer}},{binding:3,resource:{buffer:indirectBuffer}},{binding:4,resource:{buffer:uniformBuffer}}]});caBindGroup=device.createBindGroup({layout:caPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:labelBuffer}},{binding:1,resource:{buffer:plateBuffer}},{binding:2,resource:{buffer:areaBuffer}},{binding:3,resource:{buffer:uniformBuffer}},{binding:4,resource:{buffer:stepBuffer,size:16}},{binding:5,resource:{buffer:boundaryListBuffer}},{binding:6,resource:{buffer:boundaryCountBuffer}},{binding:7,resource:{buffer:indirectBuffer}},{binding:8,resource:{buffer:plateStatsBuffer}},{binding:9,resource:{buffer:contactStatsBuffer}}]});velocityBindGroup=device.createBindGroup({layout:velocityPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:labelBuffer}},{binding:1,resource:{buffer:plateBuffer}},{binding:2,resource:{buffer:velocityBuffer}},{binding:3,resource:{buffer:uniformBuffer}}]});renderBindGroup=device.createBindGroup({layout:renderPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:labelBuffer}},{binding:1,resource:{buffer:plateBuffer}},{binding:2,resource:{buffer:velocityBuffer}},{binding:3,resource:{buffer:uniformBuffer}}]})}
+function uploadPlates(){if(!device||!plateBuffer||!plateData)return;plateData.fill(0);for(const p of plates){const o=p.id*16,spin=p.spin*p.spinFactor;plateData[o]=p.vx;plateData[o+1]=p.vy;plateData[o+2]=p.wcx;plateData[o+3]=p.wcy;plateData[o+4]=p.motionX;plateData[o+5]=p.motionY;plateData[o+6]=p.speed;plateData[o+7]=spin;plateData[o+8]=p.rgb[0]/255;plateData[o+9]=p.rgb[1]/255;plateData[o+10]=p.rgb[2]/255;plateData[o+11]=p.targetArea;plateData[o+12]=p.area}device.queue.writeBuffer(plateBuffer,0,plateData)}
+function uploadAreas(){if(!device||!areaBuffer||!areasCPU)return;areasCPU.fill(0);for(const p of plates)areasCPU[p.id]=p.area;device.queue.writeBuffer(areaBuffer,0,areasCPU)}
+function updateUniform(){if(!device||!uniformBuffer)return false;uniformData.fill(0);uniformData[0]=GW;uniformData[1]=GH;uniformData[2]=worldW;uniformData[3]=worldH;uniformData[4]=topoCode();uniformData[5]=S.boundaryTension;uniformData[6]=S.areaStiffness;uniformData[7]=S.motility;uniformData[8]=S.thermalNoise;uniformData[9]=S.fieldScale;uniformData[10]=S.rotation;uniformData[11]=S.rotationRadius;uniformData[12]=S.shear;uniformData[13]=modeCode();uniformData[14]=S.displayMaxSpeed;uniformData[16]=gpuCanvas.width;uniformData[17]=gpuCanvas.height;uniformData[18]=camera.x;uniformData[19]=camera.y;uniformData[20]=camera.zoom*DPR*S.renderScale;uniformData[21]=S.showBoundaries?1:0;uniformData[22]=S.stressBoundaries?1:0;uniformData[23]=S.repeatWrapped?1:0;uniformData[24]=S.showBorder?1:0;uniformData[25]=plates.length;uniformData[26]=simTime;uniformData[27]=maxPlates;device.queue.writeBuffer(uniformBuffer,0,uniformData);return true}
+async function rebuildWorld(){if(lifecyclePending)return false;lifecycleRequest=false;lifecycleAction=null;lifecycleClock=0;if(dragPlate)dragPlate.manualActive=false;dragPlate=null;drag=false;pan=false;pointerId=null;overlay.classList.remove("drag","pan");statsGeneration++;try{statusEl.textContent="WebGPU · rebuilding…";await device.queue.onSubmittedWorkDone();destroyWorld();nextPlateUid=1;structuralCooldownUntil=0;resetMergeCandidate();worldW=S.worldWidth;worldH=S.worldHeight;GW=Math.max(16,Math.ceil(worldW/S.cellSize));GH=Math.max(16,Math.ceil(worldH/S.cellSize));N=GW*GH;cellWX=worldW/GW;cellWY=worldH/GH;maxPlates=Math.max(S.initialPlates,S.maxPlates);validateSize();plates=Array.from({length:S.initialPlates},(_,i)=>createPlate(i));buildTrig();buildSeedLabels();areasCPU=new Uint32Array(maxPlates);contactCount=new Int32Array(maxPlates*maxPlates);contactNX=new Int32Array(maxPlates*maxPlates);contactNY=new Int32Array(maxPlates*maxPlates);scanContactCount=new Int32Array(maxPlates*maxPlates);scanContactNX=new Int32Array(maxPlates*maxPlates);scanContactNY=new Int32Array(maxPlates*maxPlates);scanAreas=new Uint32Array(maxPlates);scanSX=new Float64Array(maxPlates);scanSY=new Float64Array(maxPlates);scanSSX=new Float64Array(maxPlates);scanSCX=new Float64Array(maxPlates);scanSSY=new Float64Array(maxPlates);scanSCY=new Float64Array(maxPlates);neighborScratch=new Int32Array(maxPlates);neighborTouched=new Int32Array(maxPlates);compMap=new Int32Array(N);compMap.fill(-1);bfsQueue=new Int32Array(N);rebuildCpuStats();for(const p of plates)p.targetArea=p.area;updateArrowVisuals(0,true);plateData=new Float32Array(maxPlates*16);labelBuffer=gpuBuffer(N*4,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC);boundaryListBuffer=gpuBuffer(N*4,GPUBufferUsage.STORAGE);boundaryCountBuffer=gpuBuffer(4,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST);indirectBuffer=gpuBuffer(12,GPUBufferUsage.STORAGE|GPUBufferUsage.INDIRECT);plateBuffer=gpuBuffer(maxPlates*64,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST);areaBuffer=gpuBuffer(maxPlates*4,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC);plateStatsBuffer=gpuBuffer(maxPlates*32,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC);contactStatsBuffer=gpuBuffer(maxPlates*maxPlates*16,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC);velocityBuffer=gpuBuffer(N*velocityStride,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);readbackBuffer=gpuBuffer(N*4,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ);device.queue.writeBuffer(labelBuffer,0,cpuLabels);uploadRealtimeStatsFromCPU();uploadPlates();createStatsReadbacks();makeBindings();caCredit=0;caStep=1;simTime=0;fieldFrame=0;lifecycleClock=0;lifecycleAction=null;lastStatsApply=performance.now();lastStatsSimTime=0;statsSerial=0;lastAppliedStatsSerial=0;statsHz=0;statsHzCount=0;statsHzClock=performance.now();splitEvents=mergeEvents=microEvents=0;updateUniform();dispatchVelocity();camera.x=worldW*.5;camera.y=worldH*.5;fitWorld();rebuildBtn.classList.remove("pending");rebuildBtn.textContent="Rebuild world";statusEl.textContent=`WebGPU · ${useF16?"FP16":"FP32"} velocity · ${GW}×${GH} · ${(N/1e6).toFixed(2)}M cells`;return true}catch(e){showError(e.message);statusEl.textContent="WebGPU · rebuild failed";return false}}
+function dispatchVelocity(){if(!device||!velocityPipeline||!velocityBindGroup||!velocityBuffer)return;if(!updateUniform())return;const e=device.createCommandEncoder(),p=e.beginComputePass();p.setPipeline(velocityPipeline);p.setBindGroup(0,velocityBindGroup);p.dispatchWorkgroups(Math.ceil(GW/16),Math.ceil(GH/16));p.end();device.queue.submit([e.finish()])}
+function encodeFrame(passes,doVelocity){updateUniform();for(let k=0;k<passes;k++){const o=k*64;stepU32[o]=caStep++;stepU32[o+1]=(caStep-1)&3}if(passes)device.queue.writeBuffer(stepBuffer,0,stepData,0,passes*256);const e=device.createCommandEncoder();if(passes){let done=0,reuse=Math.max(1,Math.round(S.boundaryReuse));while(done<passes){e.clearBuffer(boundaryCountBuffer);let b=e.beginComputePass();b.setPipeline(boundaryBuildPipeline);b.setBindGroup(0,boundaryBindGroup);b.dispatchWorkgroups(Math.ceil(GW/16),Math.ceil(GH/16));b.setPipeline(boundaryFinalizePipeline);b.setBindGroup(0,boundaryBindGroup);b.dispatchWorkgroups(1);b.end();const count=Math.min(reuse,passes-done);let c=e.beginComputePass();c.setPipeline(caPipeline);for(let q=0;q<count;q++){c.setBindGroup(0,caBindGroup,[(done+q)*256]);c.dispatchWorkgroupsIndirect(indirectBuffer,0)}c.end();done+=count}}if(doVelocity){const v=e.beginComputePass();v.setPipeline(velocityPipeline);v.setBindGroup(0,velocityBindGroup);v.dispatchWorkgroups(Math.ceil(GW/16),Math.ceil(GH/16));v.end()}const statsSlot=scheduleStatsCopy(e);const view=context.getCurrentTexture().createView(),r=e.beginRenderPass({colorAttachments:[{view,clearValue:{r:.023,g:.035,b:.05,a:1},loadOp:"clear",storeOp:"store"}]});r.setPipeline(renderPipeline);r.setBindGroup(0,renderBindGroup);r.draw(3);r.end();device.queue.submit([e.finish()]);requestStatsMap(statsSlot);lastGpuSubmit=performance.now()}
+function fitWorld(){camera.zoom=clamp(Math.min(viewportW/worldW,viewportH/worldH)*.92,.03,12);camera.x=worldW*.5;camera.y=worldH*.5}
+function screenWorld(x,y){return{x:camera.x+(x-viewportW*.5)/camera.zoom,y:camera.y+(y-viewportH*.5)/camera.zoom}}
+function worldBase(w){let x=w.x,y=w.y;if(wrapsX())x=mod(x,worldW);else if(x<0||x>=worldW)return null;if(wrapsY())y=mod(y,worldH);else if(y<0||y>=worldH)return null;return{x,y}}
+function cpuPlateAt(x,y){const b=worldBase({x,y});if(!b)return-1;const gx=clamp(Math.floor(b.x/worldW*GW),0,GW-1),gy=clamp(Math.floor(b.y/worldH*GH),0,GH-1);return cpuLabels[gy*GW+gx]??-1}
+function tileOffsets(){const hw=viewportW*.5/camera.zoom,hh=viewportH*.5/camera.zoom,xs=[0],ys=[0];if(wrapsX()&&S.repeatWrapped){xs.length=0;for(let k=Math.floor((camera.x-hw)/worldW)-1;k<=Math.floor((camera.x+hw)/worldW)+1;k++)xs.push(k*worldW)}if(wrapsY()&&S.repeatWrapped){ys.length=0;for(let k=Math.floor((camera.y-hh)/worldH)-1;k<=Math.floor((camera.y+hh)/worldH)+1;k++)ys.push(k*worldH)}const a=[];for(const x of xs)for(const y of ys)a.push([x,y]);return a}
+function updateArrowVisuals(dt,snap=false){
+  const alpha=snap
+    ?1
+    :1-Math.exp(-Math.max(0,dt)/.055);
+
+  for(const p of plates){
+    const tx=p.wcx;
+    const ty=p.wcy;
+
+    if(
+      snap||
+      !Number.isFinite(p.arrowX)||
+      !Number.isFinite(p.arrowY)
+    ){
+      p.arrowX=tx;
+      p.arrowY=ty;
+      continue;
+    }
+
+    const dx=shortest(
+      tx-p.arrowX,
+      worldW,
+      wrapsX()
+    );
+
+    const dy=shortest(
+      ty-p.arrowY,
+      worldH,
+      wrapsY()
+    );
+
+    p.arrowX+=dx*alpha;
+    p.arrowY+=dy*alpha;
+
+    if(wrapsX()){
+      p.arrowX=mod(p.arrowX,worldW);
+    }
+
+    if(wrapsY()){
+      p.arrowY=mod(p.arrowY,worldH);
+    }
+  }
+}
+
+function arrow(x,y,vx,vy,color){
+  const sx=
+    (x-camera.x)*
+    camera.zoom+
+    viewportW*.5;
+
+  const sy=
+    (y-camera.y)*
+    camera.zoom+
+    viewportH*.5;
+
+  const speed=Math.hypot(vx,vy);
+
+  octx.strokeStyle=color;
+  octx.fillStyle=color;
+  octx.lineWidth=2;
+  octx.lineCap="round";
+
+  if(speed<1e-6){
+    octx.beginPath();
+    octx.arc(sx,sy,2.25,0,Math.PI*2);
+    octx.fill();
+    return;
+  }
+
+  // Arrow scale is expressed in world units per unit velocity.
+  const pxScale=
+    S.arrowScale*
+    camera.zoom;
+
+  const ex=sx+vx*pxScale;
+  const ey=sy+vy*pxScale;
+  const a=Math.atan2(vy,vx);
+  const h=6;
+
+  octx.beginPath();
+  octx.moveTo(sx,sy);
+  octx.lineTo(ex,ey);
+  octx.stroke();
+
+  octx.beginPath();
+  octx.moveTo(ex,ey);
+  octx.lineTo(
+    ex-Math.cos(a-.5)*h,
+    ey-Math.sin(a-.5)*h
+  );
+  octx.lineTo(
+    ex-Math.cos(a+.5)*h,
+    ey-Math.sin(a+.5)*h
+  );
+  octx.closePath();
+  octx.fill();
+}
+
+function drawOverlay(){
+  octx.clearRect(
+    0,0,
+    viewportW,
+    viewportH
+  );
+
+  if(!S.showArrows)return;
+
+  for(const [ox,oy] of tileOffsets()){
+    for(const p of plates){
+      const c=
+        `rgb(${p.rgb[0]},${p.rgb[1]},${p.rgb[2]})`;
+
+      const x=Number.isFinite(p.arrowX)
+        ?p.arrowX
+        :p.wcx;
+
+      const y=Number.isFinite(p.arrowY)
+        ?p.arrowY
+        :p.wcy;
+
+      arrow(
+        x+ox,
+        y+oy,
+        p.vx,
+        p.vy,
+        c
+      );
+    }
+  }
+}
+
+async function lifecycleReadback(){if(lifecyclePending||!labelBuffer)return;lifecyclePending=true;statsGeneration++;lifecycleStructural=false;lifecycleNeedsGpuResync=false;lifecyclePhase="GPU label snapshot";lifecycleProgress=0;try{const e=device.createCommandEncoder();e.copyBufferToBuffer(labelBuffer,0,readbackBuffer,0,N*4);device.queue.submit([e.finish()]);await readbackBuffer.mapAsync(GPUMapMode.READ);cpuLabels.set(new Uint32Array(readbackBuffer.getMappedRange()).subarray(0,N));readbackBuffer.unmap();lifecycleProgress=.05;await processLifecycle();if(lifecycleStructural||lifecycleNeedsGpuResync){updateArrowVisuals(0,true);device.queue.writeBuffer(labelBuffer,0,cpuLabels);uploadRealtimeStatsFromCPU();uploadPlates();dispatchVelocity()}}catch(e){showError("Structural lifecycle failed: "+e.message)}finally{lifecycleStructural=false;lifecycleNeedsGpuResync=false;lifecyclePending=false;lifecycleClock=0;lifecycleRequest=false;lifecycleAction=null;lifecyclePhase="";lifecycleProgress=0}}
+function halfToFloat(h){const s=(h&0x8000)?-1:1,e=(h>>10)&31,f=h&1023;if(e===0)return s*Math.pow(2,-14)*(f/1024);if(e===31)return f?NaN:s*Infinity;return s*Math.pow(2,e-15)*(1+f/1024)}
+async function sampleExact(x,y){const b=worldBase({x,y});if(!b)return null;const gx=clamp(Math.floor(b.x/worldW*GW),0,GW-1),gy=clamp(Math.floor(b.y/worldH*GH),0,GH-1),idx=gy*GW+gx,r=gpuBuffer(256,GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ),e=device.createCommandEncoder(),labelOffset=8;e.copyBufferToBuffer(velocityBuffer,idx*velocityStride,r,0,velocityStride);e.copyBufferToBuffer(labelBuffer,idx*4,r,labelOffset,4);device.queue.submit([e.finish()]);await r.mapAsync(GPUMapMode.READ);let vx,vy;if(useF16){const f=new Uint16Array(r.getMappedRange(0,4));vx=halfToFloat(f[0]);vy=halfToFloat(f[1])}else{const f=new Float32Array(r.getMappedRange(0,8));vx=f[0];vy=f[1]}const u=new Uint32Array(r.getMappedRange(labelOffset,4)),out={gridX:gx,gridY:gy,index:idx,plateId:u[0],vx,vy,speed:Math.hypot(vx,vy),angleRadians:Math.atan2(vy,vx)};r.unmap();r.destroy();out.angleDegrees=mod(out.angleRadians*180/Math.PI,360);return out}
+window.velocityFieldAPI={get gridWidth(){return GW},get gridHeight(){return GH},get worldWidth(){return worldW},get worldHeight(){return worldH},get cellWidth(){return cellWX},get cellHeight(){return cellWY},get gpuVelocityBuffer(){return velocityBuffer},get velocityFormat(){return useF16?"vec2<f16>":"vec2<f32>"},get gpuLabelBuffer(){return labelBuffer},get gpuAreaBuffer(){return areaBuffer},get gpuPlateStatsBuffer(){return plateStatsBuffer},get gpuContactStatsBuffer(){return contactStatsBuffer},sampleWorldAsync:sampleExact,requestLifecycleSnapshot(){requestStructuralAction({type:"validate"})}};
+function updateSample(x,y){const w=screenWorld(x,y),b=worldBase(w);if(!b){sampleEl.textContent="outside bounded world";return}const id=cpuPlateAt(w.x,w.y),p=plates[id];sampleEl.textContent=p?`snapshot plate ${id} · v=(${p.vx.toFixed(4)}, ${p.vy.toFixed(4)}) · |v|=${p.speed.toFixed(4)} · exact GPU sample: velocityFieldAPI.sampleWorldAsync(x,y)`:"no CPU snapshot plate"}
+function updateStats(now,passes){fpsFrames++;if(now-fpsClock>=500){fps=fpsFrames*1000/(now-fpsClock);fpsFrames=0;fpsClock=now;const scan=lifecyclePending?` · structural ${lifecyclePhase||"lifecycle"} ${Math.round(lifecycleProgress*100)}%`:` · stats ${statsHz.toFixed(0)} Hz`;statsEl.textContent=`${GW}×${GH} · ${(N/1e6).toFixed(2)}M GPU cells · ${plates.length} plates · ${passes} CA passes/frame · ${splitEvents} splits · ${mergeEvents} merges · ${microEvents} microplates absorbed · ${fps.toFixed(0)} fps${scan}`}}
+function frame(now){
+  const realDt=Math.min(
+    (now-lastNow)/1000,
+    .05
+  );
+
+  lastNow=now;
+  let passes=0;
+
+  if(!paused||singleStep){
+    if(!lifecycleStructural){
+      const simDt=realDt*S.simSpeed;
+      integrateDynamics(simDt);
+      uploadPlates();
+    }
+
+    const canMutateCA=
+      !lifecyclePending&&
+      !lifecycleRequest;
+
+    if(canMutateCA){
+      caCredit+=
+        realDt*
+        S.caPassRate*
+        S.simSpeed;
+
+      caCredit=Math.min(
+        caCredit,
+        S.maxPassesFrame*4
+      );
+
+      passes=singleStep
+        ?4
+        :Math.min(
+          S.maxPassesFrame,
+          Math.floor(caCredit)
+        );
+
+      caCredit-=passes;
+    }else{
+      caCredit=0;
+    }
+
+    fieldFrame++;
+
+    const fv=
+      !lifecycleStructural&&
+      fieldFrame%
+        Math.max(
+          1,
+          Math.round(S.fieldEvery)
+        )===0;
+
+    encodeFrame(passes,fv);
+    singleStep=false;
+
+    if(
+      !lifecyclePending&&
+      !lifecycleRequest&&
+      S.enableLifecycle&&
+      S.autoSplit
+    ){
+      lifecycleClock+=realDt;
+
+      if(
+        lifecycleClock>=
+        S.validationInterval
+      ){
+        requestStructuralAction({
+          type:"validate"
+        });
+      }
+    }
+  }else{
+    encodeFrame(0,false);
+  }
+
+  if(
+    lifecycleRequest&&
+    !lifecyclePending
+  ){
+    lifecycleReadback();
+  }
+
+  updateArrowVisuals(realDt);
+  drawOverlay();
+  updateStats(now,passes);
+  requestAnimationFrame(frame);
+}
+async function pointerDown(e){if(e.button===2){pan=true;pointerId=e.pointerId;lastPX=e.clientX;lastPY=e.clientY;overlay.setPointerCapture(e.pointerId);overlay.classList.add("pan");return}if(e.button!==0)return;const w=screenWorld(e.clientX,e.clientY);pointerId=e.pointerId;dragStartX=w.x;dragStartY=w.y;overlay.setPointerCapture(e.pointerId);const q=await sampleExact(w.x,w.y);if(pointerId!==e.pointerId||!q||!plates[q.plateId])return;drag=true;dragPlate=plates[q.plateId];dragPlate.manualActive=true;dragPlate.manualHold=0;overlay.classList.add("drag")}
+function pointerMove(e){updateSample(e.clientX,e.clientY);if(e.pointerId!==pointerId)return;if(pan){const dx=e.clientX-lastPX,dy=e.clientY-lastPY;camera.x-=dx/camera.zoom;camera.y-=dy/camera.zoom;lastPX=e.clientX;lastPY=e.clientY}else if(drag&&dragPlate){const w=screenWorld(e.clientX,e.clientY),dx=shortest(w.x-dragStartX,worldW,wrapsX()),dy=shortest(w.y-dragStartY,worldH,wrapsY()),vx=dx*S.mouseDragScale,vy=dy*S.mouseDragScale,lim=Math.max(.5,S.driveSpeed*5+1),sp=Math.hypot(vx,vy),q=sp>lim?lim/sp:1;dragPlate.driveX=vx*q;dragPlate.driveY=vy*q;dragPlate.driveRateX=dragPlate.driveRateY=0}}
+function pointerUp(e){if(e.pointerId!==pointerId)return;if(dragPlate){dragPlate.manualActive=false;dragPlate.manualHold=S.manualHold;const sp=Math.hypot(dragPlate.driveX,dragPlate.driveY);if(sp>1e-7){dragPlate.heading=Math.atan2(dragPlate.driveY,dragPlate.driveX);dragPlate.dirX=dragPlate.driveX/sp;dragPlate.dirY=dragPlate.driveY/sp;dragPlate.wanderTargetAngle=dragPlate.heading}dragPlate=null}pan=drag=false;pointerId=null;overlay.classList.remove("pan","drag");try{overlay.releasePointerCapture(e.pointerId)}catch{}}
+overlay.addEventListener("contextmenu",e=>e.preventDefault());overlay.addEventListener("pointerdown",pointerDown);overlay.addEventListener("pointermove",pointerMove);overlay.addEventListener("pointerup",pointerUp);overlay.addEventListener("pointercancel",pointerUp);overlay.addEventListener("wheel",e=>{e.preventDefault();const before=screenWorld(e.clientX,e.clientY),f=Math.exp(-e.deltaY*.01*S.wheelZoom),z=clamp(camera.zoom*f,.03,20);camera.zoom=z;const after=screenWorld(e.clientX,e.clientY);camera.x+=before.x-after.x;camera.y+=before.y-after.y},{passive:false});overlay.addEventListener("dblclick",fitWorld);
+addEventListener("resize",resize);document.getElementById("pause").onclick=e=>{paused=!paused;e.currentTarget.textContent=paused?"Resume":"Pause"};document.getElementById("step").onclick=()=>{paused=true;document.getElementById("pause").textContent="Resume";singleStep=true};rebuildBtn.onclick=rebuildWorld;document.getElementById("randomize").onclick=randomizeDrives;document.getElementById("forceSplit").onclick=()=>requestStructuralAction({type:"forceFission"});document.getElementById("forceMerge").onclick=()=>requestStructuralAction({type:"forceMerge"});document.getElementById("defaults").onclick=()=>{Object.assign(S,D);buildSettings();resize();markRebuild()};document.getElementById("zoomOut").onclick=()=>camera.zoom=clamp(camera.zoom/1.25,.03,20);document.getElementById("zoomIn").onclick=()=>camera.zoom=clamp(camera.zoom*1.25,.03,20);document.getElementById("fit").onclick=fitWorld;document.getElementById("one").onclick=()=>{camera.zoom=1;camera.x=worldW*.5;camera.y=worldH*.5};addEventListener("keydown",e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement)return;if(e.code==="Space"){e.preventDefault();document.getElementById("pause").click()}else if(e.key.toLowerCase()==="r")randomizeDrives();else if(e.key.toLowerCase()==="n")rebuildWorld()});
+try{buildSettings();await initGPU();const ok=await rebuildWorld();if(ok)requestAnimationFrame(frame)}catch(e){showError(e.message);statusEl.textContent="WebGPU unavailable"}
+})();
+</script>
+</body>
+</html>
